@@ -1,0 +1,148 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-income: var(--income);
+  --color-income-bg: var(--income-bg);
+  --color-expense: var(--expense);
+  --color-expense-bg: var(--expense-bg);
+  --color-transfer: var(--transfer);
+  --color-transfer-bg: var(--transfer-bg);
+  --color-split: var(--split);
+  --color-split-bg: var(--split-bg);
+  --color-owed: var(--owed);
+  --color-owe: var(--owe);
+  --color-settled: var(--settled);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --shadow-fab: 0 4px 20px oklch(0.55 0.24 290 / 0.45);
+  --shadow-phone: 0 25px 60px -15px oklch(0 0 0 / 0.7);
+
+  --gradient-balance: linear-gradient(135deg, oklch(0.18 0.13 290) 0%, oklch(0.30 0.18 295) 100%);
+}
+
+:root {
+  --radius: 0.75rem;
+
+  --background: oklch(0.04 0 0);
+  --foreground: oklch(1 0 0);
+  --surface: oklch(0.13 0 0);
+  --surface-2: oklch(0.18 0 0);
+  --card: oklch(0.13 0 0);
+  --card-foreground: oklch(1 0 0);
+  --popover: oklch(0.13 0 0);
+  --popover-foreground: oklch(1 0 0);
+
+  --primary: oklch(0.55 0.24 290);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.18 0 0);
+  --secondary-foreground: oklch(1 0 0);
+  --muted: oklch(0.18 0 0);
+  --muted-foreground: oklch(0.66 0.01 286);
+  --accent: oklch(0.18 0 0);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.62 0.24 25);
+  --destructive-foreground: oklch(1 0 0);
+
+  --border: oklch(0.18 0 0);
+  --input: oklch(0.18 0 0);
+  --ring: oklch(0.55 0.24 290);
+
+  --income: oklch(0.74 0.20 145);
+  --income-bg: oklch(0.30 0.10 145);
+  --expense: oklch(0.66 0.24 25);
+  --expense-bg: oklch(0.30 0.13 25);
+  --transfer: oklch(0.65 0.18 252);
+  --transfer-bg: oklch(0.30 0.12 252);
+  --split: oklch(0.74 0.16 70);
+  --split-bg: oklch(0.30 0.10 70);
+  --owed: oklch(0.72 0.18 160);
+  --owe: oklch(0.74 0.16 70);
+  --settled: oklch(0.55 0.01 286);
+
+  --chart-1: oklch(0.66 0.24 25);
+  --chart-2: oklch(0.74 0.20 145);
+  --chart-3: oklch(0.65 0.18 252);
+  --chart-4: oklch(0.74 0.16 70);
+  --chart-5: oklch(0.55 0.24 290);
+  --chart-6: oklch(0.70 0.18 200);
+  --chart-7: oklch(0.70 0.20 340);
+
+  color-scheme: dark;
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  html, body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  .font-mono { font-family: var(--font-mono); }
+}
+
+.phone-frame {
+  max-width: 430px;
+  margin-left: auto;
+  margin-right: auto;
+  min-height: 100dvh;
+  background-color: var(--color-background);
+  position: relative;
+}
+
+@media (min-width: 768px) {
+  .phone-frame {
+    box-shadow: var(--shadow-phone);
+    border-radius: 28px;
+    overflow: hidden;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    min-height: calc(100dvh - 2rem);
+    border: 1px solid var(--color-surface-2);
+  }
+  body { background-color: oklch(0.07 0 0); }
+}
+
+.balance-gradient { background: var(--gradient-balance); }
+.fab-shadow { box-shadow: var(--shadow-fab); }
