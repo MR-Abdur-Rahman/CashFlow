@@ -1,3 +1,4 @@
+import { useRealtimeSplits } from "@/hooks/useRealtimeSplits";
 import { useQuery } from "@tanstack/react-query";
 import { peopleQuery, groupsQuery, splitsQuery } from "@/lib/queries";
 import { Users, Plus, ChevronRight, Archive, QrCode } from "lucide-react";
@@ -11,6 +12,7 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
 export default function SplitPage() {
+  useRealtimeSplits();
   const { data: people = [] } = useQuery(peopleQuery());
   const { data: groups = [] } = useQuery(groupsQuery());
   const { data: splits = [] } = useQuery(splitsQuery());

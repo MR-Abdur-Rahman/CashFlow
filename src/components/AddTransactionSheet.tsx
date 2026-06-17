@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { formatMoney } from "@/lib/format";
 
 type Tab = "income" | "expense" | "transfer" | "split";
 
@@ -317,10 +318,10 @@ function SplitForm({ onClose }: { onClose: () => void }) {
   const participants = useMemo(() => {
     if (target === "person") {
       const p = people.find((x) => x.id === personId);
-      return p ? [{ id: p.id, name: p.name }] : [];
+      return p ? [{ id: p.id, name: p.name, customAmount: 0 }] : [];
     }
     const g = groups.find((x) => x.id === groupId);
-    return (g?.group_members ?? []).map((m: any) => ({ id: m.person_id, name: m.people?.name ?? "?" }));
+    return (g?.group_members ?? []).map((m: any) => ({ id: m.person_id, name: m.people?.name ?? "?", customAmount: 0 }));
   }, [target, personId, groupId, people, groups]);
 
   const mutation = useMutation({
