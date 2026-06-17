@@ -1,3 +1,5 @@
+import SettingsHistory from './routes/settings-history'
+import SettingsProfile from './routes/settings-profile'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
 import Home from './routes/home'
@@ -17,6 +19,8 @@ function App() {
     <BrowserRouter>
       <div className="phone-frame">
         <Routes>
+          <Route path="/settings/history" element={<SettingsHistory />} />
+          <Route path="/settings/profile" element={<SettingsProfile />} />
           <Route path="/" element={<Navigate to="/home" />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/home" element={<Home />} />

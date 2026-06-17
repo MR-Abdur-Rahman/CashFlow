@@ -223,6 +223,9 @@ export default function SettingsPage() {
       </Section>
 
       <Section label="Data & backup">
+        <Link to="/settings/history">
+          <Row icon={<ChevronRight className="h-4 w-4" />} label="Transaction history" />
+        </Link>
         <Row icon={<Download className="h-4 w-4" />} label="Export transactions (CSV)" onClick={exportCsv} />
         <Row icon={<Download className="h-4 w-4" />} label="Export full data (JSON)" onClick={exportJson} />
         <Row icon={<Upload className="h-4 w-4" />} label="Import from JSON" onClick={() => document.getElementById("import-json")?.click()} />
