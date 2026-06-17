@@ -6,15 +6,18 @@ import { formatMoney, greeting } from "@/lib/format";
 import { AccountIcon } from "@/components/AccountIcon";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
 import { Fab } from "@/components/Fab";
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SwipeRow } from "@/components/SwipeRow";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const [open, setOpen] = useState(false);
+  const [editTxn, setEditTxn] = useState<any>(null);
   const today = format(new Date(), "yyyy-MM-dd");
   const { data: accounts = [] } = useQuery(accountsQuery());
   const { data: txns = [] } = useQuery(transactionsQuery({ dateFrom: today, dateTo: today }));
@@ -54,13 +57,17 @@ export default function Home() {
         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">Accounts</p>
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
           {accounts.map((a) => (
-            <div key={a.id} className="surface-card min-w-[180px] p-3 snap-start">
+            <Link
+              to={`/accounts/${a.id}`}
+              key={a.id}
+              className="surface-card min-w-[180px] p-3 snap-start block active:opacity-80"
+            >
               <AccountIcon iconType={a.icon_type} iconName={a.icon_name} iconColor={a.icon_color} iconUrl={a.icon_url} size={36} />
               <p className="text-xs text-muted-foreground mt-2 truncate">
                 {[a.institution, a.label].filter(Boolean).join(" · ") || a.label}
               </p>
               <p className="font-mono text-base font-semibold mt-0.5">{formatMoney(a.current_balance)}</p>
-            </div>
+            </Link>
           ))}
           {accounts.length === 0 && (
             <p className="text-sm text-muted-foreground py-4">No accounts yet</p>
@@ -77,7 +84,9 @@ export default function Home() {
             </p>
           ) : (
             <div className="divide-y divide-border">
-              {txns.map((t: any) => <TxRow key={t.id} t={t} />)}
+              {txns.map((t: any) => (
+                <TxRow key={t.id} t={t} onEdit={() => setEditTxn(t)} />
+              ))}
             </div>
           )}
         </div>
@@ -85,11 +94,18 @@ export default function Home() {
 
       <Fab onClick={() => setOpen(true)} />
       <AddTransactionSheet open={open} onOpenChange={setOpen} />
+
+      {editTxn && (
+        <TxDetailDialog
+          txn={editTxn}
+          onClose={() => setEditTxn(null)}
+        />
+      )}
     </div>
   );
 }
 
-function TxRow({ t }: { t: any }) {
+function TxRow({ t, onEdit }: { t: any; onEdit: () => void }) {
   const qc = useQueryClient();
 
   async function del() {
@@ -101,23 +117,14 @@ function TxRow({ t }: { t: any }) {
     qc.invalidateQueries({ queryKey: ["accounts"] });
   }
 
-  async function edit() {
-    const note = window.prompt("Edit note", t.note ?? "");
-    if (note === null) return;
-    const { error } = await supabase.from("transactions").update({ note }).eq("id", t.id);
-    if (error) return toast.error(error.message);
-    toast.success("Updated");
-    qc.invalidateQueries({ queryKey: ["transactions"] });
-  }
-
   return (
-    <SwipeRow onEdit={edit} onDelete={del}>
-      <TxRowInner t={t} />
+    <SwipeRow onEdit={onEdit} onDelete={del}>
+      <TxRowInner t={t} onClick={onEdit} />
     </SwipeRow>
   );
 }
 
-function TxRowInner({ t }: { t: any }) {
+function TxRowInner({ t, onClick }: { t: any; onClick: () => void }) {
   const isIncome = t.type === "income";
   const isExpense = t.type === "expense";
   const isTransfer = t.type === "transfer";
@@ -139,7 +146,7 @@ function TxRowInner({ t }: { t: any }) {
     : (t.accounts ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ") : "");
 
   return (
-    <div className="flex items-center gap-3 p-4">
+    <div className="flex items-center gap-3 p-4 cursor-pointer active:bg-secondary/40" onClick={onClick}>
       <div className={`h-10 w-10 rounded-full flex items-center justify-center ${bgClass} ${colorClass}`}>
         <Icon className="h-5 w-5" />
       </div>
@@ -152,5 +159,90 @@ function TxRowInner({ t }: { t: any }) {
         <p className="text-[10px] text-muted-foreground font-mono">{t.time?.slice(0, 5)}</p>
       </div>
     </div>
+  );
+}
+
+function TxDetailDialog({ txn, onClose }: { txn: any; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [note, setNote] = useState(txn.note ?? "");
+
+  async function save() {
+    const { error } = await supabase.from("transactions").update({ note }).eq("id", txn.id);
+    if (error) return toast.error(error.message);
+    toast.success("Updated");
+    qc.invalidateQueries({ queryKey: ["transactions"] });
+    onClose();
+  }
+
+  async function del() {
+    if (!confirm("Delete this transaction?")) return;
+    const { error } = await supabase.from("transactions").delete().eq("id", txn.id);
+    if (error) return toast.error(error.message);
+    toast.success("Deleted");
+    qc.invalidateQueries({ queryKey: ["transactions"] });
+    qc.invalidateQueries({ queryKey: ["accounts"] });
+    onClose();
+  }
+
+  const isIncome = txn.type === "income";
+  const isExpense = txn.type === "expense";
+  const colorClass = txn.is_split ? "text-split" : isIncome ? "text-income" : isExpense ? "text-expense" : "text-transfer";
+  const sign = isIncome ? "+" : txn.type === "transfer" ? "" : "-";
+
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogTitle>Transaction Detail</DialogTitle>
+        <div className="space-y-4">
+          <div className="text-center">
+            <p className={`text-3xl font-mono font-bold ${colorClass}`}>
+              {sign}{formatMoney(txn.amount)}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">{txn.date} at {txn.time?.slice(0, 5)}</p>
+          </div>
+          <div className="surface-card p-3 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Type</span>
+              <span className="capitalize">{txn.type}</span>
+            </div>
+            {txn.accounts && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Account</span>
+                <span>{[txn.accounts.institution, txn.accounts.label].filter(Boolean).join(" · ")}</span>
+              </div>
+            )}
+            {txn.categories && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Category</span>
+                <span>{txn.categories.icon} {txn.categories.name}</span>
+              </div>
+            )}
+            {txn.income_source_text && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Source</span>
+                <span>{txn.income_source_text}</span>
+              </div>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm text-muted-foreground">Note</label>
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="w-full bg-secondary rounded-md px-3 py-2 text-sm text-foreground outline-none"
+              placeholder="Add a note..."
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" className="text-expense" onClick={del}>
+              <Trash2 className="h-4 w-4 mr-1" /> Delete
+            </Button>
+            <Button onClick={save}>
+              <Pencil className="h-4 w-4 mr-1" /> Save
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

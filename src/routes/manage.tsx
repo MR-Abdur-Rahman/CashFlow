@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { categoriesQuery, allSubCategoriesQuery, peopleQuery, groupsQuery } from "@/lib/queries";
+import { categoriesQuery, allSubCategoriesQuery, peopleQuery, groupsQuery, splitsQuery } from "@/lib/queries";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -11,7 +11,10 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { SwipeRow } from "@/components/SwipeRow";
+import { Plus, Pencil, Trash2, Archive } from "lucide-react";
+import { formatMoney } from "@/lib/format";
+import { Link } from "react-router-dom";
 
 export default function ManagePage() {
   return (
@@ -55,9 +58,12 @@ function Categories() {
       </Button>
       <div className="surface-card divide-y divide-border">
         {cats.map((c) => (
-          <Row key={c.id} icon={c.icon ?? "📦"} label={`${c.name} · ${c.type}`}
-            onEdit={() => { setEdit(c); setOpen(true); }}
-            onDelete={() => del.mutate(c.id)} />
+          <SwipeRow key={c.id} onEdit={() => { setEdit(c); setOpen(true); }} onDelete={() => del.mutate(c.id)}>
+            <div className="flex items-center gap-3 p-3">
+              <span className="text-lg w-7 text-center">{c.icon ?? "📦"}</span>
+              <span className="flex-1 text-sm truncate">{c.name} · {c.type}</span>
+            </div>
+          </SwipeRow>
         ))}
       </div>
       <CategoryDialog open={open} onOpenChange={setOpen} edit={edit} />
@@ -152,7 +158,12 @@ function SubCategories() {
       </Button>
       <div className="surface-card divide-y divide-border">
         {subs.map((s: any) => (
-          <Row key={s.id} icon={s.categories?.icon ?? "•"} label={`${s.name} · ${s.categories?.name ?? ""}`} onDelete={() => del.mutate(s.id)} />
+          <SwipeRow key={s.id} onDelete={() => del.mutate(s.id)}>
+            <div className="flex items-center gap-3 p-3">
+              <span className="text-lg w-7 text-center">{s.categories?.icon ?? "•"}</span>
+              <span className="flex-1 text-sm truncate">{s.name} · {s.categories?.name ?? ""}</span>
+            </div>
+          </SwipeRow>
         ))}
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -177,9 +188,25 @@ function SubCategories() {
 
 function People() {
   const { data: people = [] } = useQuery(peopleQuery());
+  const { data: splits = [] } = useQuery(splitsQuery());
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<any>(null);
+
+  function personBalance(personId: string) {
+    let owed = 0;
+    for (const s of splits as any[]) {
+      const shares = s.split_shares ?? [];
+      const settled = (s as any).settlements ?? [];
+      for (const sh of shares) {
+        if (sh.person_id === personId) {
+          const settledAmt = settled.filter((x: any) => x.split_share_id === sh.id).reduce((a: number, x: any) => a + Number(x.amount), 0);
+          owed += Number(sh.share_amount) - settledAmt;
+        }
+      }
+    }
+    return owed;
+  }
 
   const del = useMutation({
     mutationFn: async (id: string) => {
@@ -196,11 +223,31 @@ function People() {
         <Plus className="h-4 w-4 mr-2" /> Add person
       </Button>
       <div className="surface-card divide-y divide-border">
-        {people.map((p) => (
-          <Row key={p.id} icon={p.name[0]?.toUpperCase() ?? "?"} label={`${p.name}${p.phone_number ? " · " + p.phone_number : ""}`}
-            onEdit={() => { setEdit(p); setOpen(true); }}
-            onDelete={() => { if (confirm("Delete person? Their split data stays.")) del.mutate(p.id); }} />
-        ))}
+        {people.map((p) => {
+          const bal = personBalance(p.id);
+          return (
+            <SwipeRow
+              key={p.id}
+              onEdit={() => { setEdit(p); setOpen(true); }}
+              onDelete={() => { if (confirm("Delete person?")) del.mutate(p.id); }}
+            >
+              <Link to={`/split/person/${p.id}`} className="flex items-center gap-3 p-3 active:bg-secondary/40">
+                <div className="h-9 w-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm">
+                  {p.name[0]?.toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{p.name}{p.linked_user_id && " 🔗"}</p>
+                  <p className="text-xs text-muted-foreground">{p.phone_number ?? "no phone"}</p>
+                </div>
+                {bal !== 0 && (
+                  <span className={`text-xs font-mono font-semibold ${bal > 0 ? "text-income" : "text-expense"}`}>
+                    {bal > 0 ? "+" : ""}{formatMoney(bal)}
+                  </span>
+                )}
+              </Link>
+            </SwipeRow>
+          );
+        })}
       </div>
       <AddPersonDialog open={open} onOpenChange={setOpen} edit={edit} />
     </div>
@@ -213,6 +260,16 @@ function Groups() {
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<any>(null);
 
+  const archive = useMutation({
+    mutationFn: async (id: string) => {
+      const g = groups.find((x: any) => x.id === id) as any;
+      const { error } = await supabase.from("groups").update({ is_archived: !g?.is_archived }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["groups"] }); toast.success("Updated"); },
+    onError: (e) => toast.error(e.message),
+  });
+
   const del = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("groups").delete().eq("id", id);
@@ -222,30 +279,56 @@ function Groups() {
     onError: (e) => toast.error(e.message),
   });
 
+  const activeGroups = groups.filter((g: any) => !g.is_archived);
+  const archivedGroups = groups.filter((g: any) => g.is_archived);
+
   return (
     <div className="space-y-3 mt-4">
       <Button className="w-full" variant="outline" onClick={() => { setEdit(null); setOpen(true); }}>
         <Plus className="h-4 w-4 mr-2" /> Create group
       </Button>
+
       <div className="surface-card divide-y divide-border">
-        {groups.map((g: any) => (
-          <Row key={g.id} icon="👥" label={`${g.name} · ${g.group_members?.length ?? 0} members`}
+        {activeGroups.map((g: any) => (
+          <SwipeRow
+            key={g.id}
             onEdit={() => { setEdit(g); setOpen(true); }}
-            onDelete={() => { if (confirm("Delete group?")) del.mutate(g.id); }} />
+            onDelete={() => archive.mutate(g.id)}
+          >
+            <Link to={`/split/group/${g.id}`} className="flex items-center gap-3 p-3 active:bg-secondary/40">
+              <span className="text-lg w-7 text-center">👥</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{g.name}</p>
+                <p className="text-xs text-muted-foreground">{g.group_members?.length ?? 0} members</p>
+              </div>
+            </Link>
+          </SwipeRow>
         ))}
       </div>
-      <AddGroupDialog open={open} onOpenChange={setOpen} edit={edit} />
-    </div>
-  );
-}
 
-function Row({ icon, label, onEdit, onDelete }: { icon: string; label: string; onEdit?: () => void; onDelete?: () => void }) {
-  return (
-    <div className="flex items-center gap-3 p-3">
-      <span className="text-lg w-7 text-center">{icon}</span>
-      <span className="flex-1 text-sm truncate">{label}</span>
-      {onEdit && <button className="text-muted-foreground p-1" onClick={onEdit}><Pencil className="h-4 w-4" /></button>}
-      {onDelete && <button className="text-expense p-1" onClick={onDelete}><Trash2 className="h-4 w-4" /></button>}
+      {archivedGroups.length > 0 && (
+        <>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground px-1 flex items-center gap-1">
+            <Archive className="h-3 w-3" /> Archived
+          </p>
+          <div className="surface-card divide-y divide-border opacity-60">
+            {archivedGroups.map((g: any) => (
+              <SwipeRow
+                key={g.id}
+                onEdit={() => archive.mutate(g.id)}
+                onDelete={() => { if (confirm("Delete group?")) del.mutate(g.id); }}
+              >
+                <div className="flex items-center gap-3 p-3">
+                  <span className="text-lg w-7 text-center">👥</span>
+                  <p className="text-sm truncate">{g.name}</p>
+                </div>
+              </SwipeRow>
+            ))}
+          </div>
+        </>
+      )}
+
+      <AddGroupDialog open={open} onOpenChange={setOpen} edit={edit} />
     </div>
   );
 }

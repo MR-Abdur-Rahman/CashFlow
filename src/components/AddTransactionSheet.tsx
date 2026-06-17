@@ -412,6 +412,29 @@ function SplitForm({ onClose }: { onClose: () => void }) {
             <button type="button" key={m} onClick={() => setSplitType(m)} className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", splitType === m && "bg-primary text-white")}>{m}</button>
           ))}
         </div>
+        {splitType === "equal" && participants.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Each person pays: {formatMoney(Number(amount) / (participants.length + 1))}
+          </p>
+        )}
+        {splitType === "custom" && participants.length > 0 && (
+          <div className="space-y-2 mt-2">
+            <p className="text-xs text-muted-foreground">Enter each person's share:</p>
+            {participants.map((p) => (
+              <div key={p.id} className="flex items-center gap-2">
+                <span className="text-sm flex-1">{p.name}</span>
+                <input
+                  type="number"
+                  placeholder="0.00"
+                  className="w-24 bg-secondary rounded-md px-2 py-1 text-sm text-right font-mono outline-none"
+                  onChange={(e) => {
+                    p.customAmount = Number(e.target.value);
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="space-y-1.5">
         <Label>Category</Label>
