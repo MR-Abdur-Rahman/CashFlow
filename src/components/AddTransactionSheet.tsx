@@ -333,7 +333,7 @@ function SplitForm({ onClose }: { onClose: () => void }) {
       const totalPeople = participants.length + 1;
       const share = total / totalPeople;
       const { data: split, error } = await supabase.from("splits").insert({
-        type: target, person_id: target === "person" ? personId : null,
+        type: target === "person" ? "individual" : "group", person_id: target === "person" ? personId : null,
         group_id: target === "group" ? groupId : null,
         description: desc, total_amount: total,
         paid_by: whoPaid === "me" ? "me" : participants[0]?.name ?? "other",
