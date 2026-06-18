@@ -146,3 +146,27 @@
 
 .balance-gradient { background: var(--gradient-balance); }
 .fab-shadow { box-shadow: var(--shadow-fab); }
+
+html.light {
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.15 0 0);
+  --surface: oklch(0.97 0 0);
+  --surface-2: oklch(0.92 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0 0);
+  --secondary: oklch(0.94 0 0);
+  --secondary-foreground: oklch(0.15 0 0);
+  --muted: oklch(0.94 0 0);
+  --muted-foreground: oklch(0.45 0.01 286);
+  --accent: oklch(0.94 0 0);
+  --accent-foreground: oklch(0.15 0 0);
+  --border: oklch(0.90 0 0);
+  --input: oklch(0.94 0 0);
+  --income-bg: oklch(0.92 0.08 145);
+  --expense-bg: oklch(0.92 0.09 25);
+  --transfer-bg: oklch(0.92 0.08 252);
+  --split-bg: oklch(0.93 0.07 70);
+  color-scheme: light;
+}
