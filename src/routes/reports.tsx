@@ -16,7 +16,7 @@ export default function ReportsPage() {
   const [incomeSourceType, setIncomeSourceType] = useState<"person" | "source">("source");
   const [selectedPerson, setSelectedPerson] = useState<string>("all");
   const [selectedSource, setSelectedSource] = useState<string>("");
-  const [drillCategory, setDrillCategory] = useState<string | null>(null);
+  const [drillCategory, setDrillCategory] = useState<string | null | undefined>(null);
 
   const { data: accounts = [] } = useQuery(accountsQuery());
   const { data: expenseCats = [] } = useQuery(categoriesQuery("expense"));
