@@ -6,7 +6,7 @@ import { formatMoney, greeting } from "@/lib/format";
 import { AccountIcon } from "@/components/AccountIcon";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
 import { Fab } from "@/components/Fab";
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users, Pencil, Trash2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users, Pencil, Trash2, ChevronDown } from "lucide-react";
 import { format, startOfWeek, startOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -15,6 +15,12 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type FilterPeriod = "today" | "week" | "month";
 
@@ -27,8 +33,8 @@ function getDateRange(period: FilterPeriod): { dateFrom: string; dateTo: string 
 
 const PERIOD_LABELS: { key: FilterPeriod; label: string }[] = [
   { key: "today", label: "Today" },
-  { key: "week", label: "This Week" },
-  { key: "month", label: "This Month" },
+  { key: "week", label: "Weekly" },
+  { key: "month", label: "Monthly" },
 ];
 
 export default function Home() {
@@ -56,6 +62,8 @@ export default function Home() {
     week: "No transactions this week. Tap + to add one.",
     month: "No transactions this month. Tap + to add one.",
   };
+
+  const currentLabel = PERIOD_LABELS.find((p) => p.key === period)?.label ?? "Today";
 
   return (
     <div className="px-4 pt-6 space-y-5 pb-24">
@@ -107,22 +115,25 @@ export default function Home() {
         {/* Period Filter */}
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs uppercase tracking-wider text-muted-foreground px-1">Transactions</p>
-          <div className="flex gap-1 bg-secondary rounded-lg p-1">
-            {PERIOD_LABELS.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setPeriod(key)}
-                className={cn(
-                  "px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors",
-                  period === key
-                    ? "bg-primary text-white"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {label}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-4 py-1.5 rounded-xl">
+                {currentLabel}
+                <ChevronDown className="h-4 w-4" />
               </button>
-            ))}
-          </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              {PERIOD_LABELS.map(({ key, label }) => (
+                <DropdownMenuItem
+                  key={key}
+                  onClick={() => setPeriod(key)}
+                  className={cn("text-base py-3", period === key && "text-primary font-medium")}
+                >
+                  {label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Transaction List */}
