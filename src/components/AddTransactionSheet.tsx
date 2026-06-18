@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
-import { Plus, QrCode, GripVertical, X, ChevronRight } from "lucide-react";
+import { Plus, QrCode, GripVertical, X, ChevronRight, Pencil } from "lucide-react";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { QrScannerDialog } from "@/components/QrScannerDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -90,6 +90,152 @@ function FormShell({ children, onSubmit, button, color }: { children: React.Reac
   );
 }
 
+// ─── Category Picker Sheet (two-column like reference image) ───────────────
+function CategoryPickerSheet({
+  open,
+  onOpenChange,
+  onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onSelect: (catId: string, catName: string, catIcon: string, subId?: string, subName?: string) => void;
+}) {
+  const { data: cats = [] } = useQuery(categoriesQuery("expense"));
+  const [activeCatId, setActiveCatId] = useState<string>("");
+  const { data: subs = [] } = useQuery(subCategoriesQuery(activeCatId || null));
+  const [addCatOpen, setAddCatOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatIcon, setNewCatIcon] = useState("📦");
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    if (cats.length > 0 && !activeCatId) setActiveCatId((cats[0] as any).id);
+  }, [cats]);
+
+  async function addCategory() {
+    if (!newCatName.trim()) return;
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const { error } = await supabase.from("categories").insert({
+      user_id: u.user.id,
+      name: newCatName.trim(),
+      icon: newCatIcon,
+      type: "expense",
+      is_default: false,
+    });
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Category added");
+      qc.invalidateQueries({ queryKey: ["categories"] });
+      setNewCatName("");
+      setAddCatOpen(false);
+    }
+  }
+
+  const activeCat = (cats as any[]).find((c) => c.id === activeCatId);
+
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
+          <SheetTitle className="sr-only">Select Category</SheetTitle>
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border bg-[#1a1a1a]">
+            <span className="text-base font-semibold">Category</span>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setAddCatOpen(true)} className="text-muted-foreground hover:text-foreground">
+                <Pencil className="h-5 w-5" />
+              </button>
+              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Two-column body */}
+          <div className="flex flex-1 min-h-0">
+            {/* Left — categories */}
+            <div className="w-[45%] border-r border-border overflow-y-auto">
+              {(cats as any[]).map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setActiveCatId(c.id)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-4 py-4 text-left text-sm border-b border-border transition-colors",
+                    activeCatId === c.id ? "bg-primary/10 text-primary font-medium" : "bg-card text-foreground"
+                  )}
+                >
+                  <span className="truncate">{c.icon} {c.name}</span>
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 ml-1 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+
+            {/* Right — sub-categories */}
+            <div className="flex-1 overflow-y-auto">
+              {/* "Select category only" option at top */}
+              {activeCat && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelect(activeCat.id, activeCat.name, activeCat.icon ?? "");
+                    onOpenChange(false);
+                  }}
+                  className="w-full px-4 py-4 text-left text-sm border-b border-border text-primary font-medium bg-primary/5"
+                >
+                  {activeCat.icon} {activeCat.name} only
+                </button>
+              )}
+              {subs.length === 0 && (
+                <p className="text-xs text-muted-foreground px-4 py-4">No sub-categories</p>
+              )}
+              {(subs as any[]).map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => {
+                    onSelect(activeCat!.id, activeCat!.name, activeCat!.icon ?? "", s.id, s.name);
+                    onOpenChange(false);
+                  }}
+                  className="w-full px-4 py-4 text-left text-sm border-b border-border bg-card hover:bg-secondary/40 text-foreground"
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Add Category Dialog */}
+      <Dialog open={addCatOpen} onOpenChange={setAddCatOpen}>
+        <DialogContent>
+          <DialogTitle>Add Category</DialogTitle>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Emoji icon"
+                value={newCatIcon}
+                onChange={(e) => setNewCatIcon(e.target.value)}
+                className="w-20 text-center text-lg"
+                maxLength={2}
+              />
+              <Input
+                placeholder="Category name"
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                className="flex-1"
+              />
+            </div>
+            <Button className="w-full" onClick={addCategory}>Add</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 // ─── Person Picker Sheet ───────────────────────────────────────────────────
 function PersonPickerSheet({
   open,
@@ -137,7 +283,6 @@ function PersonPickerSheet({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
           <SheetTitle className="sr-only">Select Person</SheetTitle>
-          {/* Header */}
           <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
             <span className="text-base font-semibold">Person</span>
             <div className="flex items-center gap-3">
@@ -152,7 +297,6 @@ function PersonPickerSheet({
               </button>
             </div>
           </div>
-          {/* List */}
           <div className="flex-1 overflow-y-auto divide-y divide-border">
             {ordered.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-10">No people yet. Tap + to add.</p>
@@ -166,10 +310,7 @@ function PersonPickerSheet({
                 className="flex items-center gap-3 px-5 py-4 bg-card active:bg-secondary/40 cursor-pointer"
               >
                 <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                <div
-                  className="flex-1"
-                  onClick={() => { onSelect(p.id, p.name); onOpenChange(false); }}
-                >
+                <div className="flex-1" onClick={() => { onSelect(p.id, p.name); onOpenChange(false); }}>
                   <p className="text-sm font-medium">{p.name}</p>
                   {p.phone_number && <p className="text-xs text-muted-foreground">{p.phone_number}</p>}
                 </div>
@@ -225,7 +366,6 @@ function SourcePickerSheet({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
           <SheetTitle className="sr-only">Select Source</SheetTitle>
-          {/* Header */}
           <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
             <span className="text-base font-semibold">Source</span>
             <div className="flex items-center gap-3">
@@ -237,7 +377,6 @@ function SourcePickerSheet({
               </button>
             </div>
           </div>
-          {/* List */}
           <div className="flex-1 overflow-y-auto divide-y divide-border">
             {sources.map((s, idx) => (
               <div
@@ -248,10 +387,7 @@ function SourcePickerSheet({
                 className="flex items-center gap-3 px-5 py-4 bg-card active:bg-secondary/40 cursor-pointer"
               >
                 <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                <div
-                  className="flex-1"
-                  onClick={() => { onSelect(s); onOpenChange(false); }}
-                >
+                <div className="flex-1" onClick={() => { onSelect(s); onOpenChange(false); }}>
                   <p className="text-sm font-medium">{s}</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -260,8 +396,6 @@ function SourcePickerSheet({
           </div>
         </SheetContent>
       </Sheet>
-
-      {/* Add Source Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
           <DialogTitle>Add Source</DialogTitle>
@@ -339,28 +473,18 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
               </button>
             ))}
           </div>
-
-          {/* Person selector button */}
           {sourceType === "person" && (
-            <button
-              type="button"
-              onClick={() => setPersonPickerOpen(true)}
-              className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm"
-            >
+            <button type="button" onClick={() => setPersonPickerOpen(true)}
+              className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
               <span className={personName ? "text-foreground" : "text-muted-foreground"}>
                 {personName || "Select person"}
               </span>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
           )}
-
-          {/* Source selector button */}
           {sourceType === "source" && (
-            <button
-              type="button"
-              onClick={() => setSourcePickerOpen(true)}
-              className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm"
-            >
+            <button type="button" onClick={() => setSourcePickerOpen(true)}
+              className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
               <span className={sourceText ? "text-foreground" : "text-muted-foreground"}>
                 {sourceText || "Select source"}
               </span>
@@ -368,7 +492,6 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
             </button>
           )}
         </div>
-
         <div className="space-y-1.5">
           <Label>To account</Label>
           <Select value={accountId} onValueChange={setAccountId}>
@@ -381,17 +504,10 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
         <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
         <div className="space-y-1.5"><Label>Note</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></div>
       </FormShell>
-
-      <PersonPickerSheet
-        open={personPickerOpen}
-        onOpenChange={setPersonPickerOpen}
-        onSelect={(id, name) => { setPersonId(id); setPersonName(name); }}
-      />
-      <SourcePickerSheet
-        open={sourcePickerOpen}
-        onOpenChange={setSourcePickerOpen}
-        onSelect={(s) => setSourceText(s)}
-      />
+      <PersonPickerSheet open={personPickerOpen} onOpenChange={setPersonPickerOpen}
+        onSelect={(id, name) => { setPersonId(id); setPersonName(name); }} />
+      <SourcePickerSheet open={sourcePickerOpen} onOpenChange={setSourcePickerOpen}
+        onSelect={(s) => setSourceText(s)} />
     </>
   );
 }
@@ -399,19 +515,20 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
 // ─── Expense Form ──────────────────────────────────────────────────────────
 function ExpenseForm({ onClose }: { onClose: () => void }) {
   const { data: accounts = [] } = useQuery(accountsQuery());
-  const { data: cats = [] } = useQuery(categoriesQuery("expense"));
   const qc = useQueryClient();
   const [amount, setAmount] = useState("");
   const [accountId, setAccountId] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryIcon, setCategoryIcon] = useState("");
   const [subCatId, setSubCatId] = useState("");
+  const [subCatName, setSubCatName] = useState("");
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [time, setTime] = useState(format(new Date(), "HH:mm"));
   const [note, setNote] = useState("");
+  const [catPickerOpen, setCatPickerOpen] = useState(false);
 
   useEffect(() => { if (accounts[0]?.id) setAccountId(accounts[0].id); }, [accounts]);
-  const { data: subs = [] } = useQuery(subCategoriesQuery(categoryId || null));
-  useEffect(() => { setSubCatId(""); }, [categoryId]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -440,40 +557,50 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
   });
 
   return (
-    <FormShell color="bg-[oklch(0.40_0.18_25)] hover:bg-[oklch(0.45_0.18_25)]" button="Save expense" onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
-      <AmountInput value={amount} onChange={setAmount} accent="text-expense" />
-      <div className="space-y-1.5">
-        <Label>From account</Label>
-        <Select value={accountId} onValueChange={setAccountId}>
-          <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-          <SelectContent>
-            {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-1.5">
-        <Label>Category</Label>
-        <Select value={categoryId} onValueChange={setCategoryId}>
-          <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-          <SelectContent>
-            {cats.map((c) => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-      {categoryId && subs.length > 0 && (
+    <>
+      <FormShell color="bg-[oklch(0.40_0.18_25)] hover:bg-[oklch(0.45_0.18_25)]" button="Save expense"
+        onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
+        <AmountInput value={amount} onChange={setAmount} accent="text-expense" />
         <div className="space-y-1.5">
-          <Label>Sub-category</Label>
-          <Select value={subCatId} onValueChange={setSubCatId}>
-            <SelectTrigger><SelectValue placeholder="Select sub-category" /></SelectTrigger>
+          <Label>From account</Label>
+          <Select value={accountId} onValueChange={setAccountId}>
+            <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
             <SelectContent>
-              {subs.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+              {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
-      )}
-      <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
-      <div className="space-y-1.5"><Label>Note</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></div>
-    </FormShell>
+
+        {/* Category picker button */}
+        <div className="space-y-1.5">
+          <Label>Category</Label>
+          <button type="button" onClick={() => setCatPickerOpen(true)}
+            className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
+            <span className={categoryId ? "text-foreground" : "text-muted-foreground"}>
+              {categoryId
+                ? `${categoryIcon} ${categoryName}${subCatName ? " · " + subCatName : ""}`
+                : "Select category"}
+            </span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
+        <div className="space-y-1.5"><Label>Note</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></div>
+      </FormShell>
+
+      <CategoryPickerSheet
+        open={catPickerOpen}
+        onOpenChange={setCatPickerOpen}
+        onSelect={(cId, cName, cIcon, sId, sName) => {
+          setCategoryId(cId);
+          setCategoryName(cName);
+          setCategoryIcon(cIcon);
+          setSubCatId(sId ?? "");
+          setSubCatName(sName ?? "");
+        }}
+      />
+    </>
   );
 }
 
@@ -520,7 +647,8 @@ function TransferForm({ onClose }: { onClose: () => void }) {
   });
 
   return (
-    <FormShell color="bg-[oklch(0.40_0.13_252)] hover:bg-[oklch(0.45_0.13_252)]" button="Save transfer" onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
+    <FormShell color="bg-[oklch(0.40_0.13_252)] hover:bg-[oklch(0.45_0.13_252)]" button="Save transfer"
+      onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
       <AmountInput value={amount} onChange={setAmount} accent="text-transfer" />
       <div className="space-y-1.5">
         <Label>From account</Label>
@@ -637,14 +765,16 @@ function SplitForm({ onClose }: { onClose: () => void }) {
   });
 
   return (
-    <FormShell color="bg-[oklch(0.40_0.13_70)] hover:bg-[oklch(0.45_0.13_70)]" button="Save split" onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
+    <FormShell color="bg-[oklch(0.40_0.13_70)] hover:bg-[oklch(0.45_0.13_70)]" button="Save split"
+      onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
       <AmountInput value={amount} onChange={setAmount} accent="text-split" />
       <div className="space-y-1.5"><Label>Description</Label><Input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Dinner" required /></div>
       <div className="space-y-1.5">
         <Label>Split with</Label>
         <div className="flex gap-2 rounded-lg bg-secondary p-1">
           {(["person", "group"] as const).map((m) => (
-            <button type="button" key={m} onClick={() => setTarget(m)} className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", target === m && "bg-primary text-white")}>{m}</button>
+            <button type="button" key={m} onClick={() => setTarget(m)}
+              className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", target === m && "bg-primary text-white")}>{m}</button>
           ))}
         </div>
         {target === "person" ? (
@@ -663,7 +793,10 @@ function SplitForm({ onClose }: { onClose: () => void }) {
         <Label>Who paid?</Label>
         <div className="flex gap-2 rounded-lg bg-secondary p-1">
           {(["me", "other"] as const).map((m) => (
-            <button type="button" key={m} onClick={() => setWhoPaid(m)} className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", whoPaid === m && "bg-primary text-white")}>{m === "me" ? "You paid" : "Other paid"}</button>
+            <button type="button" key={m} onClick={() => setWhoPaid(m)}
+              className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", whoPaid === m && "bg-primary text-white")}>
+              {m === "me" ? "You paid" : "Other paid"}
+            </button>
           ))}
         </div>
       </div>
@@ -680,7 +813,8 @@ function SplitForm({ onClose }: { onClose: () => void }) {
         <Label>Split type</Label>
         <div className="flex gap-2 rounded-lg bg-secondary p-1">
           {(["equal", "custom"] as const).map((m) => (
-            <button type="button" key={m} onClick={() => setSplitType(m)} className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", splitType === m && "bg-primary text-white")}>{m}</button>
+            <button type="button" key={m} onClick={() => setSplitType(m)}
+              className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", splitType === m && "bg-primary text-white")}>{m}</button>
           ))}
         </div>
         {splitType === "equal" && participants.length > 0 && (
@@ -694,12 +828,9 @@ function SplitForm({ onClose }: { onClose: () => void }) {
             {participants.map((p) => (
               <div key={p.id} className="flex items-center gap-2">
                 <span className="text-sm flex-1">{p.name}</span>
-                <input
-                  type="number"
-                  placeholder="0.00"
+                <input type="number" placeholder="0.00"
                   className="w-24 bg-secondary rounded-md px-2 py-1 text-sm text-right font-mono outline-none"
-                  onChange={(e) => { p.customAmount = Number(e.target.value); }}
-                />
+                  onChange={(e) => { p.customAmount = Number(e.target.value); }} />
               </div>
             ))}
           </div>
@@ -709,7 +840,7 @@ function SplitForm({ onClose }: { onClose: () => void }) {
         <Label>Category</Label>
         <Select value={categoryId} onValueChange={setCategoryId}>
           <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-          <SelectContent>{cats.map((c) => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}</SelectContent>
+          <SelectContent>{cats.map((c) => <SelectItem key={c.id} value={c.id}>{(c as any).icon} {c.name}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       {categoryId && subs.length > 0 && (
@@ -717,7 +848,7 @@ function SplitForm({ onClose }: { onClose: () => void }) {
           <Label>Sub-category</Label>
           <Select value={subCatId} onValueChange={setSubCatId}>
             <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
-            <SelectContent>{subs.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+            <SelectContent>{(subs as any[]).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
       )}
