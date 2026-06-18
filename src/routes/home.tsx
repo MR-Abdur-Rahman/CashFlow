@@ -7,20 +7,38 @@ import { AccountIcon } from "@/components/AccountIcon";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
 import { Fab } from "@/components/Fab";
 import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users, Pencil, Trash2 } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfWeek, startOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SwipeRow } from "@/components/SwipeRow";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+type FilterPeriod = "today" | "week" | "month";
+
+function getDateRange(period: FilterPeriod): { dateFrom: string; dateTo: string } {
+  const today = format(new Date(), "yyyy-MM-dd");
+  if (period === "today") return { dateFrom: today, dateTo: today };
+  if (period === "week") return { dateFrom: format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd"), dateTo: today };
+  return { dateFrom: format(startOfMonth(new Date()), "yyyy-MM-dd"), dateTo: today };
+}
+
+const PERIOD_LABELS: { key: FilterPeriod; label: string }[] = [
+  { key: "today", label: "Today" },
+  { key: "week", label: "This Week" },
+  { key: "month", label: "This Month" },
+];
 
 export default function Home() {
   const [open, setOpen] = useState(false);
   const [editTxn, setEditTxn] = useState<any>(null);
-  const today = format(new Date(), "yyyy-MM-dd");
+  const [period, setPeriod] = useState<FilterPeriod>("today");
+
+  const { dateFrom, dateTo } = getDateRange(period);
   const { data: accounts = [] } = useQuery(accountsQuery());
-  const { data: txns = [] } = useQuery(transactionsQuery({ dateFrom: today, dateTo: today }));
+  const { data: txns = [] } = useQuery(transactionsQuery({ dateFrom, dateTo }));
 
   const [userId, setUserId] = useState<string | undefined>();
   useEffect(() => {
@@ -33,8 +51,15 @@ export default function Home() {
     ? profile.full_name.split(/\s+/).slice(0, 2).join(" ")
     : "there";
 
+  const emptyMessages: Record<FilterPeriod, string> = {
+    today: "No transactions today. Tap + to add one.",
+    week: "No transactions this week. Tap + to add one.",
+    month: "No transactions this month. Tap + to add one.",
+  };
+
   return (
     <div className="px-4 pt-6 space-y-5 pb-24">
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm text-muted-foreground">{greeting()},</p>
@@ -45,6 +70,7 @@ export default function Home() {
         </Link>
       </div>
 
+      {/* Balance Card */}
       <div className="balance-gradient rounded-2xl p-5 relative overflow-hidden">
         <p className="text-xs font-mono text-white/70 uppercase tracking-wider">Total Balance</p>
         <p className="text-xs font-mono text-white mt-1">LKR</p>
@@ -53,6 +79,7 @@ export default function Home() {
         </p>
       </div>
 
+      {/* Accounts */}
       <div>
         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">Accounts</p>
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
@@ -75,16 +102,38 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Transactions Section */}
       <div>
-        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">Today's Transactions</p>
+        {/* Period Filter */}
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground px-1">Transactions</p>
+          <div className="flex gap-1 bg-secondary rounded-lg p-1">
+            {PERIOD_LABELS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setPeriod(key)}
+                className={cn(
+                  "px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors",
+                  period === key
+                    ? "bg-primary text-white"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Transaction List */}
         <div className="surface-card overflow-hidden">
           {txns.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-10 px-4">
-              No transactions today. Tap + to add one.
+              {emptyMessages[period]}
             </p>
           ) : (
             <div className="divide-y divide-border">
-              {txns.map((t: any) => (
+              {(txns as any[]).map((t: any) => (
                 <TxRow key={t.id} t={t} onEdit={() => setEditTxn(t)} />
               ))}
             </div>
@@ -146,7 +195,7 @@ function TxRowInner({ t, onClick }: { t: any; onClick: () => void }) {
     : (t.accounts ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ") : "");
 
   return (
-    <div className="flex items-center gap-3 p-4 cursor-pointer active:bg-secondary/40" onClick={onClick}>
+    <div className="flex items-center gap-3 p-4 bg-card cursor-pointer active:bg-secondary/40" onClick={onClick}>
       <div className={`h-10 w-10 rounded-full flex items-center justify-center ${bgClass} ${colorClass}`}>
         <Icon className="h-5 w-5" />
       </div>
