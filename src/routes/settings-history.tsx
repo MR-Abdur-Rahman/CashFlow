@@ -14,8 +14,17 @@ export default function HistoryPage() {
   const filtered = useMemo(() => {
     return (txns as any[]).filter((t) => {
       if (type !== "all" && t.type !== type) return false;
+      if (type === "split" && !t.is_split) return false;
       if (!q) return true;
-      const hay = [t.note, t.categories?.name, t.sub_categories?.name, t.accounts?.label, t.income_source_text].join(" ").toLowerCase();
+      const hay = [
+        t.note,
+        t.categories?.name,
+        t.sub_categories?.name,
+        t.accounts?.label,
+        t.accounts?.institution,
+        t.income_source_text,
+        t.to_account?.label,
+      ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(q.toLowerCase());
     });
   }, [txns, q, type]);
@@ -35,9 +44,9 @@ export default function HistoryPage() {
         <ArrowLeft className="h-4 w-4 mr-1" /> Settings
       </Link>
       <h1 className="text-xl font-semibold">History</h1>
-      <Input placeholder="Search transactions..." value={q} onChange={(e) => setQ(e.target.value)} />
-      <div className="flex gap-2 text-xs">
-        {["all", "income", "expense", "transfer"].map((t) => (
+      <Input placeholder="Search by category, account, note..." value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="flex gap-2 text-xs flex-wrap">
+        {["all", "income", "expense", "transfer", "split"].map((t) => (
           <button key={t} onClick={() => setType(t)}
             className={`px-3 py-1.5 rounded-full capitalize ${type === t ? "bg-primary text-white" : "bg-secondary"}`}>
             {t}
@@ -64,14 +73,28 @@ function Row({ t }: { t: any }) {
   const isExpense = t.type === "expense";
   const isTransfer = t.type === "transfer";
   const isSplit = t.is_split;
+
   const color = isSplit ? "text-split" : isIncome ? "text-income" : isExpense ? "text-expense" : "text-transfer";
   const Icon = isSplit ? Users : isIncome ? ArrowDownLeft : isExpense ? ArrowUpRight : ArrowLeftRight;
   const sign = isIncome ? "+" : isTransfer ? "" : "-";
+
   const title = t.categories
-    ? `${t.categories.icon ?? ""} ${t.categories.name}`
-    : isIncome ? (t.income_source_text ?? "Income")
-    : isTransfer ? "Transfer"
+    ? `${t.categories.icon ?? ""} ${t.categories.name}${t.sub_categories ? " · " + t.sub_categories.name : ""}`
+    : isIncome
+    ? (t.income_source_text ?? "Income")
+    : isTransfer
+    ? "Transfer"
+    : isSplit
+    ? "Split"
     : "Expense";
+
+  const sub = isTransfer
+    ? `${t.accounts?.label ?? ""} → ${t.to_account?.label ?? ""}`
+    : isIncome
+    ? (t.accounts ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ") : "")
+    : t.accounts
+    ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ")
+    : "";
 
   return (
     <div className="flex items-center gap-3 p-3">
@@ -80,9 +103,12 @@ function Row({ t }: { t: any }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm truncate">{title}</p>
-        <p className="text-[10px] text-muted-foreground truncate">{t.accounts?.label ?? ""}{t.note ? ` · ${t.note}` : ""}</p>
+        <p className="text-[10px] text-muted-foreground truncate">{sub}{t.note ? ` · ${t.note}` : ""}</p>
       </div>
-      <p className={`text-sm font-mono font-semibold ${color}`}>{sign}{formatMoney(t.amount)}</p>
+      <div className="text-right">
+        <p className={`text-sm font-mono font-semibold ${color}`}>{sign}{formatMoney(t.amount)}</p>
+        <p className="text-[10px] text-muted-foreground font-mono">{t.time?.slice(0, 5)}</p>
+      </div>
     </div>
   );
 }
