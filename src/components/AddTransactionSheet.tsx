@@ -759,8 +759,7 @@ function TransferForm({ onClose }: { onClose: () => void }) {
 // ─── Split Form ────────────────────────────────────────────────────────────
 function SplitForm({ onClose }: { onClose: () => void }) {
   const { data: accounts = [] } = useQuery(accountsQuery());
-  const { data: cats = [] } = useQuery(categoriesQuery("expense"));
-  const { data: subs = [] } = useQuery(subCategoriesQuery(null));
+  const { data: groups = [] } = useQuery(groupsQuery());
   const qc = useQueryClient();
 
   const [amount, setAmount] = useState("");
@@ -781,7 +780,8 @@ function SplitForm({ onClose }: { onClose: () => void }) {
   const [groupPickerOpen, setGroupPickerOpen] = useState(false);
 
   // Who paid
-  const [whoPaid, setWhoPaid] = useState<"me" | string>("me");
+  const [whoPaid, setWhoPaid] = useState<"me" | "other">("me");
+  const [otherPayerId, setOtherPayerId] = useState<string>("");
   const [accountId, setAccountId] = useState("");
 
   // Split type
@@ -803,21 +803,33 @@ function SplitForm({ onClose }: { onClose: () => void }) {
 
   useEffect(() => { if (accounts[0]?.id) setAccountId(accounts[0].id); }, [accounts]);
 
+  // Reset who paid when target changes
+  useEffect(() => { setWhoPaid("me"); setOtherPayerId(""); }, [target]);
+
   // All participants depending on target
   const participants: { id: string; name: string }[] = useMemo(() => {
     if (target === "person" && personId && personName) return [{ id: personId, name: personName }];
     if (target === "multi") return multiPeople;
-    return []; // group handled separately via group_id
-  }, [target, personId, personName, multiPeople]);
-
-  // Who paid options: "me" + all participants
-  const whoPaidOptions = [
-    { value: "me", label: "You" },
-    ...participants.map((p) => ({ value: p.id, label: p.name })),
-  ];
+    if (target === "group") {
+      const g = (groups as any[]).find((x) => x.id === groupId);
+      return (g?.group_members ?? []).map((m: any) => ({ id: m.person_id, name: m.people?.name ?? "?" }));
+    }
+    return [];
+  }, [target, personId, personName, multiPeople, groupId, groups]);
 
   const total = Number(amount);
   const equalShare = participants.length > 0 ? total / (participants.length + 1) : 0;
+
+  // Resolve paid_by string for DB
+  const paidByValue = useMemo(() => {
+    if (whoPaid === "me") return "me";
+    if (target === "person") return personName; // the one person
+    if (target === "multi" || target === "group") {
+      const p = participants.find((x) => x.id === otherPayerId);
+      return p?.name ?? "other";
+    }
+    return "other";
+  }, [whoPaid, target, personName, participants, otherPayerId]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -827,15 +839,13 @@ function SplitForm({ onClose }: { onClose: () => void }) {
       if (target !== "group" && participants.length === 0) throw new Error("Select at least one person");
       if (target === "group" && !groupId) throw new Error("Select a group");
 
-      const paidByName = whoPaid === "me" ? "me" : participants.find((p) => p.id === whoPaid)?.name ?? "other";
-
       const { data: split, error } = await supabase.from("splits").insert({
         type: target === "group" ? "group" : "individual",
         person_id: target === "person" && personId ? personId : null,
         group_id: target === "group" && groupId ? groupId : null,
         description: note || null,
         total_amount: total,
-        paid_by: paidByName,
+        paid_by: paidByValue,
         split_type: splitType,
         category_id: categoryId || null,
         sub_category_id: subCatId || null,
@@ -881,7 +891,7 @@ function SplitForm({ onClose }: { onClose: () => void }) {
         onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
         <AmountInput value={amount} onChange={setAmount} accent="text-split" />
 
-        {/* Split with — 3 options */}
+        {/* Split with */}
         <div className="space-y-1.5">
           <Label>Split with</Label>
           <div className="flex gap-2 rounded-lg bg-secondary p-1">
@@ -893,7 +903,6 @@ function SplitForm({ onClose }: { onClose: () => void }) {
             ))}
           </div>
 
-          {/* Person picker button */}
           {target === "person" && (
             <button type="button" onClick={() => setPersonPickerOpen(true)}
               className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
@@ -902,7 +911,6 @@ function SplitForm({ onClose }: { onClose: () => void }) {
             </button>
           )}
 
-          {/* Multi person picker button */}
           {target === "multi" && (
             <button type="button" onClick={() => setMultiPickerOpen(true)}
               className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
@@ -913,7 +921,6 @@ function SplitForm({ onClose }: { onClose: () => void }) {
             </button>
           )}
 
-          {/* Group picker button */}
           {target === "group" && (
             <button type="button" onClick={() => setGroupPickerOpen(true)}
               className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
@@ -926,15 +933,47 @@ function SplitForm({ onClose }: { onClose: () => void }) {
         {/* Who paid */}
         <div className="space-y-1.5">
           <Label>Who paid?</Label>
-          <div className="flex flex-wrap gap-2">
-            {whoPaidOptions.map((opt) => (
-              <button key={opt.value} type="button" onClick={() => setWhoPaid(opt.value)}
-                className={cn("px-3 py-1.5 rounded-lg text-sm border transition-colors",
-                  whoPaid === opt.value ? "bg-primary text-white border-primary" : "border-border text-foreground bg-secondary")}>
-                {opt.label}
+
+          {/* You / Other toggle — same for all targets */}
+          <div className="flex gap-2 rounded-lg bg-secondary p-1">
+            {(["me", "other"] as const).map((m) => (
+              <button type="button" key={m} onClick={() => { setWhoPaid(m); setOtherPayerId(""); }}
+                className={cn("flex-1 rounded-md py-1.5 text-sm", whoPaid === m && "bg-primary text-white")}>
+                {m === "me" ? "You paid" : "Other paid"}
               </button>
             ))}
           </div>
+
+          {/* Person target + Other paid → no extra UI needed, person name is used automatically */}
+          {whoPaid === "other" && target === "person" && personName && (
+            <p className="text-xs text-muted-foreground px-1">
+              {personName} paid for this expense
+            </p>
+          )}
+
+          {/* Multi target + Other paid → dropdown to pick who paid */}
+          {whoPaid === "other" && target === "multi" && multiPeople.length > 0 && (
+            <Select value={otherPayerId} onValueChange={setOtherPayerId}>
+              <SelectTrigger><SelectValue placeholder="Select who paid" /></SelectTrigger>
+              <SelectContent>
+                {multiPeople.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Group target + Other paid → dropdown to pick which member paid */}
+          {whoPaid === "other" && target === "group" && participants.length > 0 && (
+            <Select value={otherPayerId} onValueChange={setOtherPayerId}>
+              <SelectTrigger><SelectValue placeholder="Select who paid" /></SelectTrigger>
+              <SelectContent>
+                {participants.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         {/* Account — only if "me" paid */}
@@ -953,7 +992,8 @@ function SplitForm({ onClose }: { onClose: () => void }) {
           <Label>Split type</Label>
           <div className="flex gap-2 rounded-lg bg-secondary p-1">
             {(["equal", "custom"] as const).map((m) => (
-              <button type="button" key={m} onClick={() => { setSplitType(m); if (m === "custom" && participants.length > 0) setCustomSheetOpen(true); }}
+              <button type="button" key={m}
+                onClick={() => { setSplitType(m); if (m === "custom" && participants.length > 0) setCustomSheetOpen(true); }}
                 className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", splitType === m && "bg-primary text-white")}>{m}</button>
             ))}
           </div>
@@ -989,7 +1029,6 @@ function SplitForm({ onClose }: { onClose: () => void }) {
         <div className="space-y-1.5"><Label>Note</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></div>
       </FormShell>
 
-      {/* Pickers */}
       <PersonPickerSheet open={personPickerOpen} onOpenChange={setPersonPickerOpen}
         onSelect={(id, name) => { setPersonId(id); setPersonName(name); }} />
 
