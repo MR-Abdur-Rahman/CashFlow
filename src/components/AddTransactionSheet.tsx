@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
-import { Plus, QrCode, GripVertical, X, ChevronRight, Pencil } from "lucide-react";
+import { Plus, QrCode, GripVertical, X, ChevronRight } from "lucide-react";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { QrScannerDialog } from "@/components/QrScannerDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -90,7 +90,7 @@ function FormShell({ children, onSubmit, button, color }: { children: React.Reac
   );
 }
 
-// ─── Category Picker Sheet (two-column like reference image) ───────────────
+// ─── Category Picker Sheet ─────────────────────────────────────────────────
 function CategoryPickerSheet({
   open,
   onOpenChange,
@@ -103,9 +103,12 @@ function CategoryPickerSheet({
   const { data: cats = [] } = useQuery(categoriesQuery("expense"));
   const [activeCatId, setActiveCatId] = useState<string>("");
   const { data: subs = [] } = useQuery(subCategoriesQuery(activeCatId || null));
-  const [addCatOpen, setAddCatOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addType, setAddType] = useState<"category" | "sub-category">("category");
   const [newCatName, setNewCatName] = useState("");
   const [newCatIcon, setNewCatIcon] = useState("📦");
+  const [newSubName, setNewSubName] = useState("");
+  const [newSubParentId, setNewSubParentId] = useState("");
   const qc = useQueryClient();
 
   useEffect(() => {
@@ -128,7 +131,28 @@ function CategoryPickerSheet({
       toast.success("Category added");
       qc.invalidateQueries({ queryKey: ["categories"] });
       setNewCatName("");
-      setAddCatOpen(false);
+      setNewCatIcon("📦");
+      setAddOpen(false);
+    }
+  }
+
+  async function addSubCategory() {
+    if (!newSubName.trim() || !newSubParentId) return;
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const { error } = await supabase.from("sub_categories").insert({
+      user_id: u.user.id,
+      category_id: newSubParentId,
+      name: newSubName.trim(),
+      is_default: false,
+    });
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Sub-category added");
+      qc.invalidateQueries({ queryKey: ["sub_categories"] });
+      setNewSubName("");
+      setNewSubParentId("");
+      setAddOpen(false);
     }
   }
 
@@ -139,12 +163,13 @@ function CategoryPickerSheet({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
           <SheetTitle className="sr-only">Select Category</SheetTitle>
+
           {/* Header */}
-          <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border bg-[#1a1a1a]">
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
             <span className="text-base font-semibold">Category</span>
             <div className="flex items-center gap-3">
-              <button type="button" onClick={() => setAddCatOpen(true)} className="text-muted-foreground hover:text-foreground">
-                <Pencil className="h-5 w-5" />
+              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground">
+                <Plus className="h-5 w-5" />
               </button>
               <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground">
                 <X className="h-5 w-5" />
@@ -174,7 +199,6 @@ function CategoryPickerSheet({
 
             {/* Right — sub-categories */}
             <div className="flex-1 overflow-y-auto">
-              {/* "Select category only" option at top */}
               {activeCat && (
                 <button
                   type="button"
@@ -208,27 +232,71 @@ function CategoryPickerSheet({
         </SheetContent>
       </Sheet>
 
-      {/* Add Category Dialog */}
-      <Dialog open={addCatOpen} onOpenChange={setAddCatOpen}>
+      {/* Add Category or Sub-category Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
-          <DialogTitle>Add Category</DialogTitle>
+          <DialogTitle>Add Category or Sub-category</DialogTitle>
           <div className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Emoji icon"
-                value={newCatIcon}
-                onChange={(e) => setNewCatIcon(e.target.value)}
-                className="w-20 text-center text-lg"
-                maxLength={2}
-              />
-              <Input
-                placeholder="Category name"
-                value={newCatName}
-                onChange={(e) => setNewCatName(e.target.value)}
-                className="flex-1"
-              />
+            {/* Type toggle */}
+            <div className="flex gap-2 rounded-lg bg-secondary p-1">
+              {(["category", "sub-category"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setAddType(m)}
+                  className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", addType === m && "bg-primary text-white")}
+                >
+                  {m}
+                </button>
+              ))}
             </div>
-            <Button className="w-full" onClick={addCategory}>Add</Button>
+
+            {addType === "category" ? (
+              <div className="flex gap-2">
+                <Input
+                  placeholder="😀"
+                  value={newCatIcon}
+                  onChange={(e) => setNewCatIcon(e.target.value)}
+                  className="w-16 text-center text-lg"
+                  maxLength={2}
+                />
+                <Input
+                  placeholder="Category name"
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  className="flex-1"
+                />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label>Parent Category</Label>
+                  <Select value={newSubParentId} onValueChange={setNewSubParentId}>
+                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectContent>
+                      {(cats as any[]).map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Sub-category name</Label>
+                  <Input
+                    placeholder="e.g. Breakfast, Lunch"
+                    value={newSubName}
+                    onChange={(e) => setNewSubName(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            <Button
+              className="w-full"
+              onClick={addType === "category" ? addCategory : addSubCategory}
+            >
+              Add
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -461,7 +529,8 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <FormShell color="bg-[oklch(0.40_0.13_145)] hover:bg-[oklch(0.45_0.13_145)]" button="Save income" onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
+      <FormShell color="bg-[oklch(0.40_0.13_145)] hover:bg-[oklch(0.45_0.13_145)]" button="Save income"
+        onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
         <AmountInput value={amount} onChange={setAmount} accent="text-income" />
         <div className="space-y-1.5">
           <Label>From</Label>
@@ -570,8 +639,6 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
             </SelectContent>
           </Select>
         </div>
-
-        {/* Category picker button */}
         <div className="space-y-1.5">
           <Label>Category</Label>
           <button type="button" onClick={() => setCatPickerOpen(true)}
@@ -584,11 +651,9 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>
         </div>
-
         <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
         <div className="space-y-1.5"><Label>Note</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></div>
       </FormShell>
-
       <CategoryPickerSheet
         open={catPickerOpen}
         onOpenChange={setCatPickerOpen}
