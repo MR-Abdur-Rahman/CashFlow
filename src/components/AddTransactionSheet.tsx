@@ -13,8 +13,9 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
-import { Plus, QrCode, GripVertical, X, ChevronRight } from "lucide-react";
+import { Plus, QrCode, GripVertical, X, ChevronRight, Check } from "lucide-react";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
+import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { QrScannerDialog } from "@/components/QrScannerDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
@@ -92,9 +93,7 @@ function FormShell({ children, onSubmit, button, color }: { children: React.Reac
 
 // ─── Category Picker Sheet ─────────────────────────────────────────────────
 function CategoryPickerSheet({
-  open,
-  onOpenChange,
-  onSelect,
+  open, onOpenChange, onSelect,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -120,20 +119,10 @@ function CategoryPickerSheet({
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
     const { error } = await supabase.from("categories").insert({
-      user_id: u.user.id,
-      name: newCatName.trim(),
-      icon: newCatIcon,
-      type: "expense",
-      is_default: false,
+      user_id: u.user.id, name: newCatName.trim(), icon: newCatIcon, type: "expense", is_default: false,
     });
     if (error) toast.error(error.message);
-    else {
-      toast.success("Category added");
-      qc.invalidateQueries({ queryKey: ["categories"] });
-      setNewCatName("");
-      setNewCatIcon("📦");
-      setAddOpen(false);
-    }
+    else { toast.success("Category added"); qc.invalidateQueries({ queryKey: ["categories"] }); setNewCatName(""); setNewCatIcon("📦"); setAddOpen(false); }
   }
 
   async function addSubCategory() {
@@ -141,19 +130,10 @@ function CategoryPickerSheet({
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
     const { error } = await supabase.from("sub_categories").insert({
-      user_id: u.user.id,
-      category_id: newSubParentId,
-      name: newSubName.trim(),
-      is_default: false,
+      user_id: u.user.id, category_id: newSubParentId, name: newSubName.trim(), is_default: false,
     });
     if (error) toast.error(error.message);
-    else {
-      toast.success("Sub-category added");
-      qc.invalidateQueries({ queryKey: ["sub_categories"] });
-      setNewSubName("");
-      setNewSubParentId("");
-      setAddOpen(false);
-    }
+    else { toast.success("Sub-category added"); qc.invalidateQueries({ queryKey: ["sub_categories"] }); setNewSubName(""); setNewSubParentId(""); setAddOpen(false); }
   }
 
   const activeCat = (cats as any[]).find((c) => c.id === activeCatId);
@@ -163,67 +143,36 @@ function CategoryPickerSheet({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
           <SheetTitle className="sr-only">Select Category</SheetTitle>
-
-          {/* Header */}
           <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
             <span className="text-base font-semibold">Category</span>
             <div className="flex items-center gap-3">
-              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground">
-                <Plus className="h-5 w-5" />
-              </button>
-              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground">
-                <X className="h-5 w-5" />
-              </button>
+              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground"><Plus className="h-5 w-5" /></button>
+              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
           </div>
-
-          {/* Two-column body */}
           <div className="flex flex-1 min-h-0">
-            {/* Left — categories */}
             <div className="w-[45%] border-r border-border overflow-y-auto">
               {(cats as any[]).map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setActiveCatId(c.id)}
-                  className={cn(
-                    "w-full flex items-center justify-between px-4 py-4 text-left text-sm border-b border-border transition-colors",
-                    activeCatId === c.id ? "bg-primary/10 text-primary font-medium" : "bg-card text-foreground"
-                  )}
-                >
+                <button key={c.id} type="button" onClick={() => setActiveCatId(c.id)}
+                  className={cn("w-full flex items-center justify-between px-4 py-4 text-left text-sm border-b border-border transition-colors",
+                    activeCatId === c.id ? "bg-primary/10 text-primary font-medium" : "bg-card text-foreground")}>
                   <span className="truncate">{c.icon} {c.name}</span>
                   <ChevronRight className="h-3.5 w-3.5 shrink-0 ml-1 text-muted-foreground" />
                 </button>
               ))}
             </div>
-
-            {/* Right — sub-categories */}
             <div className="flex-1 overflow-y-auto">
               {activeCat && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSelect(activeCat.id, activeCat.name, activeCat.icon ?? "");
-                    onOpenChange(false);
-                  }}
-                  className="w-full px-4 py-4 text-left text-sm border-b border-border text-primary font-medium bg-primary/5"
-                >
+                <button type="button" onClick={() => { onSelect(activeCat.id, activeCat.name, activeCat.icon ?? ""); onOpenChange(false); }}
+                  className="w-full px-4 py-4 text-left text-sm border-b border-border text-primary font-medium bg-primary/5">
                   {activeCat.icon} {activeCat.name} only
                 </button>
               )}
-              {subs.length === 0 && (
-                <p className="text-xs text-muted-foreground px-4 py-4">No sub-categories</p>
-              )}
+              {subs.length === 0 && <p className="text-xs text-muted-foreground px-4 py-4">No sub-categories</p>}
               {(subs as any[]).map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => {
-                    onSelect(activeCat!.id, activeCat!.name, activeCat!.icon ?? "", s.id, s.name);
-                    onOpenChange(false);
-                  }}
-                  className="w-full px-4 py-4 text-left text-sm border-b border-border bg-card hover:bg-secondary/40 text-foreground"
-                >
+                <button key={s.id} type="button"
+                  onClick={() => { onSelect(activeCat!.id, activeCat!.name, activeCat!.icon ?? "", s.id, s.name); onOpenChange(false); }}
+                  className="w-full px-4 py-4 text-left text-sm border-b border-border bg-card hover:bg-secondary/40 text-foreground">
                   {s.name}
                 </button>
               ))}
@@ -231,41 +180,20 @@ function CategoryPickerSheet({
           </div>
         </SheetContent>
       </Sheet>
-
-      {/* Add Category or Sub-category Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
           <DialogTitle>Add Category or Sub-category</DialogTitle>
           <div className="space-y-4">
-            {/* Type toggle */}
             <div className="flex gap-2 rounded-lg bg-secondary p-1">
               {(["category", "sub-category"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setAddType(m)}
-                  className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", addType === m && "bg-primary text-white")}
-                >
-                  {m}
-                </button>
+                <button key={m} type="button" onClick={() => setAddType(m)}
+                  className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", addType === m && "bg-primary text-white")}>{m}</button>
               ))}
             </div>
-
             {addType === "category" ? (
               <div className="flex gap-2">
-                <Input
-                  placeholder="😀"
-                  value={newCatIcon}
-                  onChange={(e) => setNewCatIcon(e.target.value)}
-                  className="w-16 text-center text-lg"
-                  maxLength={2}
-                />
-                <Input
-                  placeholder="Category name"
-                  value={newCatName}
-                  onChange={(e) => setNewCatName(e.target.value)}
-                  className="flex-1"
-                />
+                <Input placeholder="😀" value={newCatIcon} onChange={(e) => setNewCatIcon(e.target.value)} className="w-16 text-center text-lg" maxLength={2} />
+                <Input placeholder="Category name" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} className="flex-1" />
               </div>
             ) : (
               <div className="space-y-3">
@@ -273,30 +201,16 @@ function CategoryPickerSheet({
                   <Label>Parent Category</Label>
                   <Select value={newSubParentId} onValueChange={setNewSubParentId}>
                     <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                    <SelectContent>
-                      {(cats as any[]).map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
+                    <SelectContent>{(cats as any[]).map((c) => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Sub-category name</Label>
-                  <Input
-                    placeholder="e.g. Breakfast, Lunch"
-                    value={newSubName}
-                    onChange={(e) => setNewSubName(e.target.value)}
-                  />
+                  <Input placeholder="e.g. Breakfast, Lunch" value={newSubName} onChange={(e) => setNewSubName(e.target.value)} />
                 </div>
               </div>
             )}
-
-            <Button
-              className="w-full"
-              onClick={addType === "category" ? addCategory : addSubCategory}
-            >
-              Add
-            </Button>
+            <Button className="w-full" onClick={addType === "category" ? addCategory : addSubCategory}>Add</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -304,11 +218,9 @@ function CategoryPickerSheet({
   );
 }
 
-// ─── Person Picker Sheet ───────────────────────────────────────────────────
+// ─── Person Picker Sheet (single select) ──────────────────────────────────
 function PersonPickerSheet({
-  open,
-  onOpenChange,
-  onSelect,
+  open, onOpenChange, onSelect,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -320,17 +232,12 @@ function PersonPickerSheet({
   const [qrOpen, setQrOpen] = useState(false);
   const dragIdx = useRef<number | null>(null);
 
-  useEffect(() => {
-    if (people.length > 0 && order.length === 0) {
-      setOrder(people.map((p: any) => p.id));
-    }
-  }, [people]);
+  useEffect(() => { if (people.length > 0 && order.length === 0) setOrder(people.map((p: any) => p.id)); }, [people]);
 
   const ordered = useMemo(() => {
     if (order.length === 0) return people;
     return [...people].sort((a: any, b: any) => {
-      const ai = order.indexOf(a.id);
-      const bi = order.indexOf(b.id);
+      const ai = order.indexOf(a.id); const bi = order.indexOf(b.id);
       return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
     });
   }, [people, order]);
@@ -354,29 +261,16 @@ function PersonPickerSheet({
           <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
             <span className="text-base font-semibold">Person</span>
             <div className="flex items-center gap-3">
-              <button type="button" onClick={() => setQrOpen(true)} className="text-muted-foreground hover:text-foreground">
-                <QrCode className="h-5 w-5" />
-              </button>
-              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground">
-                <Plus className="h-5 w-5" />
-              </button>
-              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground">
-                <X className="h-5 w-5" />
-              </button>
+              <button type="button" onClick={() => setQrOpen(true)} className="text-muted-foreground hover:text-foreground"><QrCode className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground"><Plus className="h-5 w-5" /></button>
+              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-border">
-            {ordered.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-10">No people yet. Tap + to add.</p>
-            )}
+            {ordered.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">No people yet. Tap + to add.</p>}
             {ordered.map((p: any, idx: number) => (
-              <div
-                key={p.id}
-                draggable
-                onDragStart={() => handleDragStart(idx)}
-                onDragOver={(e) => handleDragOver(e, idx)}
-                className="flex items-center gap-3 px-5 py-4 bg-card active:bg-secondary/40 cursor-pointer"
-              >
+              <div key={p.id} draggable onDragStart={() => handleDragStart(idx)} onDragOver={(e) => handleDragOver(e, idx)}
+                className="flex items-center gap-3 px-5 py-4 bg-card active:bg-secondary/40 cursor-pointer">
                 <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
                 <div className="flex-1" onClick={() => { onSelect(p.id, p.name); onOpenChange(false); }}>
                   <p className="text-sm font-medium">{p.name}</p>
@@ -394,13 +288,211 @@ function PersonPickerSheet({
   );
 }
 
+// ─── Multi Person Picker Sheet (checkbox style) ────────────────────────────
+function MultiPersonPickerSheet({
+  open, onOpenChange, selected, onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  selected: { id: string; name: string }[];
+  onConfirm: (people: { id: string; name: string }[]) => void;
+}) {
+  const { data: people = [] } = useQuery(peopleQuery());
+  const [checked, setChecked] = useState<Set<string>>(new Set(selected.map((p) => p.id)));
+  const [addOpen, setAddOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+
+  useEffect(() => { if (open) setChecked(new Set(selected.map((p) => p.id))); }, [open]);
+
+  function toggle(id: string) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function confirm() {
+    const result = (people as any[]).filter((p) => checked.has(p.id)).map((p) => ({ id: p.id, name: p.name }));
+    onConfirm(result);
+    onOpenChange(false);
+  }
+
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
+          <SheetTitle className="sr-only">Select People</SheetTitle>
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
+            <span className="text-base font-semibold">Select People</span>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setQrOpen(true)} className="text-muted-foreground hover:text-foreground"><QrCode className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground"><Plus className="h-5 w-5" /></button>
+              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto divide-y divide-border">
+            {(people as any[]).length === 0 && <p className="text-sm text-muted-foreground text-center py-10">No people yet. Tap + to add.</p>}
+            {(people as any[]).map((p) => (
+              <div key={p.id} onClick={() => toggle(p.id)}
+                className="flex items-center gap-3 px-5 py-4 bg-card active:bg-secondary/40 cursor-pointer">
+                <div className={cn("h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
+                  checked.has(p.id) ? "bg-primary border-primary" : "border-border")}>
+                  {checked.has(p.id) && <Check className="h-3 w-3 text-white" />}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{p.name}</p>
+                  {p.phone_number && <p className="text-xs text-muted-foreground">{p.phone_number}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="p-4 border-t border-border">
+            <Button className="w-full bg-primary text-white" onClick={confirm} disabled={checked.size === 0}>
+              Confirm ({checked.size} selected)
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+      <AddPersonDialog open={addOpen} onOpenChange={setAddOpen} />
+      <QrScannerDialog open={qrOpen} onOpenChange={setQrOpen} onResult={() => {}} />
+    </>
+  );
+}
+
+// ─── Group Picker Sheet ────────────────────────────────────────────────────
+function GroupPickerSheet({
+  open, onOpenChange, onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onSelect: (id: string, name: string) => void;
+}) {
+  const { data: groups = [] } = useQuery(groupsQuery());
+  const [addOpen, setAddOpen] = useState(false);
+
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
+          <SheetTitle className="sr-only">Select Group</SheetTitle>
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
+            <span className="text-base font-semibold">Group</span>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground"><Plus className="h-5 w-5" /></button>
+              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto divide-y divide-border">
+            {groups.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">No groups yet. Tap + to add.</p>}
+            {(groups as any[]).map((g) => (
+              <div key={g.id} onClick={() => { onSelect(g.id, g.name); onOpenChange(false); }}
+                className="flex items-center gap-3 px-5 py-4 bg-card active:bg-secondary/40 cursor-pointer">
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{g.name}</p>
+                  <p className="text-xs text-muted-foreground">{g.group_members?.length ?? 0} members</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+      <AddGroupDialog open={addOpen} onOpenChange={setAddOpen} />
+    </>
+  );
+}
+
+// ─── Custom Split Sheet ────────────────────────────────────────────────────
+function CustomSplitSheet({
+  open, onOpenChange, participants, total, onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  participants: { id: string; name: string }[];
+  total: number;
+  onConfirm: (amounts: Record<string, number>) => void;
+}) {
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (open) {
+      const init: Record<string, string> = {};
+      participants.forEach((p) => { init[p.id] = ""; });
+      setAmounts(init);
+    }
+  }, [open, participants]);
+
+  const assigned = Object.values(amounts).reduce((s, v) => s + (Number(v) || 0), 0);
+  const myShare = total - assigned;
+  const remaining = myShare;
+
+  function confirm() {
+    const result: Record<string, number> = {};
+    participants.forEach((p) => { result[p.id] = Number(amounts[p.id]) || 0; });
+    onConfirm(result);
+    onOpenChange(false);
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
+        <SheetTitle className="sr-only">Custom Split</SheetTitle>
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
+          <span className="text-base font-semibold">Custom Split</span>
+          <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+        </div>
+
+        {/* Total summary */}
+        <div className="px-5 py-3 bg-secondary/30 border-b border-border">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Total</span>
+            <span className="font-mono font-semibold">{formatMoney(total)}</span>
+          </div>
+          <div className="flex justify-between text-sm mt-1">
+            <span className="text-muted-foreground">Your share</span>
+            <span className={cn("font-mono font-semibold", remaining < 0 ? "text-expense" : "text-income")}>
+              {formatMoney(remaining)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto divide-y divide-border">
+          {participants.map((p) => (
+            <div key={p.id} className="flex items-center gap-3 px-5 py-4">
+              <div className="flex-1">
+                <p className="text-sm font-medium">{p.name}</p>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground font-mono">LKR</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={amounts[p.id] ?? ""}
+                  onChange={(e) => setAmounts((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                  className="w-28 bg-secondary rounded-md px-2 py-1.5 text-sm text-right font-mono outline-none border border-border focus:border-primary"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="p-4 border-t border-border">
+          <Button className="w-full bg-primary text-white" onClick={confirm}>
+            Confirm Split
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 // ─── Source Picker Sheet ───────────────────────────────────────────────────
 const DEFAULT_SOURCES = ["Salary", "Freelance", "Business", "Gift", "Bonus", "Rental", "Investment", "Other"];
 
 function SourcePickerSheet({
-  open,
-  onOpenChange,
-  onSelect,
+  open, onOpenChange, onSelect,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -437,23 +529,14 @@ function SourcePickerSheet({
           <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
             <span className="text-base font-semibold">Source</span>
             <div className="flex items-center gap-3">
-              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground">
-                <Plus className="h-5 w-5" />
-              </button>
-              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground">
-                <X className="h-5 w-5" />
-              </button>
+              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground"><Plus className="h-5 w-5" /></button>
+              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-border">
             {sources.map((s, idx) => (
-              <div
-                key={s}
-                draggable
-                onDragStart={() => handleDragStart(idx)}
-                onDragOver={(e) => handleDragOver(e, idx)}
-                className="flex items-center gap-3 px-5 py-4 bg-card active:bg-secondary/40 cursor-pointer"
-              >
+              <div key={s} draggable onDragStart={() => handleDragStart(idx)} onDragOver={(e) => handleDragOver(e, idx)}
+                className="flex items-center gap-3 px-5 py-4 bg-card active:bg-secondary/40 cursor-pointer">
                 <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
                 <div className="flex-1" onClick={() => { onSelect(s); onOpenChange(false); }}>
                   <p className="text-sm font-medium">{s}</p>
@@ -468,12 +551,8 @@ function SourcePickerSheet({
         <DialogContent>
           <DialogTitle>Add Source</DialogTitle>
           <div className="space-y-4">
-            <Input
-              placeholder="e.g. Rental, Dividend"
-              value={newSource}
-              onChange={(e) => setNewSource(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSource(); } }}
-            />
+            <Input placeholder="e.g. Rental, Dividend" value={newSource} onChange={(e) => setNewSource(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSource(); } }} />
             <Button className="w-full" onClick={addSource}>Add</Button>
           </div>
         </DialogContent>
@@ -505,25 +584,15 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
       const { error } = await supabase.from("transactions").insert({
-        user_id: u.user.id,
-        type: "income",
-        amount: Number(amount),
-        account_id: accountId || null,
+        user_id: u.user.id, type: "income", amount: Number(amount), account_id: accountId || null,
         income_source_type: sourceType,
         income_person_id: sourceType === "person" && personId ? personId : null,
         income_source_text: sourceType === "source" ? sourceText : null,
-        date,
-        time,
-        note: note || null,
+        date, time, note: note || null,
       });
       if (error) throw error;
     },
-    onSuccess: () => {
-      toast.success("Income added");
-      qc.invalidateQueries({ queryKey: ["transactions"] });
-      qc.invalidateQueries({ queryKey: ["accounts"] });
-      onClose();
-    },
+    onSuccess: () => { toast.success("Income added"); qc.invalidateQueries({ queryKey: ["transactions"] }); qc.invalidateQueries({ queryKey: ["accounts"] }); onClose(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -537,26 +606,20 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
           <div className="flex gap-2 rounded-lg bg-secondary p-1">
             {(["person", "source"] as const).map((m) => (
               <button type="button" key={m} onClick={() => setSourceType(m)}
-                className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", sourceType === m && "bg-primary text-white")}>
-                {m}
-              </button>
+                className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", sourceType === m && "bg-primary text-white")}>{m}</button>
             ))}
           </div>
           {sourceType === "person" && (
             <button type="button" onClick={() => setPersonPickerOpen(true)}
               className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
-              <span className={personName ? "text-foreground" : "text-muted-foreground"}>
-                {personName || "Select person"}
-              </span>
+              <span className={personName ? "text-foreground" : "text-muted-foreground"}>{personName || "Select person"}</span>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
           )}
           {sourceType === "source" && (
             <button type="button" onClick={() => setSourcePickerOpen(true)}
               className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
-              <span className={sourceText ? "text-foreground" : "text-muted-foreground"}>
-                {sourceText || "Select source"}
-              </span>
+              <span className={sourceText ? "text-foreground" : "text-muted-foreground"}>{sourceText || "Select source"}</span>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
           )}
@@ -565,18 +628,14 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
           <Label>To account</Label>
           <Select value={accountId} onValueChange={setAccountId}>
             <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-            <SelectContent>
-              {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>)}
-            </SelectContent>
+            <SelectContent>{accounts.map((a) => <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
         <div className="space-y-1.5"><Label>Note</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></div>
       </FormShell>
-      <PersonPickerSheet open={personPickerOpen} onOpenChange={setPersonPickerOpen}
-        onSelect={(id, name) => { setPersonId(id); setPersonName(name); }} />
-      <SourcePickerSheet open={sourcePickerOpen} onOpenChange={setSourcePickerOpen}
-        onSelect={(s) => setSourceText(s)} />
+      <PersonPickerSheet open={personPickerOpen} onOpenChange={setPersonPickerOpen} onSelect={(id, name) => { setPersonId(id); setPersonName(name); }} />
+      <SourcePickerSheet open={sourcePickerOpen} onOpenChange={setSourcePickerOpen} onSelect={(s) => setSourceText(s)} />
     </>
   );
 }
@@ -604,24 +663,13 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
       const { error } = await supabase.from("transactions").insert({
-        user_id: u.user.id,
-        type: "expense",
-        amount: Number(amount),
-        account_id: accountId || null,
-        category_id: categoryId || null,
-        sub_category_id: subCatId || null,
-        date,
-        time,
-        note: note || null,
+        user_id: u.user.id, type: "expense", amount: Number(amount),
+        account_id: accountId || null, category_id: categoryId || null,
+        sub_category_id: subCatId || null, date, time, note: note || null,
       });
       if (error) throw error;
     },
-    onSuccess: () => {
-      toast.success("Expense added");
-      qc.invalidateQueries({ queryKey: ["transactions"] });
-      qc.invalidateQueries({ queryKey: ["accounts"] });
-      onClose();
-    },
+    onSuccess: () => { toast.success("Expense added"); qc.invalidateQueries({ queryKey: ["transactions"] }); qc.invalidateQueries({ queryKey: ["accounts"] }); onClose(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -634,9 +682,7 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
           <Label>From account</Label>
           <Select value={accountId} onValueChange={setAccountId}>
             <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-            <SelectContent>
-              {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>)}
-            </SelectContent>
+            <SelectContent>{accounts.map((a) => <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div className="space-y-1.5">
@@ -644,9 +690,7 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
           <button type="button" onClick={() => setCatPickerOpen(true)}
             className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
             <span className={categoryId ? "text-foreground" : "text-muted-foreground"}>
-              {categoryId
-                ? `${categoryIcon} ${categoryName}${subCatName ? " · " + subCatName : ""}`
-                : "Select category"}
+              {categoryId ? `${categoryIcon} ${categoryName}${subCatName ? " · " + subCatName : ""}` : "Select category"}
             </span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>
@@ -654,17 +698,8 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
         <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
         <div className="space-y-1.5"><Label>Note</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></div>
       </FormShell>
-      <CategoryPickerSheet
-        open={catPickerOpen}
-        onOpenChange={setCatPickerOpen}
-        onSelect={(cId, cName, cIcon, sId, sName) => {
-          setCategoryId(cId);
-          setCategoryName(cName);
-          setCategoryIcon(cIcon);
-          setSubCatId(sId ?? "");
-          setSubCatName(sName ?? "");
-        }}
-      />
+      <CategoryPickerSheet open={catPickerOpen} onOpenChange={setCatPickerOpen}
+        onSelect={(cId, cName, cIcon, sId, sName) => { setCategoryId(cId); setCategoryName(cName); setCategoryIcon(cIcon); setSubCatId(sId ?? ""); setSubCatName(sName ?? ""); }} />
     </>
   );
 }
@@ -680,10 +715,7 @@ function TransferForm({ onClose }: { onClose: () => void }) {
   const [time, setTime] = useState(format(new Date(), "HH:mm"));
   const [note, setNote] = useState("");
 
-  useEffect(() => {
-    if (accounts[0]?.id) setFromId(accounts[0].id);
-    if (accounts[1]?.id) setToId(accounts[1].id);
-  }, [accounts]);
+  useEffect(() => { if (accounts[0]?.id) setFromId(accounts[0].id); if (accounts[1]?.id) setToId(accounts[1].id); }, [accounts]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -691,23 +723,12 @@ function TransferForm({ onClose }: { onClose: () => void }) {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
       const { error } = await supabase.from("transactions").insert({
-        user_id: u.user.id,
-        type: "transfer",
-        amount: Number(amount),
-        account_id: fromId || null,
-        to_account_id: toId || null,
-        date,
-        time,
-        note: note || null,
+        user_id: u.user.id, type: "transfer", amount: Number(amount),
+        account_id: fromId || null, to_account_id: toId || null, date, time, note: note || null,
       });
       if (error) throw error;
     },
-    onSuccess: () => {
-      toast.success("Transfer recorded");
-      qc.invalidateQueries({ queryKey: ["transactions"] });
-      qc.invalidateQueries({ queryKey: ["accounts"] });
-      onClose();
-    },
+    onSuccess: () => { toast.success("Transfer recorded"); qc.invalidateQueries({ queryKey: ["transactions"] }); qc.invalidateQueries({ queryKey: ["accounts"] }); onClose(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -739,83 +760,108 @@ function TransferForm({ onClose }: { onClose: () => void }) {
 function SplitForm({ onClose }: { onClose: () => void }) {
   const { data: accounts = [] } = useQuery(accountsQuery());
   const { data: cats = [] } = useQuery(categoriesQuery("expense"));
-  const { data: people = [] } = useQuery(peopleQuery());
-  const { data: groups = [] } = useQuery(groupsQuery());
+  const { data: subs = [] } = useQuery(subCategoriesQuery(null));
   const qc = useQueryClient();
+
   const [amount, setAmount] = useState("");
-  const [desc, setDesc] = useState("");
-  const [target, setTarget] = useState<"person" | "group">("person");
+  const [target, setTarget] = useState<"person" | "multi" | "group">("person");
+
+  // Single person
   const [personId, setPersonId] = useState("");
+  const [personName, setPersonName] = useState("");
+  const [personPickerOpen, setPersonPickerOpen] = useState(false);
+
+  // Multi person
+  const [multiPeople, setMultiPeople] = useState<{ id: string; name: string }[]>([]);
+  const [multiPickerOpen, setMultiPickerOpen] = useState(false);
+
+  // Group
   const [groupId, setGroupId] = useState("");
-  const [whoPaid, setWhoPaid] = useState<"me" | "other">("me");
+  const [groupName, setGroupName] = useState("");
+  const [groupPickerOpen, setGroupPickerOpen] = useState(false);
+
+  // Who paid
+  const [whoPaid, setWhoPaid] = useState<"me" | string>("me");
   const [accountId, setAccountId] = useState("");
+
+  // Split type
   const [splitType, setSplitType] = useState<"equal" | "custom">("equal");
+  const [customAmounts, setCustomAmounts] = useState<Record<string, number>>({});
+  const [customSheetOpen, setCustomSheetOpen] = useState(false);
+
+  // Category
   const [categoryId, setCategoryId] = useState("");
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryIcon, setCategoryIcon] = useState("");
   const [subCatId, setSubCatId] = useState("");
+  const [subCatName, setSubCatName] = useState("");
+  const [catPickerOpen, setCatPickerOpen] = useState(false);
+
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [time, setTime] = useState(format(new Date(), "HH:mm"));
   const [note, setNote] = useState("");
 
   useEffect(() => { if (accounts[0]?.id) setAccountId(accounts[0].id); }, [accounts]);
-  const { data: subs = [] } = useQuery(subCategoriesQuery(categoryId || null));
 
-  const participants = useMemo(() => {
-    if (target === "person") {
-      const p = people.find((x) => x.id === personId);
-      return p ? [{ id: p.id, name: p.name, customAmount: 0 }] : [];
-    }
-    const g = groups.find((x) => x.id === groupId);
-    return (g?.group_members ?? []).map((m: any) => ({ id: m.person_id, name: m.people?.name ?? "?", customAmount: 0 }));
-  }, [target, personId, groupId, people, groups]);
+  // All participants depending on target
+  const participants: { id: string; name: string }[] = useMemo(() => {
+    if (target === "person" && personId && personName) return [{ id: personId, name: personName }];
+    if (target === "multi") return multiPeople;
+    return []; // group handled separately via group_id
+  }, [target, personId, personName, multiPeople]);
+
+  // Who paid options: "me" + all participants
+  const whoPaidOptions = [
+    { value: "me", label: "You" },
+    ...participants.map((p) => ({ value: p.id, label: p.name })),
+  ];
+
+  const total = Number(amount);
+  const equalShare = participants.length > 0 ? total / (participants.length + 1) : 0;
 
   const mutation = useMutation({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
-      const total = Number(amount);
-      if (!total || participants.length === 0) throw new Error("Add an amount and pick participants");
-      const totalPeople = participants.length + 1;
-      const share = total / totalPeople;
+      if (!total) throw new Error("Enter an amount");
+      if (target !== "group" && participants.length === 0) throw new Error("Select at least one person");
+      if (target === "group" && !groupId) throw new Error("Select a group");
+
+      const paidByName = whoPaid === "me" ? "me" : participants.find((p) => p.id === whoPaid)?.name ?? "other";
 
       const { data: split, error } = await supabase.from("splits").insert({
-        type: target === "person" ? "individual" : "group",
+        type: target === "group" ? "group" : "individual",
         person_id: target === "person" && personId ? personId : null,
         group_id: target === "group" && groupId ? groupId : null,
-        description: desc,
+        description: note || null,
         total_amount: total,
-        paid_by: whoPaid === "me" ? "me" : participants[0]?.name ?? "other",
+        paid_by: paidByName,
         split_type: splitType,
         category_id: categoryId || null,
         sub_category_id: subCatId || null,
         account_id: whoPaid === "me" && accountId ? accountId : null,
-        date,
-        time,
-        created_by: u.user.id,
+        date, time, created_by: u.user.id,
       }).select("*").single();
       if (error) throw error;
 
-      const shares = participants.map((p: { id: string; name: string }) => ({
+      const shares = participants.map((p) => ({
         split_id: split.id,
         person_name: p.name,
         person_id: p.id || null,
-        share_amount: share,
+        share_amount: splitType === "custom" ? (customAmounts[p.id] ?? 0) : equalShare,
       }));
-      const { error: e2 } = await supabase.from("split_shares").insert(shares);
-      if (e2) throw e2;
+      if (shares.length > 0) {
+        const { error: e2 } = await supabase.from("split_shares").insert(shares);
+        if (e2) throw e2;
+      }
 
       if (whoPaid === "me" && accountId) {
         await supabase.from("transactions").insert({
-          user_id: u.user.id,
-          type: "expense",
-          amount: total,
-          account_id: accountId || null,
-          category_id: categoryId || null,
+          user_id: u.user.id, type: "expense", amount: total,
+          account_id: accountId || null, category_id: categoryId || null,
           sub_category_id: subCatId || null,
-          note: `Split: ${desc}`,
-          date,
-          time,
-          is_split: true,
-          split_id: split.id,
+          note: note ? `Split: ${note}` : "Split expense",
+          date, time, is_split: true, split_id: split.id,
         });
       }
     },
@@ -830,95 +876,135 @@ function SplitForm({ onClose }: { onClose: () => void }) {
   });
 
   return (
-    <FormShell color="bg-[oklch(0.40_0.13_70)] hover:bg-[oklch(0.45_0.13_70)]" button="Save split"
-      onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
-      <AmountInput value={amount} onChange={setAmount} accent="text-split" />
-      <div className="space-y-1.5"><Label>Description</Label><Input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Dinner" required /></div>
-      <div className="space-y-1.5">
-        <Label>Split with</Label>
-        <div className="flex gap-2 rounded-lg bg-secondary p-1">
-          {(["person", "group"] as const).map((m) => (
-            <button type="button" key={m} onClick={() => setTarget(m)}
-              className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", target === m && "bg-primary text-white")}>{m}</button>
-          ))}
-        </div>
-        {target === "person" ? (
-          <Select value={personId} onValueChange={setPersonId}>
-            <SelectTrigger><SelectValue placeholder="Select person" /></SelectTrigger>
-            <SelectContent>{people.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
-          </Select>
-        ) : (
-          <Select value={groupId} onValueChange={setGroupId}>
-            <SelectTrigger><SelectValue placeholder="Select group" /></SelectTrigger>
-            <SelectContent>{groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
-          </Select>
-        )}
-      </div>
-      <div className="space-y-1.5">
-        <Label>Who paid?</Label>
-        <div className="flex gap-2 rounded-lg bg-secondary p-1">
-          {(["me", "other"] as const).map((m) => (
-            <button type="button" key={m} onClick={() => setWhoPaid(m)}
-              className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", whoPaid === m && "bg-primary text-white")}>
-              {m === "me" ? "You paid" : "Other paid"}
-            </button>
-          ))}
-        </div>
-      </div>
-      {whoPaid === "me" && (
+    <>
+      <FormShell color="bg-[oklch(0.40_0.13_70)] hover:bg-[oklch(0.45_0.13_70)]" button="Save split"
+        onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
+        <AmountInput value={amount} onChange={setAmount} accent="text-split" />
+
+        {/* Split with — 3 options */}
         <div className="space-y-1.5">
-          <Label>Paid from</Label>
-          <Select value={accountId} onValueChange={setAccountId}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{accounts.map((a) => <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
-      )}
-      <div className="space-y-1.5">
-        <Label>Split type</Label>
-        <div className="flex gap-2 rounded-lg bg-secondary p-1">
-          {(["equal", "custom"] as const).map((m) => (
-            <button type="button" key={m} onClick={() => setSplitType(m)}
-              className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", splitType === m && "bg-primary text-white")}>{m}</button>
-          ))}
-        </div>
-        {splitType === "equal" && participants.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            Each person pays: {formatMoney(Number(amount) / (participants.length + 1))}
-          </p>
-        )}
-        {splitType === "custom" && participants.length > 0 && (
-          <div className="space-y-2 mt-2">
-            <p className="text-xs text-muted-foreground">Enter each person's share:</p>
-            {participants.map((p) => (
-              <div key={p.id} className="flex items-center gap-2">
-                <span className="text-sm flex-1">{p.name}</span>
-                <input type="number" placeholder="0.00"
-                  className="w-24 bg-secondary rounded-md px-2 py-1 text-sm text-right font-mono outline-none"
-                  onChange={(e) => { p.customAmount = Number(e.target.value); }} />
-              </div>
+          <Label>Split with</Label>
+          <div className="flex gap-2 rounded-lg bg-secondary p-1">
+            {(["person", "multi", "group"] as const).map((m) => (
+              <button type="button" key={m} onClick={() => setTarget(m)}
+                className={cn("flex-1 rounded-md py-1.5 text-xs font-medium capitalize", target === m && "bg-primary text-white")}>
+                {m === "multi" ? "People" : m}
+              </button>
             ))}
           </div>
-        )}
-      </div>
-      <div className="space-y-1.5">
-        <Label>Category</Label>
-        <Select value={categoryId} onValueChange={setCategoryId}>
-          <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-          <SelectContent>{cats.map((c) => <SelectItem key={c.id} value={c.id}>{(c as any).icon} {c.name}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      {categoryId && subs.length > 0 && (
-        <div className="space-y-1.5">
-          <Label>Sub-category</Label>
-          <Select value={subCatId} onValueChange={setSubCatId}>
-            <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
-            <SelectContent>{(subs as any[]).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-          </Select>
+
+          {/* Person picker button */}
+          {target === "person" && (
+            <button type="button" onClick={() => setPersonPickerOpen(true)}
+              className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
+              <span className={personName ? "text-foreground" : "text-muted-foreground"}>{personName || "Select person"}</span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
+
+          {/* Multi person picker button */}
+          {target === "multi" && (
+            <button type="button" onClick={() => setMultiPickerOpen(true)}
+              className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
+              <span className={multiPeople.length > 0 ? "text-foreground" : "text-muted-foreground"}>
+                {multiPeople.length > 0 ? multiPeople.map((p) => p.name).join(", ") : "Select people"}
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
+
+          {/* Group picker button */}
+          {target === "group" && (
+            <button type="button" onClick={() => setGroupPickerOpen(true)}
+              className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
+              <span className={groupName ? "text-foreground" : "text-muted-foreground"}>{groupName || "Select group"}</span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
         </div>
-      )}
-      <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
-      <div className="space-y-1.5"><Label>Note</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></div>
-    </FormShell>
+
+        {/* Who paid */}
+        <div className="space-y-1.5">
+          <Label>Who paid?</Label>
+          <div className="flex flex-wrap gap-2">
+            {whoPaidOptions.map((opt) => (
+              <button key={opt.value} type="button" onClick={() => setWhoPaid(opt.value)}
+                className={cn("px-3 py-1.5 rounded-lg text-sm border transition-colors",
+                  whoPaid === opt.value ? "bg-primary text-white border-primary" : "border-border text-foreground bg-secondary")}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Account — only if "me" paid */}
+        {whoPaid === "me" && (
+          <div className="space-y-1.5">
+            <Label>Paid from</Label>
+            <Select value={accountId} onValueChange={setAccountId}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{accounts.map((a) => <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Split type */}
+        <div className="space-y-1.5">
+          <Label>Split type</Label>
+          <div className="flex gap-2 rounded-lg bg-secondary p-1">
+            {(["equal", "custom"] as const).map((m) => (
+              <button type="button" key={m} onClick={() => { setSplitType(m); if (m === "custom" && participants.length > 0) setCustomSheetOpen(true); }}
+                className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", splitType === m && "bg-primary text-white")}>{m}</button>
+            ))}
+          </div>
+          {splitType === "equal" && participants.length > 0 && (
+            <p className="text-xs text-muted-foreground">Each person pays: {formatMoney(equalShare)}</p>
+          )}
+          {splitType === "custom" && Object.keys(customAmounts).length > 0 && (
+            <div className="space-y-1 mt-1">
+              {participants.map((p) => (
+                <div key={p.id} className="flex justify-between text-xs text-muted-foreground px-1">
+                  <span>{p.name}</span>
+                  <span className="font-mono">{formatMoney(customAmounts[p.id] ?? 0)}</span>
+                </div>
+              ))}
+              <button type="button" onClick={() => setCustomSheetOpen(true)} className="text-xs text-primary underline mt-1">Edit amounts</button>
+            </div>
+          )}
+        </div>
+
+        {/* Category */}
+        <div className="space-y-1.5">
+          <Label>Category</Label>
+          <button type="button" onClick={() => setCatPickerOpen(true)}
+            className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
+            <span className={categoryId ? "text-foreground" : "text-muted-foreground"}>
+              {categoryId ? `${categoryIcon} ${categoryName}${subCatName ? " · " + subCatName : ""}` : "Select category (optional)"}
+            </span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
+        <div className="space-y-1.5"><Label>Note</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></div>
+      </FormShell>
+
+      {/* Pickers */}
+      <PersonPickerSheet open={personPickerOpen} onOpenChange={setPersonPickerOpen}
+        onSelect={(id, name) => { setPersonId(id); setPersonName(name); }} />
+
+      <MultiPersonPickerSheet open={multiPickerOpen} onOpenChange={setMultiPickerOpen}
+        selected={multiPeople} onConfirm={setMultiPeople} />
+
+      <GroupPickerSheet open={groupPickerOpen} onOpenChange={setGroupPickerOpen}
+        onSelect={(id, name) => { setGroupId(id); setGroupName(name); }} />
+
+      <CustomSplitSheet open={customSheetOpen} onOpenChange={setCustomSheetOpen}
+        participants={participants} total={total}
+        onConfirm={(amounts) => setCustomAmounts(amounts)} />
+
+      <CategoryPickerSheet open={catPickerOpen} onOpenChange={setCatPickerOpen}
+        onSelect={(cId, cName, cIcon, sId, sName) => { setCategoryId(cId); setCategoryName(cName); setCategoryIcon(cIcon); setSubCatId(sId ?? ""); setSubCatName(sName ?? ""); }} />
+    </>
   );
 }
