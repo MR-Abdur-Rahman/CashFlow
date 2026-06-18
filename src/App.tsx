@@ -1,6 +1,5 @@
-import SettingsHistory from './routes/settings-history'
-import SettingsProfile from './routes/settings-profile'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import './index.css'
 import Home from './routes/home'
 import Accounts from './routes/accounts'
@@ -12,28 +11,53 @@ import Auth from './routes/auth'
 import AccountDetail from './routes/account-detail'
 import SplitPerson from './routes/split-person'
 import SplitGroup from './routes/split-group'
+import SettingsProfile from './routes/settings-profile'
+import SettingsHistory from './routes/settings-history'
 import { BottomNav } from './components/BottomNav'
+import { supabase } from './integrations/supabase/client'
 
 function App() {
+  const [session, setSession] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setLoading(false)
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="phone-frame flex items-center justify-center min-h-screen">
+        <p className="text-muted-foreground text-sm">Loading...</p>
+      </div>
+    )
+  }
+
   return (
     <BrowserRouter>
       <div className="phone-frame">
         <Routes>
-          <Route path="/settings/history" element={<SettingsHistory />} />
-          <Route path="/settings/profile" element={<SettingsProfile />} />
-          <Route path="/" element={<Navigate to="/home" />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/accounts" element={<Accounts />} />
-          <Route path="/accounts/:accountId" element={<AccountDetail />} />
-          <Route path="/split" element={<Split />} />
-          <Route path="/split/person/:personId" element={<SplitPerson />} />
-          <Route path="/split/group/:groupId" element={<SplitGroup />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/manage" element={<Manage />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/home" />} />
+          <Route path="/" element={<Navigate to={session ? "/home" : "/auth"} />} />
+          <Route path="/home" element={session ? <Home /> : <Navigate to="/auth" />} />
+          <Route path="/accounts" element={session ? <Accounts /> : <Navigate to="/auth" />} />
+          <Route path="/accounts/:accountId" element={session ? <AccountDetail /> : <Navigate to="/auth" />} />
+          <Route path="/split" element={session ? <Split /> : <Navigate to="/auth" />} />
+          <Route path="/split/person/:personId" element={session ? <SplitPerson /> : <Navigate to="/auth" />} />
+          <Route path="/split/group/:groupId" element={session ? <SplitGroup /> : <Navigate to="/auth" />} />
+          <Route path="/reports" element={session ? <Reports /> : <Navigate to="/auth" />} />
+          <Route path="/manage" element={session ? <Manage /> : <Navigate to="/auth" />} />
+          <Route path="/settings" element={session ? <Settings /> : <Navigate to="/auth" />} />
+          <Route path="/settings/profile" element={session ? <SettingsProfile /> : <Navigate to="/auth" />} />
+          <Route path="/settings/history" element={session ? <SettingsHistory /> : <Navigate to="/auth" />} />
         </Routes>
-        <BottomNav />
+        {session && <BottomNav />}
       </div>
     </BrowserRouter>
   )
