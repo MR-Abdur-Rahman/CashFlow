@@ -106,11 +106,16 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
       const { error } = await supabase.from("transactions").insert({
-        user_id: u.user.id, type: "income", amount: Number(amount),
-        account_id: accountId, income_source_type: sourceType,
-        income_person_id: sourceType === "person" ? personId : null,
+        user_id: u.user.id,
+        type: "income",
+        amount: Number(amount),
+        account_id: accountId || null,
+        income_source_type: sourceType,
+        income_person_id: sourceType === "person" && personId ? personId : null,
         income_source_text: sourceType === "source" ? sourceText : null,
-        date, time, note: note || null,
+        date,
+        time,
+        note: note || null,
       });
       if (error) throw error;
     },
@@ -181,9 +186,15 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
       const { error } = await supabase.from("transactions").insert({
-        user_id: u.user.id, type: "expense", amount: Number(amount),
-        account_id: accountId, category_id: categoryId || null,
-        sub_category_id: subCatId || null, date, time, note: note || null,
+        user_id: u.user.id,
+        type: "expense",
+        amount: Number(amount),
+        account_id: accountId || null,
+        category_id: categoryId || null,
+        sub_category_id: subCatId || null,
+        date,
+        time,
+        note: note || null,
       });
       if (error) throw error;
     },
@@ -255,8 +266,14 @@ function TransferForm({ onClose }: { onClose: () => void }) {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
       const { error } = await supabase.from("transactions").insert({
-        user_id: u.user.id, type: "transfer", amount: Number(amount),
-        account_id: fromId, to_account_id: toId, date, time, note: note || null,
+        user_id: u.user.id,
+        type: "transfer",
+        amount: Number(amount),
+        account_id: fromId || null,
+        to_account_id: toId || null,
+        date,
+        time,
+        note: note || null,
       });
       if (error) throw error;
     },
@@ -332,27 +349,50 @@ function SplitForm({ onClose }: { onClose: () => void }) {
       if (!total || participants.length === 0) throw new Error("Add an amount and pick participants");
       const totalPeople = participants.length + 1;
       const share = total / totalPeople;
+
       const { data: split, error } = await supabase.from("splits").insert({
-        type: target === "person" ? "individual" : "group", person_id: target === "person" ? personId : null,
-        group_id: target === "group" ? groupId : null,
-        description: desc, total_amount: total,
+        type: target === "person" ? "individual" : "group",
+        // ✅ FIX: only pass UUID if it's a non-empty string
+        person_id: target === "person" && personId ? personId : null,
+        group_id: target === "group" && groupId ? groupId : null,
+        description: desc,
+        total_amount: total,
         paid_by: whoPaid === "me" ? "me" : participants[0]?.name ?? "other",
-        split_type: splitType, category_id: categoryId || null,
+        split_type: splitType,
+        category_id: categoryId || null,
         sub_category_id: subCatId || null,
-        account_id: whoPaid === "me" ? accountId : null,
-        date, time, created_by: u.user.id,
+        // ✅ FIX: only pass accountId UUID if non-empty
+        account_id: whoPaid === "me" && accountId ? accountId : null,
+        date,
+        time,
+        created_by: u.user.id,
       }).select("*").single();
       if (error) throw error;
+
       const shares = participants.map((p: { id: string; name: string }) => ({
-        split_id: split.id, person_name: p.name, person_id: p.id, share_amount: share,
+        split_id: split.id,
+        person_name: p.name,
+        // ✅ FIX: only pass person_id UUID if non-empty
+        person_id: p.id || null,
+        share_amount: share,
       }));
       const { error: e2 } = await supabase.from("split_shares").insert(shares);
       if (e2) throw e2;
+
       if (whoPaid === "me" && accountId) {
         await supabase.from("transactions").insert({
-          user_id: u.user.id, type: "expense", amount: total, account_id: accountId,
-          category_id: categoryId || null, sub_category_id: subCatId || null,
-          note: `Split: ${desc}`, date, time, is_split: true, split_id: split.id,
+          user_id: u.user.id,
+          type: "expense",
+          amount: total,
+          // ✅ FIX: guard accountId here too
+          account_id: accountId || null,
+          category_id: categoryId || null,
+          sub_category_id: subCatId || null,
+          note: `Split: ${desc}`,
+          date,
+          time,
+          is_split: true,
+          split_id: split.id,
         });
       }
     },
