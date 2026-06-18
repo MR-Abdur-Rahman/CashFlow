@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,10 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
+import { Plus, QrCode, GripVertical, X, ChevronRight } from "lucide-react";
+import { AddPersonDialog } from "@/components/AddPersonDialog";
+import { QrScannerDialog } from "@/components/QrScannerDialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 type Tab = "income" | "expense" | "transfer" | "split";
 
@@ -86,18 +90,211 @@ function FormShell({ children, onSubmit, button, color }: { children: React.Reac
   );
 }
 
+// ─── Person Picker Sheet ───────────────────────────────────────────────────
+function PersonPickerSheet({
+  open,
+  onOpenChange,
+  onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onSelect: (id: string, name: string) => void;
+}) {
+  const { data: people = [] } = useQuery(peopleQuery());
+  const [order, setOrder] = useState<string[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const dragIdx = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (people.length > 0 && order.length === 0) {
+      setOrder(people.map((p: any) => p.id));
+    }
+  }, [people]);
+
+  const ordered = useMemo(() => {
+    if (order.length === 0) return people;
+    return [...people].sort((a: any, b: any) => {
+      const ai = order.indexOf(a.id);
+      const bi = order.indexOf(b.id);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+  }, [people, order]);
+
+  function handleDragStart(idx: number) { dragIdx.current = idx; }
+  function handleDragOver(e: React.DragEvent, idx: number) {
+    e.preventDefault();
+    if (dragIdx.current === null || dragIdx.current === idx) return;
+    const newOrder = [...ordered.map((p: any) => p.id)];
+    const [moved] = newOrder.splice(dragIdx.current, 1);
+    newOrder.splice(idx, 0, moved);
+    dragIdx.current = idx;
+    setOrder(newOrder);
+  }
+
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
+          <SheetTitle className="sr-only">Select Person</SheetTitle>
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
+            <span className="text-base font-semibold">Person</span>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setQrOpen(true)} className="text-muted-foreground hover:text-foreground">
+                <QrCode className="h-5 w-5" />
+              </button>
+              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground">
+                <Plus className="h-5 w-5" />
+              </button>
+              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+          {/* List */}
+          <div className="flex-1 overflow-y-auto divide-y divide-border">
+            {ordered.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-10">No people yet. Tap + to add.</p>
+            )}
+            {ordered.map((p: any, idx: number) => (
+              <div
+                key={p.id}
+                draggable
+                onDragStart={() => handleDragStart(idx)}
+                onDragOver={(e) => handleDragOver(e, idx)}
+                className="flex items-center gap-3 px-5 py-4 bg-card active:bg-secondary/40 cursor-pointer"
+              >
+                <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                <div
+                  className="flex-1"
+                  onClick={() => { onSelect(p.id, p.name); onOpenChange(false); }}
+                >
+                  <p className="text-sm font-medium">{p.name}</p>
+                  {p.phone_number && <p className="text-xs text-muted-foreground">{p.phone_number}</p>}
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+      <AddPersonDialog open={addOpen} onOpenChange={setAddOpen} />
+      <QrScannerDialog open={qrOpen} onOpenChange={setQrOpen} onResult={() => {}} />
+    </>
+  );
+}
+
+// ─── Source Picker Sheet ───────────────────────────────────────────────────
+const DEFAULT_SOURCES = ["Salary", "Freelance", "Business", "Gift", "Bonus", "Rental", "Investment", "Other"];
+
+function SourcePickerSheet({
+  open,
+  onOpenChange,
+  onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onSelect: (source: string) => void;
+}) {
+  const [sources, setSources] = useState<string[]>(DEFAULT_SOURCES);
+  const [addOpen, setAddOpen] = useState(false);
+  const [newSource, setNewSource] = useState("");
+  const dragIdx = useRef<number | null>(null);
+
+  function handleDragStart(idx: number) { dragIdx.current = idx; }
+  function handleDragOver(e: React.DragEvent, idx: number) {
+    e.preventDefault();
+    if (dragIdx.current === null || dragIdx.current === idx) return;
+    const newArr = [...sources];
+    const [moved] = newArr.splice(dragIdx.current, 1);
+    newArr.splice(idx, 0, moved);
+    dragIdx.current = idx;
+    setSources(newArr);
+  }
+
+  function addSource() {
+    if (!newSource.trim()) return;
+    setSources((prev) => [newSource.trim(), ...prev]);
+    setNewSource("");
+    setAddOpen(false);
+  }
+
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
+          <SheetTitle className="sr-only">Select Source</SheetTitle>
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
+            <span className="text-base font-semibold">Source</span>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground">
+                <Plus className="h-5 w-5" />
+              </button>
+              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+          {/* List */}
+          <div className="flex-1 overflow-y-auto divide-y divide-border">
+            {sources.map((s, idx) => (
+              <div
+                key={s}
+                draggable
+                onDragStart={() => handleDragStart(idx)}
+                onDragOver={(e) => handleDragOver(e, idx)}
+                className="flex items-center gap-3 px-5 py-4 bg-card active:bg-secondary/40 cursor-pointer"
+              >
+                <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                <div
+                  className="flex-1"
+                  onClick={() => { onSelect(s); onOpenChange(false); }}
+                >
+                  <p className="text-sm font-medium">{s}</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Add Source Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <DialogTitle>Add Source</DialogTitle>
+          <div className="space-y-4">
+            <Input
+              placeholder="e.g. Rental, Dividend"
+              value={newSource}
+              onChange={(e) => setNewSource(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSource(); } }}
+            />
+            <Button className="w-full" onClick={addSource}>Add</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+// ─── Income Form ───────────────────────────────────────────────────────────
 function IncomeForm({ onClose }: { onClose: () => void }) {
   const { data: accounts = [] } = useQuery(accountsQuery());
-  const { data: people = [] } = useQuery(peopleQuery());
   const qc = useQueryClient();
   const [amount, setAmount] = useState("");
   const [sourceType, setSourceType] = useState<"person" | "source">("source");
   const [personId, setPersonId] = useState("");
+  const [personName, setPersonName] = useState("");
   const [sourceText, setSourceText] = useState("");
   const [accountId, setAccountId] = useState("");
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [time, setTime] = useState(format(new Date(), "HH:mm"));
   const [note, setNote] = useState("");
+  const [personPickerOpen, setPersonPickerOpen] = useState(false);
+  const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
 
   useEffect(() => { if (accounts[0]?.id) setAccountId(accounts[0].id); }, [accounts]);
 
@@ -129,42 +326,77 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
   });
 
   return (
-    <FormShell color="bg-[oklch(0.40_0.13_145)] hover:bg-[oklch(0.45_0.13_145)]" button="Save income" onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
-      <AmountInput value={amount} onChange={setAmount} accent="text-income" />
-      <div className="space-y-1.5">
-        <Label>From</Label>
-        <div className="flex gap-2 rounded-lg bg-secondary p-1">
-          {(["person", "source"] as const).map((m) => (
-            <button type="button" key={m} onClick={() => setSourceType(m)} className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", sourceType === m && "bg-primary text-white")}>{m}</button>
-          ))}
+    <>
+      <FormShell color="bg-[oklch(0.40_0.13_145)] hover:bg-[oklch(0.45_0.13_145)]" button="Save income" onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
+        <AmountInput value={amount} onChange={setAmount} accent="text-income" />
+        <div className="space-y-1.5">
+          <Label>From</Label>
+          <div className="flex gap-2 rounded-lg bg-secondary p-1">
+            {(["person", "source"] as const).map((m) => (
+              <button type="button" key={m} onClick={() => setSourceType(m)}
+                className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", sourceType === m && "bg-primary text-white")}>
+                {m}
+              </button>
+            ))}
+          </div>
+
+          {/* Person selector button */}
+          {sourceType === "person" && (
+            <button
+              type="button"
+              onClick={() => setPersonPickerOpen(true)}
+              className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm"
+            >
+              <span className={personName ? "text-foreground" : "text-muted-foreground"}>
+                {personName || "Select person"}
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
+
+          {/* Source selector button */}
+          {sourceType === "source" && (
+            <button
+              type="button"
+              onClick={() => setSourcePickerOpen(true)}
+              className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm"
+            >
+              <span className={sourceText ? "text-foreground" : "text-muted-foreground"}>
+                {sourceText || "Select source"}
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
         </div>
-        {sourceType === "person" ? (
-          <Select value={personId} onValueChange={setPersonId}>
-            <SelectTrigger><SelectValue placeholder="Select person" /></SelectTrigger>
+
+        <div className="space-y-1.5">
+          <Label>To account</Label>
+          <Select value={accountId} onValueChange={setAccountId}>
+            <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
             <SelectContent>
-              {people.length === 0 && <div className="p-2 text-sm text-muted-foreground">No people yet</div>}
-              {people.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>)}
             </SelectContent>
           </Select>
-        ) : (
-          <Input placeholder="e.g. Salary, Freelance" value={sourceText} onChange={(e) => setSourceText(e.target.value)} />
-        )}
-      </div>
-      <div className="space-y-1.5">
-        <Label>To account</Label>
-        <Select value={accountId} onValueChange={setAccountId}>
-          <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-          <SelectContent>
-            {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-      <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
-      <div className="space-y-1.5"><Label>Note</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></div>
-    </FormShell>
+        </div>
+        <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
+        <div className="space-y-1.5"><Label>Note</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></div>
+      </FormShell>
+
+      <PersonPickerSheet
+        open={personPickerOpen}
+        onOpenChange={setPersonPickerOpen}
+        onSelect={(id, name) => { setPersonId(id); setPersonName(name); }}
+      />
+      <SourcePickerSheet
+        open={sourcePickerOpen}
+        onOpenChange={setSourcePickerOpen}
+        onSelect={(s) => setSourceText(s)}
+      />
+    </>
   );
 }
 
+// ─── Expense Form ──────────────────────────────────────────────────────────
 function ExpenseForm({ onClose }: { onClose: () => void }) {
   const { data: accounts = [] } = useQuery(accountsQuery());
   const { data: cats = [] } = useQuery(categoriesQuery("expense"));
@@ -245,6 +477,7 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Transfer Form ─────────────────────────────────────────────────────────
 function TransferForm({ onClose }: { onClose: () => void }) {
   const { data: accounts = [] } = useQuery(accountsQuery());
   const qc = useQueryClient();
@@ -309,6 +542,7 @@ function TransferForm({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Split Form ────────────────────────────────────────────────────────────
 function SplitForm({ onClose }: { onClose: () => void }) {
   const { data: accounts = [] } = useQuery(accountsQuery());
   const { data: cats = [] } = useQuery(categoriesQuery("expense"));
@@ -352,7 +586,6 @@ function SplitForm({ onClose }: { onClose: () => void }) {
 
       const { data: split, error } = await supabase.from("splits").insert({
         type: target === "person" ? "individual" : "group",
-        // ✅ FIX: only pass UUID if it's a non-empty string
         person_id: target === "person" && personId ? personId : null,
         group_id: target === "group" && groupId ? groupId : null,
         description: desc,
@@ -361,7 +594,6 @@ function SplitForm({ onClose }: { onClose: () => void }) {
         split_type: splitType,
         category_id: categoryId || null,
         sub_category_id: subCatId || null,
-        // ✅ FIX: only pass accountId UUID if non-empty
         account_id: whoPaid === "me" && accountId ? accountId : null,
         date,
         time,
@@ -372,7 +604,6 @@ function SplitForm({ onClose }: { onClose: () => void }) {
       const shares = participants.map((p: { id: string; name: string }) => ({
         split_id: split.id,
         person_name: p.name,
-        // ✅ FIX: only pass person_id UUID if non-empty
         person_id: p.id || null,
         share_amount: share,
       }));
@@ -384,7 +615,6 @@ function SplitForm({ onClose }: { onClose: () => void }) {
           user_id: u.user.id,
           type: "expense",
           amount: total,
-          // ✅ FIX: guard accountId here too
           account_id: accountId || null,
           category_id: categoryId || null,
           sub_category_id: subCatId || null,
@@ -468,9 +698,7 @@ function SplitForm({ onClose }: { onClose: () => void }) {
                   type="number"
                   placeholder="0.00"
                   className="w-24 bg-secondary rounded-md px-2 py-1 text-sm text-right font-mono outline-none"
-                  onChange={(e) => {
-                    p.customAmount = Number(e.target.value);
-                  }}
+                  onChange={(e) => { p.customAmount = Number(e.target.value); }}
                 />
               </div>
             ))}
