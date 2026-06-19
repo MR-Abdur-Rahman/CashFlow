@@ -65,18 +65,60 @@ export default function SettingsPage() {
     let payload: any;
     try { payload = JSON.parse(text); } catch { return toast.error("Not a valid QR code"); }
     if (payload?.app !== "cashflow") return toast.error("Not a CashFlow QR");
+
     const name = typeof payload.name === "string" ? payload.name.trim().slice(0, 80) : "";
     const phoneRaw = typeof payload.phone === "string" ? payload.phone.trim() : "";
     const phone = phoneRaw && /^\+?[0-9 ()-]{6,20}$/.test(phoneRaw) ? phoneRaw : null;
+    const scannedUserId = typeof payload.id === "string" ? payload.id : null;
+
     if (!name && !phone) return toast.error("QR is missing name and phone");
-    if (payload.id && payload.id === userId) return toast.error("That's your own QR");
-    const { error } = await supabase.from("people").upsert(
-      { name: name || "Friend", phone_number: phone, user_id: userId! },
+    if (scannedUserId && scannedUserId === userId) return toast.error("That's your own QR");
+
+    // Step 1 — Add scanned user to User A's people list with linked_user_id
+    const { error: e1 } = await supabase.from("people").upsert(
+      {
+        name: name || "Friend",
+        phone_number: phone,
+        user_id: userId!,
+        linked_user_id: scannedUserId || null,
+      },
       { onConflict: "user_id,phone_number", ignoreDuplicates: false },
     );
-    if (error) return toast.error(error.message);
-    toast.success(`Added ${name || phone}`);
+    if (e1) return toast.error(e1.message);
+
+    // Step 2 — Add User A to scanned user's (User B) people list as mutual connection
+    if (scannedUserId) {
+      // Get User A's profile info
+      const { data: myProfile } = await supabase
+        .from("profiles")
+        .select("full_name, phone_number")
+        .eq("id", userId!)
+        .maybeSingle();
+
+      if (myProfile) {
+        // Check if User B already has User A in their people list
+        const { data: existing } = await supabase
+          .from("people")
+          .select("id")
+          .eq("user_id", scannedUserId)
+          .eq("linked_user_id", userId!)
+          .maybeSingle();
+
+        if (!existing) {
+          // Add User A to User B's people list
+          await supabase.from("people").insert({
+            name: myProfile.full_name || fullName || "Friend",
+            phone_number: myProfile.phone_number || phone || null,
+            user_id: scannedUserId,
+            linked_user_id: userId!,
+          });
+        }
+      }
+    }
+
+    toast.success(`Connected with ${name || phone} 🔗`);
     qc.invalidateQueries({ queryKey: ["people"] });
+    qc.invalidateQueries({ queryKey: ["splits"] });
   }
 
   async function exportJson() {
@@ -246,7 +288,7 @@ export default function SettingsPage() {
           <DialogTitle>My QR</DialogTitle>
           <div className="flex flex-col items-center gap-3 p-4">
             <div className="bg-white p-4 rounded-xl">
-              <QRCodeSVG value={JSON.stringify({ app: "cashflow", id: userId, name: fullName, phone })} size={200} />
+              <QRCodeSVG value={JSON.stringify({ app: "cashflow", id: userId, name: fullName, phone: phone || profile?.phone_number || "" })} size={200} />
             </div>
             <p className="text-xs text-muted-foreground text-center">Have a friend scan this to add you as a contact.</p>
           </div>
