@@ -77,7 +77,7 @@ export function AvatarUpload({
     <div className="flex items-center gap-4">
       <UserAvatar url={currentUrl} name={name} size={72} />
       <div className="flex flex-col gap-2">
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPick} />
+        <input ref={fileRef} type="file" accept="image/*,image/heic,image/heif" className="hidden" onChange={onPick} />
         <Button type="button" size="sm" variant="secondary" disabled={busy} onClick={() => fileRef.current?.click()}>
           {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Camera className="h-4 w-4 mr-2" />}
           {currentUrl ? "Change photo" : "Upload photo"}
