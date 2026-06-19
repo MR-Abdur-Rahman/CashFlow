@@ -208,8 +208,7 @@ export const personSplitsQuery = (personId: string) =>
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return [];
 
-      console.log("personSplitsQuery called with personId:", personId);
-      console.log("current user:", u.user.id);
+
 
       const { data: personData } = await supabase
         .from("people")
@@ -217,7 +216,7 @@ export const personSplitsQuery = (personId: string) =>
         .eq("id", personId)
         .maybeSingle();
 
-      console.log("personData:", personData);
+
 
       const personIds = new Set<string>([personId]);
 
@@ -228,22 +227,22 @@ export const personSplitsQuery = (personId: string) =>
           .eq("user_id", personData.linked_user_id)
           .eq("linked_user_id", u.user.id);
         
-        console.log("mirrorPeople:", mirrorPeople);
+
         if (mirrorPeople) mirrorPeople.forEach((p: any) => personIds.add(p.id));
       }
 
       const uniquePersonIds = [...personIds];
-      console.log("uniquePersonIds:", uniquePersonIds);
+
 
       const { data: shareData, error: shareError } = await supabase
         .from("split_shares")
         .select("split_id")
         .in("person_id", uniquePersonIds);
       
-      console.log("shareData:", shareData, "shareError:", shareError);
+
 
       const splitIds = [...new Set((shareData ?? []).map((s: any) => s.split_id))];
-      console.log("splitIds:", splitIds);
+
 
       if (splitIds.length === 0) return [];
 
@@ -253,7 +252,6 @@ export const personSplitsQuery = (personId: string) =>
         .in("id", splitIds)
         .order("date", { ascending: false });
       
-      console.log("splits data:", data, "error:", error);
 
       if (error) throw error;
 
