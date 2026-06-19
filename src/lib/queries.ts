@@ -136,7 +136,7 @@ export const splitsQuery = () =>
     queryFn: async () => {
       const { data, error } = await supabase
         .from("splits")
-        .select("*, split_shares(*), settlements(*)")
+        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name)")
         .order("date", { ascending: false })
         .order("time", { ascending: false });
       if (error) throw error;
@@ -144,17 +144,39 @@ export const splitsQuery = () =>
     },
   });
 
+// Fetches splits where person appears as person_id OR in split_shares
 export const personSplitsQuery = (personId: string) =>
   queryOptions({
     queryKey: ["splits", "person", personId],
     queryFn: async () => {
+      // Get split IDs where this person appears in split_shares
+      const { data: shareData, error: shareError } = await supabase
+        .from("split_shares")
+        .select("split_id")
+        .eq("person_id", personId);
+      if (shareError) throw shareError;
+
+      const splitIds = [...new Set((shareData ?? []).map((s: any) => s.split_id))];
+
+      if (splitIds.length === 0) {
+        // Also try direct person_id match
+        const { data, error } = await supabase
+          .from("splits")
+          .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name)")
+          .eq("person_id", personId)
+          .order("date", { ascending: false });
+        if (error) throw error;
+        return data ?? [];
+      }
+
+      // Fetch all splits where person appears (via shares or direct)
       const { data, error } = await supabase
         .from("splits")
-        .select("*, split_shares(*), settlements(*)")
-        .eq("person_id", personId)
+        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name)")
+        .in("id", splitIds)
         .order("date", { ascending: false });
       if (error) throw error;
-      return data;
+      return data ?? [];
     },
   });
 
@@ -164,7 +186,7 @@ export const groupSplitsQuery = (groupId: string) =>
     queryFn: async () => {
       const { data, error } = await supabase
         .from("splits")
-        .select("*, split_shares(*), settlements(*)")
+        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name)")
         .eq("group_id", groupId)
         .order("date", { ascending: false });
       if (error) throw error;
