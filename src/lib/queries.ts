@@ -208,27 +208,52 @@ export const personSplitsQuery = (personId: string) =>
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return [];
 
-      // Get split IDs where this person appears in split_shares
+      // Get the person record to find linked_user_id
+      const { data: personData } = await supabase
+        .from("people")
+        .select("id, linked_user_id, user_id")
+        .eq("id", personId)
+        .maybeSingle();
+
+      // Collect all person IDs that represent this person across accounts
+      const personIds = [personId];
+
+      if (personData?.linked_user_id) {
+        // Find the mirror people record (same person but under the other user's account)
+        const { data: mirrorPeople } = await supabase
+          .from("people")
+          .select("id")
+          .eq("linked_user_id", personData.linked_user_id)
+          .neq("id", personId);
+        
+        if (mirrorPeople) {
+          personIds.push(...mirrorPeople.map((p: any) => p.id));
+        }
+
+        // Also find people records where linked_user_id = current person's user_id
+        const { data: linkedPeople } = await supabase
+          .from("people")
+          .select("id")
+          .eq("linked_user_id", personData.user_id ?? "");
+        
+        if (linkedPeople) {
+          personIds.push(...linkedPeople.map((p: any) => p.id));
+        }
+      }
+
+      // Get all unique person IDs
+      const uniquePersonIds = [...new Set(personIds)];
+
+      // Get split IDs where any of these person IDs appear in split_shares
       const { data: shareData, error: shareError } = await supabase
         .from("split_shares")
         .select("split_id")
-        .eq("person_id", personId);
+        .in("person_id", uniquePersonIds);
       if (shareError) throw shareError;
 
       const splitIds = [...new Set((shareData ?? []).map((s: any) => s.split_id))];
 
-      if (splitIds.length === 0) {
-        const { data, error } = await supabase
-          .from("splits")
-          .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name)")
-          .eq("person_id", personId)
-          .order("date", { ascending: false });
-        if (error) throw error;
-        return (data ?? []).map((s: any) => ({
-          ...s,
-          _isIncoming: s.created_by !== u.user!.id,
-        }));
-      }
+      if (splitIds.length === 0) return [];
 
       const { data, error } = await supabase
         .from("splits")
