@@ -6,15 +6,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import './index.css'
 import App from './App.tsx'
+import { SwipeProvider } from './components/SwipeRow'
 
 const queryClient = new QueryClient()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <PrefsApplier />
-      <App />
-      <Toaster position="top-center" richColors />
+      <SwipeProvider>
+        <PrefsApplier />
+        <App />
+        <Toaster position="top-center" richColors />
+      </SwipeProvider>
     </QueryClientProvider>
   </StrictMode>,
 )
