@@ -61,7 +61,7 @@ export default function SettingsPage() {
     navigate("/auth");
   }
 
-  async function handleScannedQr(text: string) {
+async function handleScannedQr(text: string) {
   let payload: any;
   try { payload = JSON.parse(text); } catch { return toast.error("Not a valid QR code"); }
   if (payload?.app !== "cashflow") return toast.error("Not a CashFlow QR");
@@ -71,52 +71,70 @@ export default function SettingsPage() {
   const phone = phoneRaw && /^\+?[0-9 ()-]{6,20}$/.test(phoneRaw) ? phoneRaw : null;
   const scannedUserId = typeof payload.id === "string" ? payload.id : null;
 
-  if (!name && !phone) return toast.error("QR is missing name and phone");
+  if (!name && !phone && !scannedUserId) return toast.error("QR is missing info");
   if (scannedUserId && scannedUserId === userId) return toast.error("That's your own QR");
 
-  // Step 1 — Add User B to User A's people list with linked_user_id = User B's userId
-  const { error: e1 } = await supabase.from("people").upsert(
-    {
+  // Step 1 — Add User B to User A's people list
+  // Check if already exists by linked_user_id
+  const { data: existingA } = await supabase
+    .from("people")
+    .select("id")
+    .eq("user_id", userId!)
+    .eq("linked_user_id", scannedUserId!)
+    .maybeSingle();
+
+  if (existingA) {
+    // Update existing record
+    await supabase.from("people").update({
       name: name || "Friend",
       phone_number: phone,
-      user_id: userId!,               // belongs to User A
-      linked_user_id: scannedUserId,  // links to User B's account
-    },
-    { onConflict: "user_id,phone_number", ignoreDuplicates: false },
-  );
-  if (e1) return toast.error(e1.message);
+    }).eq("id", existingA.id);
+  } else {
+    // Insert new record
+    const { error: e1 } = await supabase.from("people").insert({
+      name: name || "Friend",
+      phone_number: phone,
+      user_id: userId!,
+      linked_user_id: scannedUserId,
+    });
+    if (e1) return toast.error(e1.message);
+  }
 
-  // Step 2 — Add User A to User B's people list (mutual connection)
+  // Step 2 — Add User A to User B's people list (mutual)
   if (scannedUserId) {
-    // Get User A's profile
     const { data: myProfile } = await supabase
       .from("profiles")
       .select("full_name, phone_number")
       .eq("id", userId!)
       .maybeSingle();
 
-    // Check if User B already has User A in their list
-    const { data: existing } = await supabase
+    // Check if User B already has User A
+    const { data: existingB } = await supabase
       .from("people")
       .select("id")
-      .eq("user_id", scannedUserId)   // belongs to User B
-      .eq("linked_user_id", userId!)   // links to User A
+      .eq("user_id", scannedUserId)
+      .eq("linked_user_id", userId!)
       .maybeSingle();
 
-    if (!existing) {
-      // Add User A to User B's people list
-      // name/phone = User A's info, user_id = User B, linked_user_id = User A
+    if (existingB) {
+      // Update existing
+      await supabase.from("people").update({
+        name: myProfile?.full_name || fullName || "Friend",
+        phone_number: myProfile?.phone_number || null,
+      }).eq("id", existingB.id);
+    } else {
+      // Insert User A into User B's people list
       const { error: e2 } = await supabase.from("people").insert({
         name: myProfile?.full_name || fullName || "Friend",
         phone_number: myProfile?.phone_number || null,
-        user_id: scannedUserId,        // belongs to User B's account
-        linked_user_id: userId!,       // links back to User A
+        user_id: scannedUserId,       // User B's account
+        linked_user_id: userId!,      // links to User A
       });
       if (e2) console.warn("Mutual link error:", e2.message);
     }
   }
 
-  toast.success(`Connected with ${name || phone} 🔗`);
+  toast.success(`Connected with ${name || "friend"} 🔗`);
   qc.invalidateQueries({ queryKey: ["people"] });
   qc.invalidateQueries({ queryKey: ["splits"] });
 }
