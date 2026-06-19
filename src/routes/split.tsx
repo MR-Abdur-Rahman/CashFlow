@@ -43,7 +43,7 @@ function navigateAnchor(period: Period, anchor: Date, dir: -1 | 1): Date {
 }
 
 function formatAnchorLabel(period: Period, anchor: Date) {
-  if (period === "weekly") return `${format(startOfWeek(anchor, { weekStartsOn: 1 }), "MMM d")} – ${format(endOfWeek(anchor, { weekStartsOn: 1 }), "MMM d, yyyy")}`;
+  if (period === "weekly") return `${format(startOfWeek(anchor, { weekStartsOn: 1 }), "MMM d")}–${format(endOfWeek(anchor, { weekStartsOn: 1 }), "d")}`;
   if (period === "monthly") return format(anchor, "MMM yyyy");
   return format(anchor, "yyyy");
 }
@@ -63,8 +63,6 @@ export default function SplitPage() {
   const { data: groups = [] } = useQuery(groupsQuery());
   const { data: splits = [] } = useQuery(splitsQuery());
   const { data: incomingSplits = [] } = useQuery(incomingSplitsQuery());
-  console.log("incomingSplits:", incomingSplits);
-  console.log("splits:", splits);
   const qc = useQueryClient();
   const [addPerson, setAddPerson] = useState(false);
   const [addGroup, setAddGroup] = useState(false);
@@ -96,8 +94,19 @@ export default function SplitPage() {
     toast.success("QR scanned — review and save");
   }
 
+  // Build a map: people record id -> linked_user_id
+  // This lets us check if an incoming split involves a person linked to someone in our people list
+  const linkedPersonMap = useMemo(() => {
+    const map = new Map<string, string>(); // linked_user_id -> person.id (our people list)
+    for (const p of people as any[]) {
+      if (p.linked_user_id) map.set(p.linked_user_id, p.id);
+    }
+    return map;
+  }, [people]);
+
   function personBalance(personId: string) {
     let owed = 0;
+
     // Own splits — person owes me
     for (const s of splits as any[]) {
       for (const sh of (s.split_shares ?? [])) {
@@ -107,19 +116,28 @@ export default function SplitPage() {
         owed += Number(sh.share_amount) - settled;
       }
     }
-    // Incoming splits — I owe them (negative)
-    for (const s of incomingSplits as any[]) {
-      const myPersonId = s._myPersonId;
-      if (!myPersonId) continue;
-      const isFromThisPerson = (s.split_shares ?? []).some((sh: any) => sh.person_id === personId);
-      if (!isFromThisPerson) continue;
-      for (const sh of (s.split_shares ?? [])) {
-        if (sh.person_id !== myPersonId) continue;
-        const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
-          .reduce((a: number, x: any) => a + Number(x.amount), 0);
-        owed -= Number(sh.share_amount) - settled;
+
+    // Incoming splits — check if this incoming split was created by the person linked to personId
+    // personId is our people record (e.g. Rahman M.R.A under User B's account)
+    // The person in our list has linked_user_id = User A
+    // incomingSplits._createdByUserId = User A
+    const person = (people as any[]).find((p) => p.id === personId);
+    if (person?.linked_user_id) {
+      for (const s of incomingSplits as any[]) {
+        // This incoming split was created by person.linked_user_id (User A)
+        if (s._createdByUserId !== person.linked_user_id) continue;
+        // Get my share amount
+        const myPersonId = s._myPersonId;
+        if (!myPersonId) continue;
+        for (const sh of (s.split_shares ?? [])) {
+          if (sh.person_id !== myPersonId) continue;
+          const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
+            .reduce((a: number, x: any) => a + Number(x.amount), 0);
+          owed -= Number(sh.share_amount) - settled;
+        }
       }
     }
+
     return owed;
   }
 
@@ -130,9 +148,7 @@ export default function SplitPage() {
   // Filter splits by period and status
   const filteredSplits = useMemo(() => {
     return (splits as any[]).filter((s) => {
-      // Period filter
       if (s.date < dateFrom || s.date > dateTo) return false;
-      // Status filter
       const totalShares = (s.split_shares ?? []).length;
       const settledShares = (s.split_shares ?? []).filter((sh: any) => sh.is_settled).length;
       const isFullySettled = totalShares > 0 && settledShares === totalShares;
@@ -203,61 +219,57 @@ export default function SplitPage() {
 
       {/* History Section */}
       <div>
-        <div className="flex items-center justify-between mb-3 px-1">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">History</p>
-        </div>
-
-        {/* Filter bar: < Jun 2026 > [Monthly] [All] */}
+        {/* Compact filter bar */}
         <div className="flex items-center gap-2 mb-3">
-          {/* Period navigation */}
-          <div className="flex items-center gap-1.5 flex-1">
-            <button type="button"
-              onClick={() => setAnchor(navigateAnchor(period, anchor, -1))}
-              className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary text-foreground">
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="text-sm font-semibold flex-1 text-center">{formatAnchorLabel(period, anchor)}</span>
-            <button type="button"
-              onClick={() => setAnchor(navigateAnchor(period, anchor, 1))}
-              className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary text-foreground">
-              <ChevronRight className="h-4 w-4" />
-            </button>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium mr-1">History</p>
+          <button type="button"
+            onClick={() => setAnchor(navigateAnchor(period, anchor, -1))}
+            className="h-7 w-7 flex items-center justify-center rounded-full bg-secondary text-foreground shrink-0">
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <span className="text-xs font-semibold text-center min-w-0 truncate">{formatAnchorLabel(period, anchor)}</span>
+          <button type="button"
+            onClick={() => setAnchor(navigateAnchor(period, anchor, 1))}
+            className="h-7 w-7 flex items-center justify-center rounded-full bg-secondary text-foreground shrink-0">
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+
+          <div className="flex items-center gap-1.5 ml-auto shrink-0">
+            {/* Period dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-0.5 bg-primary text-white text-xs font-medium px-2.5 py-1.5 rounded-lg capitalize">
+                  {period === "weekly" ? "Wk" : period === "monthly" ? "Mo" : "Yr"} <ChevronDown className="h-3 w-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-28">
+                {(["weekly", "monthly", "annually"] as Period[]).map((p) => (
+                  <DropdownMenuItem key={p} onClick={() => { setPeriod(p); setAnchor(new Date()); }}
+                    className={cn("capitalize py-2", period === p && "text-primary font-medium")}>
+                    {p}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Status filter dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-0.5 bg-secondary text-foreground text-xs font-medium px-2.5 py-1.5 rounded-lg">
+                  {statusFilter === "all" ? "All" : statusFilter === "unsettled" ? "Pending" : "Done"}
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-28">
+                {(["all", "unsettled", "settled"] as StatusFilter[]).map((s) => (
+                  <DropdownMenuItem key={s} onClick={() => setStatusFilter(s)}
+                    className={cn("py-2", statusFilter === s && "text-primary font-medium")}>
+                    {s === "all" ? "All" : s === "unsettled" ? "Pending" : "Settled"}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-
-          {/* Period dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1 bg-primary text-white text-xs font-medium px-3 py-1.5 rounded-xl capitalize">
-                {period} <ChevronDown className="h-3 w-3" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-32">
-              {(["weekly", "monthly", "annually"] as Period[]).map((p) => (
-                <DropdownMenuItem key={p} onClick={() => { setPeriod(p); setAnchor(new Date()); }}
-                  className={cn("capitalize py-2", period === p && "text-primary font-medium")}>
-                  {p}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Status filter dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1 bg-secondary text-foreground text-xs font-medium px-3 py-1.5 rounded-xl capitalize">
-                {statusFilter === "all" ? "All" : statusFilter === "unsettled" ? "Unsettled" : "Settled"}
-                <ChevronDown className="h-3 w-3" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-32">
-              {(["all", "unsettled", "settled"] as StatusFilter[]).map((s) => (
-                <DropdownMenuItem key={s} onClick={() => setStatusFilter(s)}
-                  className={cn("capitalize py-2", statusFilter === s && "text-primary font-medium")}>
-                  {s === "all" ? "All" : s === "unsettled" ? "Unsettled" : "Settled"}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
 
         <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
@@ -280,7 +292,7 @@ export default function SplitPage() {
                         <p className="text-sm font-medium truncate">{label}</p>
                         <p className="text-xs text-muted-foreground font-mono">
                           {s.date} · paid by {s.paid_by}
-                          {isFullySettled ? " · ✓ settled" : unsettled ? ` · ${settledShares}/${totalShares} settled` : ""}
+                          {isFullySettled ? " · ✓" : unsettled ? ` · ${settledShares}/${totalShares}` : ""}
                         </p>
                       </div>
                       <div className="text-right shrink-0">
