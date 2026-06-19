@@ -144,12 +144,61 @@ export const splitsQuery = () =>
     },
   });
 
+// Splits created by current user's friends where current user is involved
+// (splits from OTHER users that involve me as a linked person)
+export const incomingSplitsQuery = () =>
+  queryOptions({
+    queryKey: ["splits", "incoming"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+
+      // Step 1: Find people records that link to current user
+      const { data: linkedPeople, error: e1 } = await supabase
+        .from("people")
+        .select("id, user_id, name")
+        .eq("linked_user_id", u.user.id);
+      if (e1) throw e1;
+      if (!linkedPeople || linkedPeople.length === 0) return [];
+
+      const linkedPersonIds = linkedPeople.map((p: any) => p.id);
+
+      // Step 2: Find split_shares that reference these person records
+      const { data: shares, error: e2 } = await supabase
+        .from("split_shares")
+        .select("split_id")
+        .in("person_id", linkedPersonIds);
+      if (e2) throw e2;
+      if (!shares || shares.length === 0) return [];
+
+      const splitIds = [...new Set(shares.map((s: any) => s.split_id))];
+
+      // Step 3: Fetch those splits (excluding ones I created)
+      const { data, error: e3 } = await supabase
+        .from("splits")
+        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name)")
+        .in("id", splitIds)
+        .neq("created_by", u.user.id)
+        .order("date", { ascending: false });
+      if (e3) throw e3;
+
+      // Step 4: Tag each split with who created it and my share info
+      return (data ?? []).map((s: any) => ({
+        ...s,
+        _isIncoming: true,
+        _myPersonId: linkedPeople.find((p: any) =>
+          (s.split_shares ?? []).some((sh: any) => sh.person_id === p.id)
+        )?.id ?? null,
+        _createdByUserId: s.created_by,
+      }));
+    },
+  });
+
 // Fetches splits where person appears as person_id OR in split_shares
 export const personSplitsQuery = (personId: string) =>
   queryOptions({
     queryKey: ["splits", "person", personId],
     queryFn: async () => {
-      // Get split IDs where this person appears in split_shares
       const { data: shareData, error: shareError } = await supabase
         .from("split_shares")
         .select("split_id")
@@ -159,7 +208,6 @@ export const personSplitsQuery = (personId: string) =>
       const splitIds = [...new Set((shareData ?? []).map((s: any) => s.split_id))];
 
       if (splitIds.length === 0) {
-        // Also try direct person_id match
         const { data, error } = await supabase
           .from("splits")
           .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name)")
@@ -169,7 +217,6 @@ export const personSplitsQuery = (personId: string) =>
         return data ?? [];
       }
 
-      // Fetch all splits where person appears (via shares or direct)
       const { data, error } = await supabase
         .from("splits")
         .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name)")
