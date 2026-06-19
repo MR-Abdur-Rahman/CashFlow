@@ -36,7 +36,7 @@ export default function AccountsPage() {
       {Object.entries(grouped).map(([type, byInst]) => (
         <div key={type}>
           <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">{type}</p>
-          <div className="surface-card divide-y divide-border">
+          <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
             {Object.entries(byInst).map(([inst, list]) => (
               <div key={inst} className="p-3">
                 {inst !== "—" && <p className="text-xs text-muted-foreground mb-2">{inst}</p>}

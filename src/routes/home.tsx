@@ -132,7 +132,7 @@ export default function Home() {
           </DropdownMenu>
         </div>
 
-        <div className="surface-card overflow-hidden">
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
           {txns.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-10 px-4">{emptyMessages[period]}</p>
           ) : (

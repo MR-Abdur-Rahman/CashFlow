@@ -71,7 +71,7 @@ function Categories({ onSelectCat }: { onSelectCat: (cat: { id: string; name: st
       {/* Expense categories */}
       <div>
         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">Expense</p>
-        <div className="surface-card divide-y divide-border overflow-hidden rounded-xl">
+        <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
           {expenseCats.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">No expense categories</p>}
           {expenseCats.map((c: any) => (
             <SwipeRow key={c.id} onEdit={() => { setEdit(c); setOpen(true); }} onDelete={() => del.mutate(c.id)}>
@@ -89,7 +89,7 @@ function Categories({ onSelectCat }: { onSelectCat: (cat: { id: string; name: st
       {/* Income categories */}
       <div>
         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">Income</p>
-        <div className="surface-card divide-y divide-border overflow-hidden rounded-xl">
+        <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
           {incomeCats.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">No income categories</p>}
           {incomeCats.map((c: any) => (
             <SwipeRow key={c.id} onEdit={() => { setEdit(c); setOpen(true); }} onDelete={() => del.mutate(c.id)}>
@@ -311,7 +311,7 @@ function People() {
       <Button className="w-full" variant="outline" onClick={() => { setEdit(null); setOpen(true); }}>
         <Plus className="h-4 w-4 mr-2" /> Add person
       </Button>
-      <div className="surface-card divide-y divide-border overflow-hidden rounded-xl">
+      <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
         {people.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No people yet</p>}
         {(people as any[]).map((p) => {
           const bal = personBalance(p.id);
@@ -378,7 +378,7 @@ function Groups() {
         <Plus className="h-4 w-4 mr-2" /> Create group
       </Button>
 
-      <div className="surface-card divide-y divide-border overflow-hidden rounded-xl">
+      <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
         {activeGroups.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No groups yet</p>}
         {activeGroups.map((g: any) => (
           <SwipeRow key={g.id}

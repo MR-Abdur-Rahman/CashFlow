@@ -642,10 +642,10 @@ function Section({ title, action, children }: { title: string; action?: React.Re
   return (
     <div>
       <div className="flex items-center justify-between mb-2 px-1">
-        <p className="text-xs uppercase tracking-wider text-muted-foreground">{title}</p>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{title}</p>
         {action}
       </div>
-      <div className="surface-card overflow-hidden">{children}</div>
+      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">{children}</div>
     </div>
   );
 }

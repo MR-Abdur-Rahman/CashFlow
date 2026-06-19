@@ -473,7 +473,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Category / Source list — tap to drill down */}
-      <div className="px-4 mt-2 divide-y divide-border border-t border-border">
+      <div className="mx-4 mt-2 rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
         {chartData.map((item, i) => {
           const pct = chartTotal > 0 ? Math.round((item.value / chartTotal) * 100) : 0;
           return (
