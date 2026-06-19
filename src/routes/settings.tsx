@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { profileQuery } from "@/lib/queries";
 import { QRCodeSVG } from "qrcode.react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -22,18 +22,41 @@ export default function SettingsPage() {
   const [userId, setUserId] = useState<string | undefined>();
   const [email, setEmail] = useState<string | undefined>();
 
+  // Use refs so handleScannedQr always has latest values
+  const userIdRef = useRef<string | undefined>();
+  const profileRef = useRef<any>(null);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUserId(data.user?.id);
+      userIdRef.current = data.user?.id;
       setEmail(data.user?.email ?? undefined);
     });
   }, []);
 
   const { data: profile } = useQuery(profileQuery(userId));
+
+  // Keep profileRef in sync
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
+
   const [qrOpen, setQrOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
+
+  const fullName = profile?.full_name ?? "";
+  const phone = profile?.phone_number ?? "";
+  const google = profile?.google_email ?? email ?? "—";
+  const theme = (profile as any)?.theme ?? "dark";
+  const currencyCode = (profile as any)?.currency_code ?? "LKR";
+  const thousand = (profile as any)?.thousand_separator ?? ",";
+  const decimals = (profile as any)?.decimal_places ?? 2;
+  const notifySplits = (profile as any)?.notify_splits ?? true;
+  const notifySettle = (profile as any)?.notify_settlement ?? true;
+  const notifyDaily = (profile as any)?.notify_daily ?? false;
+  const dailyTime = (profile as any)?.daily_reminder_time ?? "20:00";
 
   const updateProfile = useMutation({
     mutationFn: async (patch: Record<string, any>) => {
@@ -61,45 +84,46 @@ export default function SettingsPage() {
     navigate("/auth");
   }
 
-async function handleScannedQr(text: string) {
-  let payload: any;
-  try { payload = JSON.parse(text); } catch { return toast.error("Not a valid QR code"); }
-  if (payload?.app !== "cashflow") return toast.error("Not a CashFlow QR");
+  async function handleScannedQr(text: string) {
+    let payload: any;
+    try { payload = JSON.parse(text); } catch { return toast.error("Not a valid QR code"); }
+    if (payload?.app !== "cashflow") return toast.error("Not a CashFlow QR");
 
-  const scannedName = typeof payload.name === "string" ? payload.name.trim().slice(0, 80) : "Friend";
-  const phoneRaw = typeof payload.phone === "string" ? payload.phone.trim() : "";
-  const scannedPhone = phoneRaw && /^\+?[0-9 ()-]{6,20}$/.test(phoneRaw) ? phoneRaw : null;
-  const scannedUserId = typeof payload.id === "string" ? payload.id : null;
+    const scannedName = typeof payload.name === "string" ? payload.name.trim().slice(0, 80) : "Friend";
+    const phoneRaw = typeof payload.phone === "string" ? payload.phone.trim() : "";
+    const scannedPhone = phoneRaw && /^\+?[0-9 ()-]{6,20}$/.test(phoneRaw) ? phoneRaw : null;
+    const scannedUserId = typeof payload.id === "string" ? payload.id : null;
 
-  if (!scannedUserId) return toast.error("QR is missing user ID");
-  if (scannedUserId === userId) return toast.error("That's your own QR");
+    if (!scannedUserId) return toast.error("QR is missing user ID");
 
-  // Get my own profile info
-  const { data: myProfile } = await supabase
-    .from("profiles")
-    .select("full_name, phone_number")
-    .eq("id", userId!)
-    .maybeSingle();
+    // Use ref to get latest userId — avoids stale closure
+    const currentUserId = userIdRef.current;
+    if (!currentUserId) return toast.error("Not signed in");
+    if (scannedUserId === currentUserId) return toast.error("That's your own QR");
 
-  const myName = myProfile?.full_name || fullName || "Friend";
-  const myPhone = myProfile?.phone_number || null;
+    // Get my own profile using ref — avoids stale closure
+    const currentProfile = profileRef.current;
+    const myName = currentProfile?.full_name || "Friend";
+    const myPhone = currentProfile?.phone_number || null;
 
-  // Call SECURITY DEFINER function — bypasses RLS for mutual insert
-  const { error } = await supabase.rpc("create_mutual_connection", {
-    scanner_user_id: userId!,
-    scanner_name: myName,
-    scanner_phone: myPhone,
-    scanned_user_id: scannedUserId,
-    scanned_name: scannedName || "Friend",
-    scanned_phone: scannedPhone,
-  });
+    console.log("RPC params:", { currentUserId, myName, myPhone, scannedUserId, scannedName, scannedPhone });
 
-  if (error) return toast.error(error.message);
+    const { error } = await supabase.rpc("create_mutual_connection", {
+      scanner_user_id: currentUserId,
+      scanner_name: myName,
+      scanner_phone: myPhone,
+      scanned_user_id: scannedUserId,
+      scanned_name: scannedName || "Friend",
+      scanned_phone: scannedPhone,
+    });
 
-  toast.success(`Connected with ${scannedName || "friend"} 🔗`);
-  qc.invalidateQueries({ queryKey: ["people"] });
-  qc.invalidateQueries({ queryKey: ["splits"] });
-}
+    console.log("RPC error:", error);
+    if (error) return toast.error(error.message);
+
+    toast.success(`Connected with ${scannedName || "friend"} 🔗`);
+    qc.invalidateQueries({ queryKey: ["people"] });
+    qc.invalidateQueries({ queryKey: ["splits"] });
+  }
 
   async function exportJson() {
     const tables = ["accounts","categories","sub_categories","transactions","people","groups","group_members","splits","split_shares","settlements","settlement_reminders","profiles"];
@@ -130,18 +154,6 @@ async function handleScannedQr(text: string) {
       qc.invalidateQueries();
     } catch (err: any) { toast.error(err.message); }
   }
-
-  const fullName = profile?.full_name ?? "";
-  const phone = profile?.phone_number ?? "";
-  const google = profile?.google_email ?? email ?? "—";
-  const theme = (profile as any)?.theme ?? "dark";
-  const currencyCode = (profile as any)?.currency_code ?? "LKR";
-  const thousand = (profile as any)?.thousand_separator ?? ",";
-  const decimals = (profile as any)?.decimal_places ?? 2;
-  const notifySplits = (profile as any)?.notify_splits ?? true;
-  const notifySettle = (profile as any)?.notify_settlement ?? true;
-  const notifyDaily = (profile as any)?.notify_daily ?? false;
-  const dailyTime = (profile as any)?.daily_reminder_time ?? "20:00";
 
   function pickCurrency(code: string) {
     const preset = CURRENCY_PRESETS.find((c) => c.code === code) ?? CURRENCY_PRESETS[0];
@@ -233,13 +245,9 @@ async function handleScannedQr(text: string) {
         {notifyDaily && (
           <div className="p-4 flex items-center justify-between border-t border-border">
             <Label htmlFor="daily-time" className="text-sm">Reminder time</Label>
-            <input
-              id="daily-time"
-              type="time"
-              value={String(dailyTime).slice(0, 5)}
+            <input id="daily-time" type="time" value={String(dailyTime).slice(0, 5)}
               onChange={(e) => updateProfile.mutate({ daily_reminder_time: e.target.value })}
-              className="bg-secondary text-foreground rounded-md px-3 py-1.5 text-sm font-mono"
-            />
+              className="bg-secondary text-foreground rounded-md px-3 py-1.5 text-sm font-mono" />
           </div>
         )}
       </Section>
@@ -251,7 +259,8 @@ async function handleScannedQr(text: string) {
         <Row icon={<Download className="h-4 w-4" />} label="Export transactions (CSV)" onClick={exportCsv} />
         <Row icon={<Download className="h-4 w-4" />} label="Export full data (JSON)" onClick={exportJson} />
         <Row icon={<Upload className="h-4 w-4" />} label="Import from JSON" onClick={() => document.getElementById("import-json")?.click()} />
-        <input id="import-json" type="file" accept="application/json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) importJson(f); }} />
+        <input id="import-json" type="file" accept="application/json" className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) importJson(f); }} />
       </Section>
 
       <div className="space-y-2">
@@ -268,7 +277,7 @@ async function handleScannedQr(text: string) {
           <DialogTitle>My QR</DialogTitle>
           <div className="flex flex-col items-center gap-3 p-4">
             <div className="bg-white p-4 rounded-xl">
-              <QRCodeSVG value={JSON.stringify({ app: "cashflow", id: userId, name: fullName, phone: phone || profile?.phone_number || "" })} size={200} />
+              <QRCodeSVG value={JSON.stringify({ app: "cashflow", id: userId, name: fullName, phone: phone || "" })} size={200} />
             </div>
             <p className="text-xs text-muted-foreground text-center">Have a friend scan this to add you as a contact.</p>
           </div>
@@ -295,7 +304,7 @@ async function handleScannedQr(text: string) {
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <section>
-      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1 font-medium tracking-widest">{label}</p>
+      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1 font-medium">{label}</p>
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">{children}</div>
     </section>
   );
@@ -322,12 +331,10 @@ function ToggleRow({ label, checked, onChange }: { label: string; checked: boole
 
 function ThemeChoice({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
   return (
-    <button
-      onClick={onClick}
+    <button onClick={onClick}
       className={`flex items-center justify-center gap-2 py-3 rounded-lg border text-sm transition-colors ${
         active ? "border-primary bg-primary/10 text-foreground" : "border-border bg-secondary/40 text-muted-foreground hover:text-foreground"
-      }`}
-    >
+      }`}>
       {icon} {label}
     </button>
   );
