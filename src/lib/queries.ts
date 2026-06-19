@@ -87,7 +87,13 @@ export const peopleQuery = () =>
   queryOptions({
     queryKey: ["people"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("people").select("*").order("name");
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("people")
+        .select("*")
+        .eq("user_id", u.user.id)
+        .order("name");
       if (error) throw error;
       return data;
     },
