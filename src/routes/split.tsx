@@ -1,7 +1,7 @@
 import { useRealtimeSplits } from "@/hooks/useRealtimeSplits";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { peopleQuery, groupsQuery, splitsQuery, incomingSplitsQuery, accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
-import { Users, Plus, ChevronRight, Archive, QrCode, X, Check, ArrowDownLeft } from "lucide-react";
+import { peopleQuery, groupsQuery, splitsQuery, accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
+import { Users, Plus, ChevronRight, Archive, QrCode, X, Check } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
@@ -38,7 +38,6 @@ export default function SplitPage() {
   const { data: people = [] } = useQuery(peopleQuery());
   const { data: groups = [] } = useQuery(groupsQuery());
   const { data: splits = [] } = useQuery(splitsQuery());
-  const { data: incomingSplits = [] } = useQuery(incomingSplitsQuery());
   const qc = useQueryClient();
   const [addPerson, setAddPerson] = useState(false);
   const [addGroup, setAddGroup] = useState(false);
@@ -136,57 +135,6 @@ export default function SplitPage() {
           </div>
         )}
       </Section>
-
-      {/* Incoming Splits Section — from other users */}
-      {(incomingSplits as any[]).length > 0 && (
-        <Section title="From others">
-          <div className="divide-y divide-border">
-            {(incomingSplits as any[]).map((s) => {
-              const myPersonId = s._myPersonId;
-              const myShare = (s.split_shares ?? []).find((sh: any) => sh.person_id === myPersonId);
-              const myPaid = myShare
-                ? (s.settlements ?? []).filter((x: any) => x.split_share_id === myShare.id)
-                    .reduce((a: number, x: any) => a + Number(x.amount), 0)
-                : 0;
-              const myRemaining = myShare ? Number(myShare.share_amount) - myPaid : 0;
-              const isSettled = myRemaining <= 0.005;
-              const label = getSplitLabel(s);
-
-              return (
-                <div key={s.id} className="flex items-center gap-3 px-4 py-3 bg-card">
-                  <div className="h-9 w-9 rounded-full bg-expense/20 flex items-center justify-center text-expense shrink-0">
-                    <ArrowDownLeft className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{label}</p>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      {s.date} · paid by {s.paid_by}
-                    </p>
-                    {myShare && (
-                      <p className="text-xs mt-0.5">
-                        Your share: <span className="font-mono">{formatMoney(myShare.share_amount)}</span>
-                        {isSettled
-                          ? <span className="text-income ml-1">· ✓ settled</span>
-                          : <span className="text-expense ml-1">· {formatMoney(myRemaining)} remaining</span>}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-mono font-semibold text-expense">{formatMoney(s.total_amount)}</p>
-                    {!isSettled && myShare && (
-                      <button type="button"
-                        onClick={() => setSettleItem({ share: myShare, split: s })}
-                        className="text-[10px] text-primary underline mt-0.5">
-                        Settle up
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Section>
-      )}
 
       {/* History Section */}
       <Section title="History">
