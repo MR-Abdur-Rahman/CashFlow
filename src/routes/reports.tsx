@@ -456,17 +456,13 @@ export default function ReportsPage() {
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={{ background: "#1A1A1A", border: "1px solid #2A2A2A", borderRadius: 8, fontSize: 12 }}
-                  formatter={(v: any) => formatMoney(v)}
-                />
               </PieChart>
             </ResponsiveContainer>
 
             {/* Popup on slice tap */}
             {activeSlice && (
               <div className="mx-auto w-fit bg-card border border-border rounded-xl px-5 py-3 text-center shadow-lg -mt-4 mb-2">
-                <p className="text-sm font-semibold">{activeSlice.name}</p>
+                <p className="text-sm font-semibold text-foreground">{activeSlice.name}</p>
                 <p className="font-mono text-base font-bold mt-0.5" style={{ color: activeSlice.color }}>
                   {formatMoney(activeSlice.value)}
                 </p>
