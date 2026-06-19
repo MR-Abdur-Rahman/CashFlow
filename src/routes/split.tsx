@@ -1,7 +1,7 @@
 import { useRealtimeSplits } from "@/hooks/useRealtimeSplits";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { peopleQuery, groupsQuery, splitsQuery, incomingSplitsQuery, accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
-import { Users, Plus, ChevronRight, Archive, QrCode, X, Check } from "lucide-react";
+import { Users, Plus, ChevronRight, Archive, QrCode, X, Check, ChevronLeft, ChevronDown } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
@@ -18,11 +18,35 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, addWeeks, subMonths, addMonths, subYears, addYears } from "date-fns";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+type Period = "weekly" | "monthly" | "annually";
+type StatusFilter = "all" | "unsettled" | "settled";
+
+function getPeriodRange(period: Period, anchor: Date) {
+  if (period === "weekly") return { from: startOfWeek(anchor, { weekStartsOn: 1 }), to: endOfWeek(anchor, { weekStartsOn: 1 }) };
+  if (period === "monthly") return { from: startOfMonth(anchor), to: endOfMonth(anchor) };
+  return { from: startOfYear(anchor), to: endOfYear(anchor) };
+}
+
+function navigateAnchor(period: Period, anchor: Date, dir: -1 | 1): Date {
+  if (period === "weekly") return dir === -1 ? subWeeks(anchor, 1) : addWeeks(anchor, 1);
+  if (period === "monthly") return dir === -1 ? subMonths(anchor, 1) : addMonths(anchor, 1);
+  return dir === -1 ? subYears(anchor, 1) : addYears(anchor, 1);
+}
+
+function formatAnchorLabel(period: Period, anchor: Date) {
+  if (period === "weekly") return `${format(startOfWeek(anchor, { weekStartsOn: 1 }), "MMM d")} – ${format(endOfWeek(anchor, { weekStartsOn: 1 }), "MMM d, yyyy")}`;
+  if (period === "monthly") return format(anchor, "MMM yyyy");
+  return format(anchor, "yyyy");
+}
 
 // ─── Helper: get display label for a split ────────────────────────────────
 function getSplitLabel(s: any): string {
@@ -48,6 +72,15 @@ export default function SplitPage() {
   const [editSplit, setEditSplit] = useState<any | null>(null);
   const [settleItem, setSettleItem] = useState<{ share: any; split: any } | null>(null);
 
+  // History filters
+  const [period, setPeriod] = useState<Period>("monthly");
+  const [anchor, setAnchor] = useState(new Date());
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  const { from, to } = getPeriodRange(period, anchor);
+  const dateFrom = format(from, "yyyy-MM-dd");
+  const dateTo = format(to, "yyyy-MM-dd");
+
   function handleScan(text: string) {
     let obj: any;
     try { obj = JSON.parse(text); } catch { return toast.error("Not a valid QR code"); }
@@ -61,37 +94,51 @@ export default function SplitPage() {
     toast.success("QR scanned — review and save");
   }
 
-function personBalance(personId: string) {
-  let owed = 0;
-  // Own splits — person owes me
-  for (const s of splits as any[]) {
-    for (const sh of (s.split_shares ?? [])) {
-      if (sh.person_id !== personId) continue;
-      const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
-        .reduce((a: number, x: any) => a + Number(x.amount), 0);
-      owed += Number(sh.share_amount) - settled;
+  function personBalance(personId: string) {
+    let owed = 0;
+    // Own splits — person owes me
+    for (const s of splits as any[]) {
+      for (const sh of (s.split_shares ?? [])) {
+        if (sh.person_id !== personId) continue;
+        const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
+          .reduce((a: number, x: any) => a + Number(x.amount), 0);
+        owed += Number(sh.share_amount) - settled;
+      }
     }
-  }
-  // Incoming splits — I owe them (negative)
-  for (const s of incomingSplits as any[]) {
-    const myPersonId = s._myPersonId;
-    if (!myPersonId) continue;
-    // Check if this incoming split is from this person
-    const isFromThisPerson = (s.split_shares ?? []).some((sh: any) => sh.person_id === personId);
-    if (!isFromThisPerson) continue;
-    for (const sh of (s.split_shares ?? [])) {
-      if (sh.person_id !== myPersonId) continue;
-      const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
-        .reduce((a: number, x: any) => a + Number(x.amount), 0);
-      owed -= Number(sh.share_amount) - settled;
+    // Incoming splits — I owe them (negative)
+    for (const s of incomingSplits as any[]) {
+      const myPersonId = s._myPersonId;
+      if (!myPersonId) continue;
+      const isFromThisPerson = (s.split_shares ?? []).some((sh: any) => sh.person_id === personId);
+      if (!isFromThisPerson) continue;
+      for (const sh of (s.split_shares ?? [])) {
+        if (sh.person_id !== myPersonId) continue;
+        const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
+          .reduce((a: number, x: any) => a + Number(x.amount), 0);
+        owed -= Number(sh.share_amount) - settled;
+      }
     }
+    return owed;
   }
-  return owed;
-}
 
   function firstUnsettledShare(s: any) {
     return (s.split_shares ?? []).find((sh: any) => !sh.is_settled);
   }
+
+  // Filter splits by period and status
+  const filteredSplits = useMemo(() => {
+    return (splits as any[]).filter((s) => {
+      // Period filter
+      if (s.date < dateFrom || s.date > dateTo) return false;
+      // Status filter
+      const totalShares = (s.split_shares ?? []).length;
+      const settledShares = (s.split_shares ?? []).filter((sh: any) => sh.is_settled).length;
+      const isFullySettled = totalShares > 0 && settledShares === totalShares;
+      if (statusFilter === "settled" && !isFullySettled) return false;
+      if (statusFilter === "unsettled" && isFullySettled) return false;
+      return true;
+    });
+  }, [splits, dateFrom, dateTo, statusFilter]);
 
   return (
     <div className="px-4 pt-6 space-y-5 pb-24">
@@ -153,46 +200,105 @@ function personBalance(personId: string) {
       </Section>
 
       {/* History Section */}
-      <Section title="History">
-        {(splits as any[]).length === 0 ? <Empty text="No splits yet" /> : (
-          <div className="divide-y divide-border">
-            {(splits as any[]).map((s) => {
-              const unsettled = firstUnsettledShare(s);
-              const totalShares = (s.split_shares ?? []).length;
-              const settledShares = (s.split_shares ?? []).filter((sh: any) => sh.is_settled).length;
-              const isFullySettled = totalShares > 0 && settledShares === totalShares;
-              const label = getSplitLabel(s);
+      <div>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">History</p>
+        </div>
 
-              return (
-                <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
-                  <div className="flex items-center gap-3 px-4 py-3 bg-card">
-                    <div className="h-9 w-9 rounded-full bg-split/20 flex items-center justify-center text-split shrink-0">
-                      <Users className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{label}</p>
-                      <p className="text-xs text-muted-foreground font-mono">
-                        {s.date} · paid by {s.paid_by}
-                        {isFullySettled ? " · ✓ settled" : unsettled ? ` · ${settledShares}/${totalShares} settled` : ""}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-mono font-semibold text-split">{formatMoney(s.total_amount)}</p>
-                      {!isFullySettled && unsettled && (
-                        <button type="button"
-                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); setSettleItem({ share: unsettled, split: s }); }}
-                          className="text-[10px] text-primary underline mt-0.5">
-                          Settle up
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </SwipeRow>
-              );
-            })}
+        {/* Filter bar: < Jun 2026 > [Monthly] [All] */}
+        <div className="flex items-center gap-2 mb-3">
+          {/* Period navigation */}
+          <div className="flex items-center gap-1.5 flex-1">
+            <button type="button"
+              onClick={() => setAnchor(navigateAnchor(period, anchor, -1))}
+              className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary text-foreground">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-semibold flex-1 text-center">{formatAnchorLabel(period, anchor)}</span>
+            <button type="button"
+              onClick={() => setAnchor(navigateAnchor(period, anchor, 1))}
+              className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary text-foreground">
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
-        )}
-      </Section>
+
+          {/* Period dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-1 bg-primary text-white text-xs font-medium px-3 py-1.5 rounded-xl capitalize">
+                {period} <ChevronDown className="h-3 w-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-32">
+              {(["weekly", "monthly", "annually"] as Period[]).map((p) => (
+                <DropdownMenuItem key={p} onClick={() => { setPeriod(p); setAnchor(new Date()); }}
+                  className={cn("capitalize py-2", period === p && "text-primary font-medium")}>
+                  {p}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Status filter dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-1 bg-secondary text-foreground text-xs font-medium px-3 py-1.5 rounded-xl capitalize">
+                {statusFilter === "all" ? "All" : statusFilter === "unsettled" ? "Unsettled" : "Settled"}
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-32">
+              {(["all", "unsettled", "settled"] as StatusFilter[]).map((s) => (
+                <DropdownMenuItem key={s} onClick={() => setStatusFilter(s)}
+                  className={cn("capitalize py-2", statusFilter === s && "text-primary font-medium")}>
+                  {s === "all" ? "All" : s === "unsettled" ? "Unsettled" : "Settled"}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+          {filteredSplits.length === 0 ? <Empty text="No splits for this period" /> : (
+            <div className="divide-y divide-border">
+              {filteredSplits.map((s) => {
+                const unsettled = firstUnsettledShare(s);
+                const totalShares = (s.split_shares ?? []).length;
+                const settledShares = (s.split_shares ?? []).filter((sh: any) => sh.is_settled).length;
+                const isFullySettled = totalShares > 0 && settledShares === totalShares;
+                const label = getSplitLabel(s);
+
+                return (
+                  <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
+                    <div className="flex items-center gap-3 px-4 py-3 bg-card">
+                      <div className="h-9 w-9 rounded-full bg-split/20 flex items-center justify-center text-split shrink-0">
+                        <Users className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{label}</p>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {s.date} · paid by {s.paid_by}
+                          {isFullySettled ? " · ✓ settled" : unsettled ? ` · ${settledShares}/${totalShares} settled` : ""}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-mono font-semibold text-split">{formatMoney(s.total_amount)}</p>
+                        {!isFullySettled && unsettled && (
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); setSettleItem({ share: unsettled, split: s }); }}
+                            className="text-[10px] text-primary underline mt-0.5">
+                            Settle up
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </SwipeRow>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
       <AddPersonDialog open={addPerson} onOpenChange={setAddPerson} initial={scanned} />
       <AddGroupDialog open={addGroup} onOpenChange={setAddGroup} />
