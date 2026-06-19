@@ -205,6 +205,10 @@ export const personSplitsQuery = (personId: string) =>
   queryOptions({
     queryKey: ["splits", "person", personId],
     queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+
+      // Get split IDs where this person appears in split_shares
       const { data: shareData, error: shareError } = await supabase
         .from("split_shares")
         .select("split_id")
@@ -220,7 +224,10 @@ export const personSplitsQuery = (personId: string) =>
           .eq("person_id", personId)
           .order("date", { ascending: false });
         if (error) throw error;
-        return data ?? [];
+        return (data ?? []).map((s: any) => ({
+          ...s,
+          _isIncoming: s.created_by !== u.user!.id,
+        }));
       }
 
       const { data, error } = await supabase
@@ -229,7 +236,11 @@ export const personSplitsQuery = (personId: string) =>
         .in("id", splitIds)
         .order("date", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+
+      return (data ?? []).map((s: any) => ({
+        ...s,
+        _isIncoming: s.created_by !== u.user!.id,
+      }));
     },
   });
 

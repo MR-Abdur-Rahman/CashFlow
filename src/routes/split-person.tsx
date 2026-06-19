@@ -44,13 +44,17 @@ export default function PersonDetail() {
       if (sh.person_id !== personId) continue;
       const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
         .reduce((a: number, x: any) => a + Number(x.amount), 0);
-      acc.owed += Number(sh.share_amount);
-      acc.paid += settled;
+      if (s._isIncoming) {
+        acc.iOwe += Number(sh.share_amount) - settled;
+      } else {
+        acc.owed += Number(sh.share_amount);
+        acc.paid += settled;
+      }
     }
     return acc;
-  }, { owed: 0, paid: 0 });
+  }, { owed: 0, paid: 0, iOwe: 0 });
 
-  const balance = totals.owed - totals.paid;
+  const balance = (totals.owed - totals.paid) - totals.iOwe;
 
   // All unsettled shares for multi-settle
   const unsettledItems = useMemo(() => {
@@ -133,7 +137,7 @@ export default function PersonDetail() {
               const remaining = myTotal - totalSettled;
               const isSettled = remaining <= 0.005;
               const unsettledShare = myShares.find((sh: any) => !sh.is_settled);
-              const label = getSplitLabel(s);
+              const label = getSplitLabel(s, personId);
 
               return (
                 <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
@@ -236,15 +240,16 @@ export default function PersonDetail() {
 }
 
 // ─── Helper: get display label for a split ────────────────────────────────
-function getSplitLabel(s: any): string {
-  // Group split
+function getSplitLabel(s: any, currentPersonId?: string): string {
+  // For incoming splits (created by someone else), show creator's people name
+  if (s._isIncoming) {
+    // Show description or "Split" for incoming
+    return s.description || "Split from others";
+  }
   if (s.type === "group" && s.groups?.name) return s.groups.name;
-  // Single person split
   if (s.type === "individual" && s.people?.name) return s.people.name;
-  // Multi-person: get names from split_shares
   const names = (s.split_shares ?? []).map((sh: any) => sh.person_name).filter(Boolean);
   if (names.length > 0) return names.join(", ");
-  // Fallback to description
   return s.description || "Split";
 }
 
