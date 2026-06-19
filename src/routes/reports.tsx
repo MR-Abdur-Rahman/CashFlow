@@ -1,44 +1,268 @@
-import { useQuery } from "@tanstack/react-query";
-import { transactionsQuery, accountsQuery, categoriesQuery, subCategoriesQuery, peopleQuery } from "@/lib/queries";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { transactionsQuery, categoriesQuery, peopleQuery } from "@/lib/queries";
 import { formatMoney } from "@/lib/format";
 import { useState, useMemo } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
-import { startOfMonth, startOfWeek, startOfYear, format, subDays } from "date-fns";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
+import { startOfWeek, startOfMonth, startOfYear, endOfWeek, endOfMonth, endOfYear, format, subMonths, addMonths, subWeeks, addWeeks, subYears, addYears, eachMonthOfInterval } from "date-fns";
+import { ChevronLeft, ChevronRight, ChevronDown, ArrowLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { formatMoney as fm } from "@/lib/format";
+import { SwipeRow } from "@/components/SwipeRow";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-const COLORS = ["#7C3AED", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981", "#EC4899", "#8B5CF6", "#14B8A6"];
+const COLORS = [
+  "#EF4444", "#F59E0B", "#10B981", "#3B82F6", "#8B5CF6",
+  "#EC4899", "#14B8A6", "#F97316", "#6366F1", "#84CC16",
+];
 
+type Period = "weekly" | "monthly" | "annually";
+
+function getPeriodRange(period: Period, anchor: Date) {
+  if (period === "weekly") return { from: startOfWeek(anchor, { weekStartsOn: 1 }), to: endOfWeek(anchor, { weekStartsOn: 1 }) };
+  if (period === "monthly") return { from: startOfMonth(anchor), to: endOfMonth(anchor) };
+  return { from: startOfYear(anchor), to: endOfYear(anchor) };
+}
+
+function navigateAnchor(period: Period, anchor: Date, dir: -1 | 1): Date {
+  if (period === "weekly") return dir === -1 ? subWeeks(anchor, 1) : addWeeks(anchor, 1);
+  if (period === "monthly") return dir === -1 ? subMonths(anchor, 1) : addMonths(anchor, 1);
+  return dir === -1 ? subYears(anchor, 1) : addYears(anchor, 1);
+}
+
+function formatAnchorLabel(period: Period, anchor: Date) {
+  if (period === "weekly") return `${format(startOfWeek(anchor, { weekStartsOn: 1 }), "MMM d")} – ${format(endOfWeek(anchor, { weekStartsOn: 1 }), "MMM d, yyyy")}`;
+  if (period === "monthly") return format(anchor, "MMM yyyy");
+  return format(anchor, "yyyy");
+}
+
+// ─── Drill-down page ───────────────────────────────────────────────────────
+function DrillPage({
+  title,
+  total,
+  items,
+  txns,
+  period,
+  anchor,
+  colorIdx,
+  onBack,
+  type,
+}: {
+  title: string;
+  total: number;
+  items: { name: string; value: number; id?: string }[];
+  txns: any[];
+  period: Period;
+  anchor: Date;
+  colorIdx: number;
+  onBack: () => void;
+  type: "income" | "expense";
+}) {
+  const qc = useQueryClient();
+  const [selectedSub, setSelectedSub] = useState<string | null>(null);
+  const [deleteTxn, setDeleteTxn] = useState<any | null>(null);
+
+  const filteredTxns = useMemo(() => {
+    if (!selectedSub) return txns;
+    return txns.filter((t) =>
+      type === "expense"
+        ? t.sub_categories?.name === selectedSub || t.categories?.name === selectedSub
+        : t.income_source_text === selectedSub || t.categories?.name === selectedSub
+    );
+  }, [txns, selectedSub, type]);
+
+  // Group by date
+  const grouped = useMemo(() => {
+    const map = new Map<string, any[]>();
+    for (const t of filteredTxns) {
+      if (!map.has(t.date)) map.set(t.date, []);
+      map.get(t.date)!.push(t);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [filteredTxns]);
+
+  // Line chart data — monthly trend
+  const trendData = useMemo(() => {
+    const months = eachMonthOfInterval({ start: subMonths(anchor, 7), end: anchor });
+    return months.map((m) => {
+      const label = format(m, "MMM");
+      const mFrom = format(startOfMonth(m), "yyyy-MM-dd");
+      const mTo = format(endOfMonth(m), "yyyy-MM-dd");
+      const val = txns.filter((t) => t.date >= mFrom && t.date <= mTo).reduce((s, t) => s + Number(t.amount), 0);
+      return { label, value: val };
+    });
+  }, [txns, anchor]);
+
+  async function deleteTx(t: any) {
+    const { error } = await supabase.from("transactions").delete().eq("id", t.id);
+    if (error) toast.error(error.message);
+    else { toast.success("Deleted"); qc.invalidateQueries({ queryKey: ["transactions"] }); qc.invalidateQueries({ queryKey: ["accounts"] }); }
+    setDeleteTxn(null);
+  }
+
+  const color = COLORS[colorIdx % COLORS.length];
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 pt-5 pb-3 border-b border-border">
+        <button type="button" onClick={onBack} className="text-muted-foreground">
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+        <span className="text-base font-semibold flex-1">{title}</span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto pb-24">
+        {/* Total */}
+        <div className="px-4 py-4">
+          <p className="text-xs text-muted-foreground">Total</p>
+          <p className="text-3xl font-mono font-bold" style={{ color }}>{formatMoney(total)}</p>
+        </div>
+
+        {/* Sub-items list */}
+        <div className="mx-4 rounded-xl overflow-hidden border border-border mb-4">
+          {/* All row */}
+          <button type="button" onClick={() => setSelectedSub(null)}
+            className={cn("w-full flex items-center justify-between px-4 py-3 text-sm border-b border-border",
+              selectedSub === null ? "bg-primary/10" : "bg-card")}>
+            <span className="font-medium">All</span>
+            <div className="flex items-center gap-4">
+              <span className="text-muted-foreground text-xs">100%</span>
+              <span className="font-mono text-xs">{formatMoney(total)}</span>
+            </div>
+          </button>
+          {items.map((item, i) => {
+            const pct = total > 0 ? (item.value / total) * 100 : 0;
+            return (
+              <button key={item.name} type="button" onClick={() => setSelectedSub(selectedSub === item.name ? null : item.name)}
+                className={cn("w-full flex items-center justify-between px-4 py-3 text-sm border-b border-border last:border-0",
+                  selectedSub === item.name ? "bg-primary/10" : "bg-card")}>
+                <span>{item.name}</span>
+                <div className="flex items-center gap-4">
+                  <span className="text-muted-foreground text-xs">{pct.toFixed(0)}%</span>
+                  <span className="font-mono text-xs">{formatMoney(item.value)}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Trend chart */}
+        <div className="mx-4 mb-4">
+          <ResponsiveContainer width="100%" height={160}>
+            <LineChart data={trendData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9CA3AF" }} />
+              <YAxis tick={{ fontSize: 10, fill: "#9CA3AF" }} width={40} />
+              <Tooltip contentStyle={{ background: "#1A1A1A", border: "1px solid #2A2A2A", fontSize: 11 }}
+                formatter={(v: any) => formatMoney(v)} />
+              <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Transaction list grouped by date */}
+        <div className="px-4 space-y-4">
+          {grouped.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-6">No transactions</p>
+          )}
+          {grouped.map(([date, dayTxns]) => {
+            const dayTotal = dayTxns.reduce((s, t) => s + Number(t.amount), 0);
+            return (
+              <div key={date}>
+                <div className="flex items-center justify-between mb-1 px-1">
+                  <p className="text-xs font-mono text-muted-foreground">{date}</p>
+                  <p className="text-xs font-mono" style={{ color }}>{formatMoney(dayTotal)}</p>
+                </div>
+                <div className="rounded-xl overflow-hidden border border-border divide-y divide-border">
+                  {dayTxns.map((t) => (
+                    <SwipeRow key={t.id} onDelete={() => setDeleteTxn(t)}>
+                      <div className="flex items-center justify-between px-4 py-3 bg-card">
+                        <div>
+                          <p className="text-sm font-medium">
+                            {type === "expense"
+                              ? (t.categories?.name ?? "Expense")
+                              : (t.income_source_text ?? "Income")}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {type === "expense"
+                              ? (t.sub_categories?.name ?? (t.accounts ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ") : ""))
+                              : (t.accounts ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ") : "")}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-mono font-semibold" style={{ color }}>
+                            {type === "income" ? "+" : "-"}{formatMoney(t.amount)}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground font-mono">{t.time?.slice(0, 5)}</p>
+                        </div>
+                      </div>
+                    </SwipeRow>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Delete confirm */}
+      <AlertDialog open={!!deleteTxn} onOpenChange={(o) => { if (!o) setDeleteTxn(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-white" onClick={() => deleteTxn && deleteTx(deleteTxn)}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// ─── Custom Pie Label ──────────────────────────────────────────────────────
+function PieLabel({ cx, cy, midAngle, outerRadius, name, percent }: any) {
+  const RADIAN = Math.PI / 180;
+  const radius = outerRadius + 30;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  if (percent < 0.03) return null;
+  return (
+    <text x={x} y={y} fill="#9CA3AF" textAnchor={x > cx ? "start" : "end"} dominantBaseline="central" fontSize={10}>
+      {name} {(percent * 100).toFixed(1)}%
+    </text>
+  );
+}
+
+// ─── Main Reports Page ─────────────────────────────────────────────────────
 export default function ReportsPage() {
-  const [period, setPeriod] = useState<"week" | "month" | "year" | "all">("month");
-  const [accountId, setAccountId] = useState<string>("all");
-  const [selectedExpenseCat, setSelectedExpenseCat] = useState<string>("all");
-  const [selectedExpenseSubCat, setSelectedExpenseSubCat] = useState<string>("all");
-  const [incomeSourceType, setIncomeSourceType] = useState<"person" | "source">("source");
-  const [selectedPerson, setSelectedPerson] = useState<string>("all");
-  const [selectedSource, setSelectedSource] = useState<string>("");
-  const [drillCategory, setDrillCategory] = useState<string | null | undefined>(null);
+  const [period, setPeriod] = useState<Period>("monthly");
+  const [anchor, setAnchor] = useState(new Date());
+  const [tab, setTab] = useState<"income" | "expense">("expense");
+  const [drillItem, setDrillItem] = useState<{ name: string; colorIdx: number } | null>(null);
 
-  const { data: accounts = [] } = useQuery(accountsQuery());
-  const { data: expenseCats = [] } = useQuery(categoriesQuery("expense"));
+  const { from, to } = getPeriodRange(period, anchor);
+  const dateFrom = format(from, "yyyy-MM-dd");
+  const dateTo = format(to, "yyyy-MM-dd");
+
+  const { data: txns = [] } = useQuery(transactionsQuery({ dateFrom, dateTo }));
   const { data: people = [] } = useQuery(peopleQuery());
-  const { data: subCats = [] } = useQuery(subCategoriesQuery(selectedExpenseCat !== "all" ? selectedExpenseCat : null));
 
-  const dateFrom = useMemo(() => {
-    const now = new Date();
-    if (period === "week") return format(startOfWeek(now), "yyyy-MM-dd");
-    if (period === "month") return format(startOfMonth(now), "yyyy-MM-dd");
-    if (period === "year") return format(startOfYear(now), "yyyy-MM-dd");
-    return undefined;
-  }, [period]);
+  const income = useMemo(() => (txns as any[]).filter((t) => t.type === "income").reduce((s, t) => s + Number(t.amount), 0), [txns]);
+  const expense = useMemo(() => (txns as any[]).filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0), [txns]);
 
-  const { data: txns = [] } = useQuery(transactionsQuery({ dateFrom, accountId: accountId === "all" ? undefined : accountId }));
-
-  const income = txns.filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0);
-  const expense = txns.filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0);
-  const net = income - expense;
-  const rate = income > 0 ? (net / income) * 100 : 0;
-
-  const expenseByCategory = useMemo(() => {
+  // Expense by category
+  const expenseData = useMemo(() => {
     const map = new Map<string, number>();
     for (const t of txns as any[]) {
       if (t.type !== "expense") continue;
@@ -48,273 +272,182 @@ export default function ReportsPage() {
     return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   }, [txns]);
 
-  const incomeBySource = useMemo(() => {
+  // Income by person or source
+  const incomeData = useMemo(() => {
     const map = new Map<string, number>();
     for (const t of txns as any[]) {
       if (t.type !== "income") continue;
-      const name = t.income_source_text ?? t.categories?.name ?? "Income";
+      let name = "Other";
+      if (t.income_source_type === "person") {
+        const person = (people as any[]).find((p) => p.id === t.income_person_id);
+        name = person?.name ?? "Unknown";
+      } else {
+        name = t.income_source_text ?? "Other";
+      }
       map.set(name, (map.get(name) ?? 0) + Number(t.amount));
     }
     return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [txns]);
+  }, [txns, people]);
 
-  // Drill down into category sub-categories
-  const drillData = useMemo(() => {
-    if (!drillCategory) return [];
+  const chartData = tab === "expense" ? expenseData : incomeData;
+  const chartTotal = tab === "expense" ? expense : income;
+
+  // Drill txns
+  const drillTxns = useMemo(() => {
+    if (!drillItem) return [];
+    return (txns as any[]).filter((t) => {
+      if (tab === "expense") {
+        return t.type === "expense" && (t.categories?.name ?? "Other") === drillItem.name;
+      } else {
+        if (t.type !== "income") return false;
+        if (t.income_source_type === "person") {
+          const person = (people as any[]).find((p) => p.id === t.income_person_id);
+          return (person?.name ?? "Unknown") === drillItem.name;
+        }
+        return (t.income_source_text ?? "Other") === drillItem.name;
+      }
+    });
+  }, [drillItem, txns, tab, people]);
+
+  // Sub-items for drill page
+  const drillSubItems = useMemo(() => {
+    if (!drillItem) return [];
     const map = new Map<string, number>();
-    for (const t of txns as any[]) {
-      if (t.type !== "expense" || t.categories?.name !== drillCategory) continue;
-      const name = t.sub_categories?.name ?? "Uncategorized";
+    for (const t of drillTxns) {
+      const name = tab === "expense"
+        ? (t.sub_categories?.name ?? "Uncategorized")
+        : (t.income_source_text ?? "Other");
       map.set(name, (map.get(name) ?? 0) + Number(t.amount));
     }
     return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [txns, drillCategory]);
+  }, [drillTxns, drillItem, tab]);
 
-  // Filtered expense transactions
-  const filteredExpenseTxns = useMemo(() => {
-    return (txns as any[]).filter((t) => {
-      if (t.type !== "expense") return false;
-      if (selectedExpenseCat !== "all" && t.category_id !== selectedExpenseCat) return false;
-      if (selectedExpenseSubCat !== "all" && t.sub_category_id !== selectedExpenseSubCat) return false;
-      return true;
-    });
-  }, [txns, selectedExpenseCat, selectedExpenseSubCat]);
-
-  // Filtered income transactions
-  const filteredIncomeTxns = useMemo(() => {
-    return (txns as any[]).filter((t) => {
-      if (t.type !== "income") return false;
-      if (incomeSourceType === "person" && selectedPerson !== "all") {
-        return t.income_person_id === selectedPerson;
-      }
-      if (incomeSourceType === "source" && selectedSource) {
-        return t.income_source_text?.toLowerCase().includes(selectedSource.toLowerCase());
-      }
-      return true;
-    });
-  }, [txns, incomeSourceType, selectedPerson, selectedSource]);
-
-  const last7 = useMemo(() => {
-    const days = Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), 6 - i), "yyyy-MM-dd"));
-    return days.map((d) => {
-      const inc = (txns as any[]).filter((t) => t.date === d && t.type === "income").reduce((s, t) => s + Number(t.amount), 0);
-      const exp = (txns as any[]).filter((t) => t.date === d && t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
-      return { day: d.slice(5), income: inc, expense: exp };
-    });
-  }, [txns]);
+  // If drill page is open
+  if (drillItem) {
+    return (
+      <div className="h-full flex flex-col">
+        <DrillPage
+          title={drillItem.name}
+          total={drillTxns.reduce((s, t) => s + Number(t.amount), 0)}
+          items={drillSubItems}
+          txns={drillTxns}
+          period={period}
+          anchor={anchor}
+          colorIdx={drillItem.colorIdx}
+          onBack={() => setDrillItem(null)}
+          type={tab}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="px-4 pt-6 pb-24 space-y-5">
-      <h1 className="text-xl font-semibold">Reports</h1>
+    <div className="pb-24">
+      {/* Top header */}
+      <div className="px-4 pt-5 pb-0 space-y-3">
+        {/* Period navigation */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setAnchor(navigateAnchor(period, anchor, -1))}
+              className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary text-foreground">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-semibold">{formatAnchorLabel(period, anchor)}</span>
+            <button type="button" onClick={() => setAnchor(navigateAnchor(period, anchor, 1))}
+              className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary text-foreground">
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
 
-      {/* Period & Account filters */}
-      <div className="grid grid-cols-2 gap-2">
-        <Select value={period} onValueChange={(v) => setPeriod(v as any)}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="week">This week</SelectItem>
-            <SelectItem value="month">This month</SelectItem>
-            <SelectItem value="year">This year</SelectItem>
-            <SelectItem value="all">All time</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={accountId} onValueChange={setAccountId}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All accounts</SelectItem>
-            {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
+          {/* Period dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-3 py-1.5 rounded-xl capitalize">
+                {period} <ChevronDown className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-36">
+              {(["weekly", "monthly", "annually"] as Period[]).map((p) => (
+                <DropdownMenuItem key={p} onClick={() => { setPeriod(p); setAnchor(new Date()); }}
+                  className={cn("capitalize py-3 text-base", period === p && "text-primary font-medium")}>
+                  {p}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Income / Expense tab toggle */}
+        <div className="flex border-b border-border">
+          <button type="button" onClick={() => setTab("income")}
+            className={cn("flex-1 py-3 text-sm font-medium transition-colors",
+              tab === "income" ? "text-income border-b-2 border-income" : "text-muted-foreground")}>
+            Income &nbsp;
+            <span className="font-mono text-xs">{formatMoney(income)}</span>
+          </button>
+          <button type="button" onClick={() => setTab("expense")}
+            className={cn("flex-1 py-3 text-sm font-medium transition-colors",
+              tab === "expense" ? "text-expense border-b-2 border-expense" : "text-muted-foreground")}>
+            Expenses &nbsp;
+            <span className="font-mono text-xs">{formatMoney(expense)}</span>
+          </button>
+        </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3">
-        <Card label="Income" value={formatMoney(income)} color="text-income" />
-        <Card label="Expenses" value={formatMoney(expense)} color="text-expense" />
-        <Card label="Net" value={formatMoney(net)} color={net >= 0 ? "text-income" : "text-expense"} />
-        <Card label="Savings Rate" value={`${rate.toFixed(1)}%`} color="text-primary" />
-      </div>
-
-      {/* Expense Pie Chart */}
-      <ChartCard title="Expenses by category">
-        {expenseByCategory.length === 0 ? <Empty /> : (
-          <ResponsiveContainer width="100%" height={220}>
+      {/* Pie chart */}
+      <div className="px-4 pt-4">
+        {chartData.length === 0 ? (
+          <div className="h-48 flex items-center justify-center">
+            <p className="text-sm text-muted-foreground">No data for this period</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie
-                data={expenseByCategory}
+                data={chartData}
                 dataKey="value"
                 nameKey="name"
-                innerRadius={50}
-                outerRadius={85}
-                paddingAngle={2}
-                onClick={(d) => setDrillCategory(drillCategory === d.name ? null : d.name)}
+                cx="50%"
+                cy="50%"
+                outerRadius={100}
+                labelLine
+                label={PieLabel}
+                onClick={(d, i) => setDrillItem({ name: d.name, colorIdx: i })}
               >
-                {expenseByCategory.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                {chartData.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
               </Pie>
-              <Tooltip contentStyle={{ background: "#0a0a0a", border: "1px solid #222" }} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Tooltip
+                contentStyle={{ background: "#1A1A1A", border: "1px solid #2A2A2A", borderRadius: 8, fontSize: 12 }}
+                formatter={(v: any) => formatMoney(v)}
+              />
             </PieChart>
           </ResponsiveContainer>
         )}
-        <ProgressList items={expenseByCategory} total={expense} onTap={(name) => setDrillCategory(drillCategory === name ? null : name)} />
+      </div>
 
-        {/* Drill down */}
-        {drillCategory && drillData.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-border">
-            <p className="text-xs text-muted-foreground mb-2">↳ {drillCategory} sub-categories</p>
-            <ProgressList items={drillData} total={drillData.reduce((s, i) => s + i.value, 0)} />
-          </div>
-        )}
-      </ChartCard>
-
-      {/* Income Pie Chart */}
-      <ChartCard title="Income by source">
-        {incomeBySource.length === 0 ? <Empty /> : (
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={incomeBySource} dataKey="value" nameKey="name" outerRadius={80}>
-                {incomeBySource.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Pie>
-              <Tooltip contentStyle={{ background: "#0a0a0a", border: "1px solid #222" }} />
-            </PieChart>
-          </ResponsiveContainer>
-        )}
-      </ChartCard>
-
-      {/* Last 7 days */}
-      <ChartCard title="Last 7 days">
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={last7}>
-            <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#888" }} />
-            <YAxis tick={{ fontSize: 10, fill: "#888" }} />
-            <Tooltip contentStyle={{ background: "#0a0a0a", border: "1px solid #222" }} />
-            <Bar dataKey="income" fill="#10B981" />
-            <Bar dataKey="expense" fill="#EF4444" />
-          </BarChart>
-        </ResponsiveContainer>
-      </ChartCard>
-
-      {/* Expense Filter */}
-      <ChartCard title="Filter expenses">
-        <div className="space-y-3">
-          <Select value={selectedExpenseCat} onValueChange={(v) => { setSelectedExpenseCat(v); setSelectedExpenseSubCat("all"); }}>
-            <SelectTrigger><SelectValue placeholder="All categories" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
-              {expenseCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          {selectedExpenseCat !== "all" && subCats.length > 0 && (
-            <Select value={selectedExpenseSubCat} onValueChange={setSelectedExpenseSubCat}>
-              <SelectTrigger><SelectValue placeholder="All sub-categories" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All sub-categories</SelectItem>
-                {subCats.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
-          <div className="text-xs text-muted-foreground">
-            {filteredExpenseTxns.length} transactions · {formatMoney(filteredExpenseTxns.reduce((s, t: any) => s + Number(t.amount), 0))}
-          </div>
-          <div className="surface-card divide-y divide-border max-h-48 overflow-y-auto">
-            {filteredExpenseTxns.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No transactions</p>
-            ) : filteredExpenseTxns.map((t: any) => (
-              <div key={t.id} className="flex justify-between items-center p-2 text-xs">
-                <span>{t.categories?.name}{t.sub_categories ? ` · ${t.sub_categories.name}` : ""}</span>
-                <span className="text-expense font-mono">-{formatMoney(t.amount)}</span>
+      {/* Category / Source list */}
+      <div className="px-4 mt-2 divide-y divide-border border-t border-border">
+        {chartData.map((item, i) => {
+          const pct = chartTotal > 0 ? Math.round((item.value / chartTotal) * 100) : 0;
+          return (
+            <button key={item.name} type="button"
+              onClick={() => setDrillItem({ name: item.name, colorIdx: i })}
+              className="w-full flex items-center gap-3 py-3.5 active:bg-secondary/40">
+              {/* % badge */}
+              <div className="h-9 w-12 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
+                style={{ background: COLORS[i % COLORS.length] }}>
+                {pct}%
               </div>
-            ))}
-          </div>
-        </div>
-      </ChartCard>
-
-      {/* Income Filter */}
-      <ChartCard title="Filter income">
-        <div className="space-y-3">
-          <div className="flex gap-2 rounded-lg bg-secondary p-1">
-            {(["source", "person"] as const).map((m) => (
-              <button key={m} onClick={() => setIncomeSourceType(m)}
-                className={`flex-1 rounded-md py-1.5 text-sm capitalize ${incomeSourceType === m ? "bg-primary text-white" : "text-muted-foreground"}`}>
-                {m}
-              </button>
-            ))}
-          </div>
-          {incomeSourceType === "person" ? (
-            <Select value={selectedPerson} onValueChange={setSelectedPerson}>
-              <SelectTrigger><SelectValue placeholder="All people" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All people</SelectItem>
-                {people.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          ) : (
-            <input
-              value={selectedSource}
-              onChange={(e) => setSelectedSource(e.target.value)}
-              placeholder="e.g. Salary, Freelance..."
-              className="w-full bg-secondary rounded-md px-3 py-2 text-sm text-foreground outline-none"
-            />
-          )}
-          <div className="text-xs text-muted-foreground">
-            {filteredIncomeTxns.length} transactions · {formatMoney(filteredIncomeTxns.reduce((s, t: any) => s + Number(t.amount), 0))}
-          </div>
-          <div className="surface-card divide-y divide-border max-h-48 overflow-y-auto">
-            {filteredIncomeTxns.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No transactions</p>
-            ) : filteredIncomeTxns.map((t: any) => (
-              <div key={t.id} className="flex justify-between items-center p-2 text-xs">
-                <span>{t.income_source_text ?? "Income"}</span>
-                <span className="text-income font-mono">+{formatMoney(t.amount)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </ChartCard>
+              {/* Name */}
+              <span className="flex-1 text-left text-sm font-medium">{item.name}</span>
+              {/* Amount */}
+              <span className="font-mono text-sm">{formatMoney(item.value)}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
-  );
-}
-
-function Card({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <div className="surface-card p-4">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`font-mono text-base font-semibold mt-1 ${color}`}>{value}</p>
-    </div>
-  );
-}
-
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="surface-card p-4">
-      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{title}</p>
-      {children}
-    </div>
-  );
-}
-
-function Empty() {
-  return <p className="text-sm text-muted-foreground text-center py-8">No data</p>;
-}
-
-function ProgressList({ items, total, onTap }: { items: { name: string; value: number }[]; total: number; onTap?: (name: string) => void }) {
-  if (items.length === 0) return null;
-  return (
-    <ul className="space-y-2 mt-3">
-      {items.slice(0, 6).map((it, i) => {
-        const pct = total > 0 ? (it.value / total) * 100 : 0;
-        return (
-          <li key={it.name} onClick={() => onTap?.(it.name)} className={onTap ? "cursor-pointer" : ""}>
-            <div className="flex justify-between text-xs mb-1">
-              <span>{it.name}</span>
-              <span className="font-mono">{formatMoney(it.value)} ({pct.toFixed(0)}%)</span>
-            </div>
-            <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: COLORS[i % COLORS.length] }} />
-            </div>
-          </li>
-        );
-      })}
-    </ul>
   );
 }
