@@ -6,40 +6,69 @@ export function QrScannerDialog({
   open,
   onOpenChange,
   onScan,
+  onResult,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  onScan: (text: string) => void;
+  onScan?: (text: string) => void;
+  onResult?: (text: string) => void;
 }) {
   const elId = "qr-reader-region";
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setHasPermission(null);
     let stopped = false;
+
     const start = async () => {
+      // Check if running on HTTPS or localhost
+      const isSecure = location.protocol === "https:" || location.hostname === "localhost";
+      if (!isSecure) {
+        setError("Camera requires HTTPS. Please open the app on your phone via the live URL.");
+        return;
+      }
+
+      // Request camera permission explicitly first
       try {
+        await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        setHasPermission(true);
+      } catch (e: any) {
+        setError("Camera access denied. Please allow camera permission and try again.");
+        return;
+      }
+
+      try {
+        // Small delay to ensure DOM element is ready
+        await new Promise((r) => setTimeout(r, 100));
+
         const scanner = new Html5Qrcode(elId, { verbose: false });
         scannerRef.current = scanner;
+
         await scanner.start(
           { facingMode: "environment" },
           { fps: 10, qrbox: { width: 240, height: 240 } },
           (decoded) => {
             if (stopped) return;
             stopped = true;
-            onScan(decoded);
-            void scanner.stop().then(() => scanner.clear());
+            // Support both prop names
+            onScan?.(decoded);
+            onResult?.(decoded);
+            void scanner.stop().then(() => scanner.clear()).catch(() => {});
             onOpenChange(false);
           },
-          () => {},
+          () => {}, // ignore per-frame errors
         );
       } catch (e: any) {
-        setError(e?.message ?? "Could not start camera. Allow camera access and try again.");
+        setError(e?.message ?? "Could not start camera. Please try again.");
       }
     };
+
     void start();
+
     return () => {
       stopped = true;
       const s = scannerRef.current;
@@ -48,17 +77,29 @@ export function QrScannerDialog({
         scannerRef.current = null;
       }
     };
-  }, [open, onOpenChange, onScan]);
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogTitle>Scan QR code</DialogTitle>
-        <div id={elId} className="w-full rounded-lg overflow-hidden bg-black" style={{ minHeight: 280 }} />
+        <div
+          id={elId}
+          className="w-full rounded-lg overflow-hidden bg-black"
+          style={{ minHeight: 280 }}
+        />
         {error ? (
-          <p className="text-xs text-expense">{error}</p>
+          <div className="space-y-2">
+            <p className="text-xs text-expense text-center">{error}</p>
+            <p className="text-xs text-muted-foreground text-center">
+              Make sure you're using the app at{" "}
+              <span className="text-primary">cash-flow-zrs8.vercel.app</span>
+            </p>
+          </div>
+        ) : hasPermission === null ? (
+          <p className="text-xs text-muted-foreground text-center">Requesting camera access...</p>
         ) : (
-          <p className="text-xs text-muted-foreground text-center">Point the camera at a CashFlow QR</p>
+          <p className="text-xs text-muted-foreground text-center">Point the camera at a CashFlow QR code</p>
         )}
       </DialogContent>
     </Dialog>
