@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { accountsQuery, transactionsQuery, profileQuery } from "@/lib/queries";
@@ -6,21 +6,25 @@ import { formatMoney, greeting } from "@/lib/format";
 import { AccountIcon } from "@/components/AccountIcon";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
 import { Fab } from "@/components/Fab";
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users, Pencil, Trash2, ChevronDown } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users, ChevronDown } from "lucide-react";
 import { format, startOfWeek, startOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SwipeRow } from "@/components/SwipeRow";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type FilterPeriod = "today" | "week" | "month";
 
@@ -40,7 +44,9 @@ const PERIOD_LABELS: { key: FilterPeriod; label: string }[] = [
 export default function Home() {
   const [open, setOpen] = useState(false);
   const [editTxn, setEditTxn] = useState<any>(null);
+  const [deleteTxn, setDeleteTxn] = useState<any>(null);
   const [period, setPeriod] = useState<FilterPeriod>("today");
+  const qc = useQueryClient();
 
   const { dateFrom, dateTo } = getDateRange(period);
   const { data: accounts = [] } = useQuery(accountsQuery());
@@ -92,11 +98,8 @@ export default function Home() {
         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">Accounts</p>
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
           {accounts.map((a) => (
-            <Link
-              to={`/accounts/${a.id}`}
-              key={a.id}
-              className="surface-card min-w-[180px] p-3 snap-start block active:opacity-80"
-            >
+            <Link to={`/accounts/${a.id}`} key={a.id}
+              className="surface-card min-w-[180px] p-3 snap-start block active:opacity-80">
               <AccountIcon iconType={a.icon_type} iconName={a.icon_name} iconColor={a.icon_color} iconUrl={a.icon_url} size={36} />
               <p className="text-xs text-muted-foreground mt-2 truncate">
                 {[a.institution, a.label].filter(Boolean).join(" · ") || a.label}
@@ -104,31 +107,24 @@ export default function Home() {
               <p className="font-mono text-base font-semibold mt-0.5">{formatMoney(a.current_balance)}</p>
             </Link>
           ))}
-          {accounts.length === 0 && (
-            <p className="text-sm text-muted-foreground py-4">No accounts yet</p>
-          )}
+          {accounts.length === 0 && <p className="text-sm text-muted-foreground py-4">No accounts yet</p>}
         </div>
       </div>
 
       {/* Transactions Section */}
       <div>
-        {/* Period Filter */}
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs uppercase tracking-wider text-muted-foreground px-1">Transactions</p>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-4 py-1.5 rounded-xl">
-                {currentLabel}
-                <ChevronDown className="h-4 w-4" />
+                {currentLabel} <ChevronDown className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               {PERIOD_LABELS.map(({ key, label }) => (
-                <DropdownMenuItem
-                  key={key}
-                  onClick={() => setPeriod(key)}
-                  className={cn("text-base py-3", period === key && "text-primary font-medium")}
-                >
+                <DropdownMenuItem key={key} onClick={() => setPeriod(key)}
+                  className={cn("text-base py-3", period === key && "text-primary font-medium")}>
                   {label}
                 </DropdownMenuItem>
               ))}
@@ -136,16 +132,15 @@ export default function Home() {
           </DropdownMenu>
         </div>
 
-        {/* Transaction List */}
         <div className="surface-card overflow-hidden">
           {txns.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-10 px-4">
-              {emptyMessages[period]}
-            </p>
+            <p className="text-sm text-muted-foreground text-center py-10 px-4">{emptyMessages[period]}</p>
           ) : (
             <div className="divide-y divide-border">
-              {(txns as any[]).map((t: any) => (
-                <TxRow key={t.id} t={t} onEdit={() => setEditTxn(t)} />
+              {(txns as any[]).map((t) => (
+                <SwipeRow key={t.id} onEdit={() => setEditTxn(t)} onDelete={() => setDeleteTxn(t)}>
+                  <TxRowInner t={t} onClick={() => setEditTxn(t)} />
+                </SwipeRow>
               ))}
             </div>
           )}
@@ -155,32 +150,35 @@ export default function Home() {
       <Fab onClick={() => setOpen(true)} />
       <AddTransactionSheet open={open} onOpenChange={setOpen} />
 
+      {/* Full edit sheet */}
       {editTxn && (
-        <TxDetailDialog
-          txn={editTxn}
-          onClose={() => setEditTxn(null)}
-        />
+        <EditTxSheet txn={editTxn} open={!!editTxn} onOpenChange={(o) => { if (!o) setEditTxn(null); }} />
       )}
+
+      {/* Delete confirm */}
+      <AlertDialog open={!!deleteTxn} onOpenChange={(o) => { if (!o) setDeleteTxn(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
+            <AlertDialogDescription>This will permanently delete this transaction and update your balance. This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
+              if (!deleteTxn) return;
+              const { error } = await supabase.from("transactions").delete().eq("id", deleteTxn.id);
+              if (error) toast.error(error.message);
+              else {
+                toast.success("Deleted");
+                qc.invalidateQueries({ queryKey: ["transactions"] });
+                qc.invalidateQueries({ queryKey: ["accounts"] });
+              }
+              setDeleteTxn(null);
+            }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
-  );
-}
-
-function TxRow({ t, onEdit }: { t: any; onEdit: () => void }) {
-  const qc = useQueryClient();
-
-  async function del() {
-    if (!confirm("Delete this transaction?")) return;
-    const { error } = await supabase.from("transactions").delete().eq("id", t.id);
-    if (error) return toast.error(error.message);
-    toast.success("Deleted");
-    qc.invalidateQueries({ queryKey: ["transactions"] });
-    qc.invalidateQueries({ queryKey: ["accounts"] });
-  }
-
-  return (
-    <SwipeRow onEdit={onEdit} onDelete={del}>
-      <TxRowInner t={t} onClick={onEdit} />
-    </SwipeRow>
   );
 }
 
@@ -222,87 +220,160 @@ function TxRowInner({ t, onClick }: { t: any; onClick: () => void }) {
   );
 }
 
-function TxDetailDialog({ txn, onClose }: { txn: any; onClose: () => void }) {
+// ─── Full Edit Transaction Sheet ───────────────────────────────────────────
+function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient();
+  const [amount, setAmount] = useState(String(txn.amount));
   const [note, setNote] = useState(txn.note ?? "");
+  const [date, setDate] = useState(txn.date ?? format(new Date(), "yyyy-MM-dd"));
+  const [time, setTime] = useState(txn.time?.slice(0, 5) ?? format(new Date(), "HH:mm"));
+  const [accountId, setAccountId] = useState(txn.account_id ?? "");
+  const [toAccountId, setToAccountId] = useState(txn.to_account_id ?? "");
+  const [categoryId, setCategoryId] = useState(txn.category_id ?? "");
+  const [subCatId, setSubCatId] = useState(txn.sub_category_id ?? "");
 
-  async function save() {
-    const { error } = await supabase.from("transactions").update({ note }).eq("id", txn.id);
-    if (error) return toast.error(error.message);
-    toast.success("Updated");
-    qc.invalidateQueries({ queryKey: ["transactions"] });
-    onClose();
-  }
+  const { data: accounts = [] } = useQuery(accountsQuery());
+  const { data: cats = [] } = useQuery({
+    queryKey: ["categories", "expense"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("categories").select("*").order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+  const { data: subs = [] } = useQuery({
+    queryKey: ["sub_categories", categoryId || "none"],
+    queryFn: async () => {
+      if (!categoryId) return [];
+      const { data, error } = await supabase.from("sub_categories").select("*").eq("category_id", categoryId).order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!categoryId,
+  });
 
-  async function del() {
-    if (!confirm("Delete this transaction?")) return;
-    const { error } = await supabase.from("transactions").delete().eq("id", txn.id);
-    if (error) return toast.error(error.message);
-    toast.success("Deleted");
-    qc.invalidateQueries({ queryKey: ["transactions"] });
-    qc.invalidateQueries({ queryKey: ["accounts"] });
-    onClose();
-  }
-
-  const isIncome = txn.type === "income";
-  const isExpense = txn.type === "expense";
-  const colorClass = txn.is_split ? "text-split" : isIncome ? "text-income" : isExpense ? "text-expense" : "text-transfer";
-  const sign = isIncome ? "+" : txn.type === "transfer" ? "" : "-";
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("transactions").update({
+        amount: Number(amount),
+        account_id: accountId || null,
+        to_account_id: txn.type === "transfer" && toAccountId ? toAccountId : undefined,
+        category_id: categoryId || null,
+        sub_category_id: subCatId || null,
+        note: note || null,
+        date, time,
+      }).eq("id", txn.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Transaction updated");
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogTitle>Transaction Detail</DialogTitle>
-        <div className="space-y-4">
-          <div className="text-center">
-            <p className={`text-3xl font-mono font-bold ${colorClass}`}>
-              {sign}{formatMoney(txn.amount)}
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">{txn.date} at {txn.time?.slice(0, 5)}</p>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[80dvh] flex flex-col">
+        <SheetTitle className="sr-only">Edit transaction</SheetTitle>
+        <div className="px-5 pt-5 pb-3 border-b border-border">
+          <span className="capitalize text-base font-semibold">{txn.is_split ? "Split" : txn.type} — Edit</span>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {/* Amount */}
+          <div className="text-center py-2">
+            <input inputMode="decimal" value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+              className="w-full bg-transparent text-center text-5xl font-mono font-semibold outline-none text-foreground" />
+            <p className="text-xs text-muted-foreground mt-1 font-mono">LKR</p>
           </div>
-          <div className="surface-card p-3 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Type</span>
-              <span className="capitalize">{txn.type}</span>
-            </div>
-            {txn.accounts && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Account</span>
-                <span>{[txn.accounts.institution, txn.accounts.label].filter(Boolean).join(" · ")}</span>
-              </div>
-            )}
-            {txn.categories && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Category</span>
-                <span>{txn.categories.icon} {txn.categories.name}</span>
-              </div>
-            )}
-            {txn.income_source_text && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Source</span>
-                <span>{txn.income_source_text}</span>
-              </div>
-            )}
-          </div>
+
+          {/* Account */}
           <div className="space-y-1.5">
-            <label className="text-sm text-muted-foreground">Note</label>
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="w-full bg-secondary rounded-md px-3 py-2 text-sm text-foreground outline-none"
-              placeholder="Add a note..."
-            />
+            <Label>{txn.type === "transfer" ? "From account" : "Account"}</Label>
+            <Select value={accountId} onValueChange={setAccountId}>
+              <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+              <SelectContent>
+                {(accounts as any[]).map((a) => (
+                  <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" className="text-expense" onClick={del}>
-              <Trash2 className="h-4 w-4 mr-1" /> Delete
-            </Button>
-            <Button onClick={save}>
-              <Pencil className="h-4 w-4 mr-1" /> Save
-            </Button>
+
+          {/* To Account (transfer) */}
+          {txn.type === "transfer" && (
+            <div className="space-y-1.5">
+              <Label>To account</Label>
+              <Select value={toAccountId} onValueChange={setToAccountId}>
+                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                <SelectContent>
+                  {(accounts as any[]).map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Category (expense/split) */}
+          {(txn.type === "expense" || txn.is_split) && (
+            <>
+              <div className="space-y-1.5">
+                <Label>Category</Label>
+                <Select value={categoryId} onValueChange={(v) => { setCategoryId(v); setSubCatId(""); }}>
+                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectContent>
+                    {(cats as any[]).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {categoryId && subs.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label>Sub-category</Label>
+                  <Select value={subCatId} onValueChange={setSubCatId}>
+                    <SelectTrigger><SelectValue placeholder="Select sub-category" /></SelectTrigger>
+                    <SelectContent>
+                      {(subs as any[]).map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Date + Time */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Date</Label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground outline-none" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Time</Label>
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)}
+                className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground outline-none" />
+            </div>
+          </div>
+
+          {/* Note */}
+          <div className="space-y-1.5">
+            <Label>Note</Label>
+            <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+        <div className="p-4 pt-2 border-t border-border bg-card">
+          <Button className="w-full bg-primary text-white" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+            {mutation.isPending ? "Saving..." : "Save changes"}
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
