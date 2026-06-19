@@ -273,8 +273,8 @@ export default function SettingsPage() {
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <section>
-      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">{label}</p>
-      <div className="surface-card divide-y divide-border overflow-hidden">{children}</div>
+      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1 font-medium tracking-widest">{label}</p>
+      <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">{children}</div>
     </section>
   );
 }
