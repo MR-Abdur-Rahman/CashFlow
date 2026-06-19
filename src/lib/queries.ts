@@ -208,43 +208,35 @@ export const personSplitsQuery = (personId: string) =>
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return [];
 
-      // Get the person record to find linked_user_id
+      // Get the person record
       const { data: personData } = await supabase
         .from("people")
         .select("id, linked_user_id, user_id")
         .eq("id", personId)
         .maybeSingle();
 
-      // Collect all person IDs that represent this person across accounts
-      const personIds = [personId];
+      // Start with this person's ID
+      const personIds = new Set<string>([personId]);
 
       if (personData?.linked_user_id) {
-        // Find the mirror people record (same person but under the other user's account)
+        // Case: User B viewing Rahman M.R.A
+        // personData.linked_user_id = User A (e80fdf24)
+        // personData.user_id = User B (f7782824)
+        // We need to find: people where user_id=User A AND linked_user_id=User B
         const { data: mirrorPeople } = await supabase
           .from("people")
           .select("id")
-          .eq("linked_user_id", personData.linked_user_id)
-          .neq("id", personId);
+          .eq("user_id", personData.linked_user_id)
+          .eq("linked_user_id", u.user.id);
         
         if (mirrorPeople) {
-          personIds.push(...mirrorPeople.map((p: any) => p.id));
-        }
-
-        // Also find people records where linked_user_id = current person's user_id
-        const { data: linkedPeople } = await supabase
-          .from("people")
-          .select("id")
-          .eq("linked_user_id", personData.user_id ?? "");
-        
-        if (linkedPeople) {
-          personIds.push(...linkedPeople.map((p: any) => p.id));
+          mirrorPeople.forEach((p: any) => personIds.add(p.id));
         }
       }
 
-      // Get all unique person IDs
-      const uniquePersonIds = [...new Set(personIds)];
+      const uniquePersonIds = [...personIds];
 
-      // Get split IDs where any of these person IDs appear in split_shares
+      // Get split IDs from split_shares
       const { data: shareData, error: shareError } = await supabase
         .from("split_shares")
         .select("split_id")
@@ -252,7 +244,6 @@ export const personSplitsQuery = (personId: string) =>
       if (shareError) throw shareError;
 
       const splitIds = [...new Set((shareData ?? []).map((s: any) => s.split_id))];
-
       if (splitIds.length === 0) return [];
 
       const { data, error } = await supabase
@@ -265,6 +256,9 @@ export const personSplitsQuery = (personId: string) =>
       return (data ?? []).map((s: any) => ({
         ...s,
         _isIncoming: s.created_by !== u.user!.id,
+        _myPersonId: uniquePersonIds.find(pid => 
+          (s.split_shares ?? []).some((sh: any) => sh.person_id === pid)
+        ) ?? null,
       }));
     },
   });

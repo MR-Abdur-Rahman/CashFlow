@@ -39,42 +39,48 @@ export default function PersonDetail() {
   const [editSplit, setEditSplit] = useState<any | null>(null);
   const [settleItem, setSettleItem] = useState<{ share: any; split: any } | null>(null);
 
-  const totals = (splits as any[]).reduce((acc, s) => {
-    for (const sh of (s.split_shares ?? [])) {
-      if (sh.person_id !== personId) continue;
-      const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
-        .reduce((a: number, x: any) => a + Number(x.amount), 0);
-      if (s._isIncoming) {
-        acc.iOwe += Number(sh.share_amount) - settled;
-      } else {
-        acc.owed += Number(sh.share_amount);
-        acc.paid += settled;
-      }
+const totals = (splits as any[]).reduce((acc, s) => {
+  // For incoming splits, use the mirror person ID
+  const targetPersonId = s._isIncoming ? s._myPersonId : personId;
+  if (!targetPersonId) return acc;
+  
+  for (const sh of (s.split_shares ?? [])) {
+    if (sh.person_id !== targetPersonId) continue;
+    const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
+      .reduce((a: number, x: any) => a + Number(x.amount), 0);
+    if (s._isIncoming) {
+      acc.iOwe += Number(sh.share_amount) - settled;
+    } else {
+      acc.owed += Number(sh.share_amount);
+      acc.paid += settled;
     }
-    return acc;
-  }, { owed: 0, paid: 0, iOwe: 0 });
+  }
+  return acc;
+}, { owed: 0, paid: 0, iOwe: 0 });
 
-  const balance = (totals.owed - totals.paid) - totals.iOwe;
+const balance = (totals.owed - totals.paid) - totals.iOwe;
 
   // All unsettled shares for multi-settle
   const unsettledItems = useMemo(() => {
-    return (splits as any[]).flatMap((s) =>
-      (s.split_shares ?? [])
-        .filter((sh: any) => sh.person_id === personId && !sh.is_settled)
+    return (splits as any[]).flatMap((s) => {
+      const targetPersonId = s._isIncoming ? s._myPersonId : personId;
+      if (!targetPersonId) return [];
+      return (s.split_shares ?? [])
+        .filter((sh: any) => sh.person_id === targetPersonId && !sh.is_settled)
         .map((sh: any) => {
           const paid = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
             .reduce((a: number, x: any) => a + Number(x.amount), 0);
           return {
             shareId: sh.id,
             splitId: s.id,
-            description: getSplitLabel(s),
+            description: getSplitLabel(s, personId),
             date: s.date,
             shareAmount: Number(sh.share_amount),
             paidAmount: paid,
             remaining: Number(sh.share_amount) - paid,
           };
-        })
-    ).filter((item) => item.remaining > 0.005);
+        });
+    }).filter((item) => item.remaining > 0.005);
   }, [splits, personId]);
 
   if (!person) return <div className="p-6">Person not found</div>;
@@ -128,7 +134,10 @@ export default function PersonDetail() {
         ) : (
           <div className="rounded-xl overflow-hidden border border-border divide-y divide-border">
             {(splits as any[]).map((s) => {
-              const myShares = (s.split_shares ?? []).filter((sh: any) => sh.person_id === personId);
+              const myShares = (s.split_shares ?? []).filter((sh: any) => {
+                const targetPersonId = s._isIncoming ? s._myPersonId : personId;
+                  return sh.person_id === targetPersonId;
+              });
               const totalSettled = myShares.reduce((acc: number, sh: any) => {
                 return acc + (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
                   .reduce((a: number, x: any) => a + Number(x.amount), 0);
