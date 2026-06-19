@@ -1,8 +1,8 @@
 import { useRealtimeSplits } from "@/hooks/useRealtimeSplits";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { peopleQuery, groupsQuery, splitsQuery } from "@/lib/queries";
-import { Users, Plus, ChevronRight, Archive, QrCode, Trash2, Pencil } from "lucide-react";
-import { useState } from "react";
+import { peopleQuery, groupsQuery, splitsQuery, accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
+import { Users, Plus, ChevronRight, Archive, QrCode, X, Check } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
@@ -13,13 +13,25 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { SwipeRow } from "@/components/SwipeRow";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+
+// ─── Helper: get display label for a split ────────────────────────────────
+function getSplitLabel(s: any): string {
+  if (s.type === "group" && s.groups?.name) return s.groups.name;
+  if (s.type === "individual" && s.people?.name) return s.people.name;
+  const names = (s.split_shares ?? []).map((sh: any) => sh.person_name).filter(Boolean);
+  if (names.length > 0) return names.join(", ");
+  return s.description || "Split";
+}
 
 export default function SplitPage() {
   useRealtimeSplits();
@@ -61,7 +73,6 @@ export default function SplitPage() {
     return owed;
   }
 
-  // Find first unsettled share for a split
   function firstUnsettledShare(s: any) {
     return (s.split_shares ?? []).find((sh: any) => !sh.is_settled);
   }
@@ -71,26 +82,18 @@ export default function SplitPage() {
       <h1 className="text-xl font-semibold">Split</h1>
 
       {/* People Section */}
-      <Section
-        title="People"
-        action={
-          <div className="flex gap-1">
-            <Button size="sm" variant="ghost" onClick={() => setScanOpen(true)}>
-              <QrCode className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => { setScanned(undefined); setAddPerson(true); }}>
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-        }
-      >
+      <Section title="People" action={
+        <div className="flex gap-1">
+          <Button size="sm" variant="ghost" onClick={() => setScanOpen(true)}><QrCode className="h-4 w-4" /></Button>
+          <Button size="sm" variant="ghost" onClick={() => { setScanned(undefined); setAddPerson(true); }}><Plus className="h-4 w-4" /></Button>
+        </div>
+      }>
         {people.length === 0 ? <Empty text="No people yet" /> : (
           <div className="divide-y divide-border">
             {(people as any[]).map((p) => {
               const bal = personBalance(p.id);
               return (
-                <Link key={p.id} to={`/split/person/${p.id}`}
-                  className="flex items-center gap-3 p-4 active:bg-secondary/40">
+                <Link key={p.id} to={`/split/person/${p.id}`} className="flex items-center gap-3 p-4 active:bg-secondary/40">
                   <Avatar name={p.name} />
                   <div className="flex-1">
                     <p className="text-sm font-medium">{p.name}{p.linked_user_id && " 🔗"}</p>
@@ -110,19 +113,13 @@ export default function SplitPage() {
       </Section>
 
       {/* Groups Section */}
-      <Section
-        title="Groups"
-        action={
-          <Button size="sm" variant="ghost" onClick={() => setAddGroup(true)}>
-            <Plus className="h-4 w-4" />
-          </Button>
-        }
-      >
+      <Section title="Groups" action={
+        <Button size="sm" variant="ghost" onClick={() => setAddGroup(true)}><Plus className="h-4 w-4" /></Button>
+      }>
         {groups.length === 0 ? <Empty text="No groups yet" /> : (
           <div className="divide-y divide-border">
             {(groups as any[]).map((g) => (
-              <Link key={g.id} to={`/split/group/${g.id}`}
-                className="flex items-center gap-3 p-4 active:bg-secondary/40">
+              <Link key={g.id} to={`/split/group/${g.id}`} className="flex items-center gap-3 p-4 active:bg-secondary/40">
                 <div className="h-10 w-10 rounded-full bg-split/20 flex items-center justify-center text-split">
                   <Users className="h-5 w-5" />
                 </div>
@@ -142,25 +139,22 @@ export default function SplitPage() {
       {/* History Section */}
       <Section title="History">
         {(splits as any[]).length === 0 ? <Empty text="No splits yet" /> : (
-          <div className="divide-y divide-border rounded-xl overflow-hidden">
+          <div className="divide-y divide-border">
             {(splits as any[]).map((s) => {
               const unsettled = firstUnsettledShare(s);
               const totalShares = (s.split_shares ?? []).length;
               const settledShares = (s.split_shares ?? []).filter((sh: any) => sh.is_settled).length;
               const isFullySettled = totalShares > 0 && settledShares === totalShares;
+              const label = getSplitLabel(s);
 
               return (
-                <SwipeRow
-                  key={s.id}
-                  onEdit={() => setEditSplit(s)}
-                  onDelete={() => setDeleteSplit(s)}
-                >
+                <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
                   <div className="flex items-center gap-3 px-4 py-3 bg-card">
                     <div className="h-9 w-9 rounded-full bg-split/20 flex items-center justify-center text-split shrink-0">
                       <Users className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{s.description || "Split"}</p>
+                      <p className="text-sm font-medium truncate">{label}</p>
                       <p className="text-xs text-muted-foreground font-mono">
                         {s.date} · paid by {s.paid_by}
                         {isFullySettled ? " · ✓ settled" : unsettled ? ` · ${settledShares}/${totalShares} settled` : ""}
@@ -188,7 +182,6 @@ export default function SplitPage() {
       <AddGroupDialog open={addGroup} onOpenChange={setAddGroup} />
       <QrScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScan} />
 
-      {/* Delete split confirm */}
       <AlertDialog open={!!deleteSplit} onOpenChange={(o) => { if (!o) setDeleteSplit(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -208,12 +201,10 @@ export default function SplitPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Edit split sheet */}
       {editSplit && (
         <EditSplitSheet split={editSplit} open={!!editSplit} onOpenChange={(o) => { if (!o) setEditSplit(null); }} />
       )}
 
-      {/* Settle up */}
       {settleItem && (
         <SettleUpDialog open={!!settleItem} onOpenChange={(o) => { if (!o) setSettleItem(null); }}
           share={settleItem.share} split={settleItem.split} />
@@ -222,18 +213,86 @@ export default function SplitPage() {
   );
 }
 
-// ─── Edit Split Sheet ──────────────────────────────────────────────────────
+// ─── Full Edit Split Sheet ─────────────────────────────────────────────────
 function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient();
-  const [description, setDescription] = useState(split.description ?? "");
-  const [note, setNote] = useState(split.note ?? "");
-  const [date, setDate] = useState(split.date ?? "");
+  const { data: accounts = [] } = useQuery(accountsQuery());
+  const { data: cats = [] } = useQuery(categoriesQuery("expense"));
+  const { data: people = [] } = useQuery(peopleQuery());
+  const { data: groups = [] } = useQuery(groupsQuery());
+
+  const [amount, setAmount] = useState(String(split.total_amount ?? ""));
+  const [target, setTarget] = useState<"person" | "multi" | "group">(
+    split.type === "group" ? "group" : (split.split_shares ?? []).length > 1 ? "multi" : "person"
+  );
+  const [personId, setPersonId] = useState(split.person_id ?? "");
+  const [personName, setPersonName] = useState(split.people?.name ?? "");
+  const [multiPeople, setMultiPeople] = useState<{ id: string; name: string }[]>(() => {
+    if (split.type !== "group" && (split.split_shares ?? []).length > 0) {
+      return (split.split_shares ?? []).map((sh: any) => ({ id: sh.person_id ?? "", name: sh.person_name ?? "" })).filter((p: any) => p.id);
+    }
+    return [];
+  });
+  const [groupId, setGroupId] = useState(split.group_id ?? "");
+  const [groupName, setGroupName] = useState(split.groups?.name ?? "");
+  const [whoPaid, setWhoPaid] = useState<"me" | "other">(split.paid_by === "me" ? "me" : "other");
+  const [otherPayerId, setOtherPayerId] = useState("");
+  const [accountId, setAccountId] = useState(split.account_id ?? "");
+  const [splitType, setSplitType] = useState<"equal" | "custom">(split.split_type ?? "equal");
+  const [categoryId, setCategoryId] = useState(split.category_id ?? "");
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryIcon, setCategoryIcon] = useState("");
+  const [subCatId, setSubCatId] = useState(split.sub_category_id ?? "");
+  const [subCatName, setSubCatName] = useState("");
+  const [date, setDate] = useState(split.date ?? format(new Date(), "yyyy-MM-dd"));
+  const [time, setTime] = useState(split.time?.slice(0, 5) ?? format(new Date(), "HH:mm"));
+  const [note, setNote] = useState(split.description ?? "");
+  const [catPickerOpen, setCatPickerOpen] = useState(false);
+  const [personPickerOpen, setPersonPickerOpen] = useState(false);
+  const [multiPickerOpen, setMultiPickerOpen] = useState(false);
+  const [groupPickerOpen, setGroupPickerOpen] = useState(false);
+
+  useEffect(() => { if (accounts.length > 0 && !accountId) setAccountId((accounts[0] as any).id); }, [accounts]);
+  useEffect(() => {
+    if (categoryId && cats.length > 0) {
+      const cat = (cats as any[]).find((c) => c.id === categoryId);
+      if (cat) { setCategoryName(cat.name); setCategoryIcon(cat.icon ?? ""); }
+    }
+  }, [categoryId, cats]);
+
+  const { data: subs = [] } = useQuery(subCategoriesQuery(categoryId || null));
+
+  const participants = useMemo(() => {
+    if (target === "person" && personId) return [{ id: personId, name: personName }];
+    if (target === "multi") return multiPeople;
+    if (target === "group") {
+      const g = (groups as any[]).find((x) => x.id === groupId);
+      return (g?.group_members ?? []).map((m: any) => ({ id: m.person_id, name: m.people?.name ?? "?" }));
+    }
+    return [];
+  }, [target, personId, personName, multiPeople, groupId, groups]);
+
+  const total = Number(amount);
+  const equalShare = participants.length > 0 ? total / (participants.length + 1) : 0;
 
   const mutation = useMutation({
     mutationFn: async () => {
+      const paidByName = whoPaid === "me" ? "me"
+        : target === "person" ? personName
+        : participants.find((p) => p.id === otherPayerId)?.name ?? "other";
+
       const { error } = await supabase.from("splits").update({
-        description: description || null,
-        date,
+        total_amount: total,
+        type: target === "group" ? "group" : "individual",
+        person_id: target === "person" && personId ? personId : null,
+        group_id: target === "group" && groupId ? groupId : null,
+        paid_by: paidByName,
+        split_type: splitType,
+        category_id: categoryId || null,
+        sub_category_id: subCatId || null,
+        account_id: whoPaid === "me" && accountId ? accountId : null,
+        date, time,
+        description: note || null,
       }).eq("id", split.id);
       if (error) throw error;
     },
@@ -246,30 +305,324 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
   });
 
   return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[88dvh] flex flex-col">
+          <SheetTitle className="sr-only">Edit Split</SheetTitle>
+          <div className="px-5 pt-5 pb-3 border-b border-border">
+            <span className="text-base font-semibold">Edit Split</span>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            <div className="text-center py-2">
+              <input inputMode="decimal" value={amount}
+                onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+                className="w-full bg-transparent text-center text-5xl font-mono font-semibold outline-none text-split" />
+              <p className="text-xs text-muted-foreground mt-1 font-mono">LKR</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Split with</Label>
+              <div className="flex gap-2 rounded-lg bg-secondary p-1">
+                {(["person", "multi", "group"] as const).map((m) => (
+                  <button type="button" key={m} onClick={() => setTarget(m)}
+                    className={cn("flex-1 rounded-md py-1.5 text-xs font-medium capitalize", target === m && "bg-primary text-white")}>
+                    {m === "multi" ? "People" : m}
+                  </button>
+                ))}
+              </div>
+              {target === "person" && (
+                <button type="button" onClick={() => setPersonPickerOpen(true)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
+                  <span className={personName ? "text-foreground" : "text-muted-foreground"}>{personName || "Select person"}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
+              {target === "multi" && (
+                <button type="button" onClick={() => setMultiPickerOpen(true)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
+                  <span className={multiPeople.length > 0 ? "text-foreground" : "text-muted-foreground"}>
+                    {multiPeople.length > 0 ? multiPeople.map((p) => p.name).join(", ") : "Select people"}
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
+              {target === "group" && (
+                <button type="button" onClick={() => setGroupPickerOpen(true)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
+                  <span className={groupName ? "text-foreground" : "text-muted-foreground"}>{groupName || "Select group"}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Who paid?</Label>
+              <div className="flex gap-2 rounded-lg bg-secondary p-1">
+                {(["me", "other"] as const).map((m) => (
+                  <button type="button" key={m} onClick={() => { setWhoPaid(m); setOtherPayerId(""); }}
+                    className={cn("flex-1 rounded-md py-1.5 text-sm", whoPaid === m && "bg-primary text-white")}>
+                    {m === "me" ? "You paid" : "Other paid"}
+                  </button>
+                ))}
+              </div>
+              {whoPaid === "other" && target === "person" && personName && (
+                <p className="text-xs text-muted-foreground px-1">{personName} paid</p>
+              )}
+              {whoPaid === "other" && (target === "multi" || target === "group") && participants.length > 0 && (
+                <Select value={otherPayerId} onValueChange={setOtherPayerId}>
+                  <SelectTrigger><SelectValue placeholder="Select who paid" /></SelectTrigger>
+                  <SelectContent>{participants.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {whoPaid === "me" && (
+              <div className="space-y-1.5">
+                <Label>Paid from</Label>
+                <Select value={accountId} onValueChange={setAccountId}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{(accounts as any[]).map((a) => <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label>Split type</Label>
+              <div className="flex gap-2 rounded-lg bg-secondary p-1">
+                {(["equal", "custom"] as const).map((m) => (
+                  <button type="button" key={m} onClick={() => setSplitType(m)}
+                    className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", splitType === m && "bg-primary text-white")}>{m}</button>
+                ))}
+              </div>
+              {splitType === "equal" && participants.length > 0 && (
+                <p className="text-xs text-muted-foreground">Each person pays: {formatMoney(equalShare)}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <button type="button" onClick={() => setCatPickerOpen(true)}
+                className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
+                <span className={categoryId ? "text-foreground" : "text-muted-foreground"}>
+                  {categoryId ? `${categoryIcon} ${categoryName}${subCatName ? " · " + subCatName : ""}` : "Select category (optional)"}
+                </span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Date</Label>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                  className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground outline-none" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Time</Label>
+                <input type="time" value={time} onChange={(e) => setTime(e.target.value)}
+                  className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground outline-none" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Note</Label>
+              <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
+            </div>
+          </div>
+          <div className="p-4 border-t border-border">
+            <Button className="w-full bg-[oklch(0.40_0.13_70)] hover:bg-[oklch(0.45_0.13_70)] text-white"
+              onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+              {mutation.isPending ? "Saving..." : "Save changes"}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <CategoryPickerSheet open={catPickerOpen} onOpenChange={setCatPickerOpen}
+        onSelect={(cId, cName, cIcon, sId, sName) => { setCategoryId(cId); setCategoryName(cName); setCategoryIcon(cIcon); setSubCatId(sId ?? ""); setSubCatName(sName ?? ""); }} />
+      <SimplePersonPicker open={personPickerOpen} onOpenChange={setPersonPickerOpen}
+        onSelect={(id, name) => { setPersonId(id); setPersonName(name); }} />
+      <MultiPersonPicker open={multiPickerOpen} onOpenChange={setMultiPickerOpen}
+        selected={multiPeople} onConfirm={setMultiPeople} />
+      <SimpleGroupPicker open={groupPickerOpen} onOpenChange={setGroupPickerOpen}
+        onSelect={(id, name) => { setGroupId(id); setGroupName(name); }} />
+    </>
+  );
+}
+
+// ─── Category Picker ───────────────────────────────────────────────────────
+function CategoryPickerSheet({ open, onOpenChange, onSelect }: {
+  open: boolean; onOpenChange: (o: boolean) => void;
+  onSelect: (catId: string, catName: string, catIcon: string, subId?: string, subName?: string) => void;
+}) {
+  const { data: cats = [] } = useQuery(categoriesQuery("expense"));
+  const [activeCatId, setActiveCatId] = useState("");
+  const { data: subs = [] } = useQuery(subCategoriesQuery(activeCatId || null));
+  useEffect(() => { if (cats.length > 0 && !activeCatId) setActiveCatId((cats[0] as any).id); }, [cats]);
+  const activeCat = (cats as any[]).find((c) => c.id === activeCatId);
+  return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[60dvh] flex flex-col">
-        <SheetTitle className="sr-only">Edit Split</SheetTitle>
-        <div className="flex items-center gap-3 px-5 pt-5 pb-3 border-b border-border">
-          <span className="text-base font-semibold">Edit Split</span>
+      <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
+        <SheetTitle className="sr-only">Select Category</SheetTitle>
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
+          <span className="text-base font-semibold">Category</span>
+          <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground"><X className="h-5 w-5" /></button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          <div className="space-y-1.5">
-            <Label>Description</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Dinner" />
+        <div className="flex flex-1 min-h-0">
+          <div className="w-[45%] border-r border-border overflow-y-auto">
+            {(cats as any[]).map((c) => (
+              <button key={c.id} type="button" onClick={() => setActiveCatId(c.id)}
+                className={cn("w-full flex items-center justify-between px-4 py-4 text-left text-sm border-b border-border",
+                  activeCatId === c.id ? "bg-primary/10 text-primary font-medium" : "bg-card text-foreground")}>
+                <span className="truncate">{c.icon} {c.name}</span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 ml-1 text-muted-foreground" />
+              </button>
+            ))}
           </div>
-          <div className="space-y-1.5">
-            <Label>Date</Label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground outline-none" />
+          <div className="flex-1 overflow-y-auto">
+            {activeCat && (
+              <button type="button" onClick={() => { onSelect(activeCat.id, activeCat.name, activeCat.icon ?? ""); onOpenChange(false); }}
+                className="w-full px-4 py-4 text-left text-sm border-b border-border text-primary font-medium bg-primary/5">
+                {activeCat.icon} {activeCat.name} only
+              </button>
+            )}
+            {(subs as any[]).map((s) => (
+              <button key={s.id} type="button"
+                onClick={() => { onSelect(activeCat!.id, activeCat!.name, activeCat!.icon ?? "", s.id, s.name); onOpenChange(false); }}
+                className="w-full px-4 py-4 text-left text-sm border-b border-border bg-card hover:bg-secondary/40 text-foreground">
+                {s.name}
+              </button>
+            ))}
           </div>
-        </div>
-        <div className="p-4 border-t border-border">
-          <Button className="w-full bg-primary text-white" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-            {mutation.isPending ? "Saving..." : "Save changes"}
-          </Button>
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+// ─── Simple Person Picker ──────────────────────────────────────────────────
+function SimplePersonPicker({ open, onOpenChange, onSelect }: {
+  open: boolean; onOpenChange: (o: boolean) => void;
+  onSelect: (id: string, name: string) => void;
+}) {
+  const { data: people = [] } = useQuery(peopleQuery());
+  const [addOpen, setAddOpen] = useState(false);
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
+          <SheetTitle className="sr-only">Select Person</SheetTitle>
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
+            <span className="text-base font-semibold">Person</span>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground"><Plus className="h-5 w-5" /></button>
+              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground"><X className="h-5 w-5" /></button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto divide-y divide-border">
+            {(people as any[]).map((p) => (
+              <div key={p.id} onClick={() => { onSelect(p.id, p.name); onOpenChange(false); }}
+                className="flex items-center gap-3 px-5 py-4 bg-card cursor-pointer active:bg-secondary/40">
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{p.name}</p>
+                  {p.phone_number && <p className="text-xs text-muted-foreground">{p.phone_number}</p>}
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+      <AddPersonDialog open={addOpen} onOpenChange={setAddOpen} />
+    </>
+  );
+}
+
+// ─── Multi Person Picker ───────────────────────────────────────────────────
+function MultiPersonPicker({ open, onOpenChange, selected, onConfirm }: {
+  open: boolean; onOpenChange: (o: boolean) => void;
+  selected: { id: string; name: string }[];
+  onConfirm: (people: { id: string; name: string }[]) => void;
+}) {
+  const { data: people = [] } = useQuery(peopleQuery());
+  const [checked, setChecked] = useState<Set<string>>(new Set(selected.map((p) => p.id)));
+  const [addOpen, setAddOpen] = useState(false);
+  useEffect(() => { if (open) setChecked(new Set(selected.map((p) => p.id))); }, [open]);
+  function toggle(id: string) { setChecked((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
+  function confirm() { onConfirm((people as any[]).filter((p) => checked.has(p.id)).map((p) => ({ id: p.id, name: p.name }))); onOpenChange(false); }
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
+          <SheetTitle className="sr-only">Select People</SheetTitle>
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
+            <span className="text-base font-semibold">Select People</span>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground"><Plus className="h-5 w-5" /></button>
+              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground"><X className="h-5 w-5" /></button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto divide-y divide-border">
+            {(people as any[]).map((p) => (
+              <div key={p.id} onClick={() => toggle(p.id)}
+                className="flex items-center gap-3 px-5 py-4 bg-card cursor-pointer active:bg-secondary/40">
+                <div className={cn("h-5 w-5 rounded border-2 flex items-center justify-center shrink-0",
+                  checked.has(p.id) ? "bg-primary border-primary" : "border-border")}>
+                  {checked.has(p.id) && <Check className="h-3 w-3 text-white" />}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{p.name}</p>
+                  {p.phone_number && <p className="text-xs text-muted-foreground">{p.phone_number}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="p-4 border-t border-border">
+            <Button className="w-full bg-primary text-white" onClick={confirm} disabled={checked.size === 0}>
+              Confirm ({checked.size} selected)
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+      <AddPersonDialog open={addOpen} onOpenChange={setAddOpen} />
+    </>
+  );
+}
+
+// ─── Simple Group Picker ───────────────────────────────────────────────────
+function SimpleGroupPicker({ open, onOpenChange, onSelect }: {
+  open: boolean; onOpenChange: (o: boolean) => void;
+  onSelect: (id: string, name: string) => void;
+}) {
+  const { data: groups = [] } = useQuery(groupsQuery());
+  const [addOpen, setAddOpen] = useState(false);
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
+          <SheetTitle className="sr-only">Select Group</SheetTitle>
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
+            <span className="text-base font-semibold">Group</span>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground"><Plus className="h-5 w-5" /></button>
+              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground"><X className="h-5 w-5" /></button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto divide-y divide-border">
+            {(groups as any[]).map((g) => (
+              <div key={g.id} onClick={() => { onSelect(g.id, g.name); onOpenChange(false); }}
+                className="flex items-center gap-3 px-5 py-4 bg-card cursor-pointer active:bg-secondary/40">
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{g.name}</p>
+                  <p className="text-xs text-muted-foreground">{g.group_members?.length ?? 0} members</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+      <AddGroupDialog open={addOpen} onOpenChange={setAddOpen} />
+    </>
   );
 }
 
