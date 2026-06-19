@@ -218,135 +218,136 @@ export default function SplitPage() {
       </Section>
 
       {/* History Section */}
-      <div>
-        {/* Compact filter bar */}
-        <div className="flex items-center gap-2 mb-3">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium mr-1">History</p>
-          <button type="button"
-            onClick={() => setAnchor(navigateAnchor(period, anchor, -1))}
-            className="h-7 w-7 flex items-center justify-center rounded-full bg-secondary text-foreground shrink-0">
-            <ChevronLeft className="h-3.5 w-3.5" />
+<div>
+  <div className="flex items-center justify-between mb-3 px-1">
+    <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">History</p>
+  </div>
+
+  {/* Filter bar */}
+  <div className="flex items-center gap-2 mb-3">
+    <button type="button"
+      onClick={() => setAnchor(navigateAnchor(period, anchor, -1))}
+      className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary text-foreground shrink-0">
+      <ChevronLeft className="h-4 w-4" />
+    </button>
+    <span className="text-sm font-semibold shrink-0">{formatAnchorLabel(period, anchor)}</span>
+    <button type="button"
+      onClick={() => setAnchor(navigateAnchor(period, anchor, 1))}
+      className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary text-foreground shrink-0">
+      <ChevronRight className="h-4 w-4" />
+    </button>
+
+    <div className="flex items-center gap-2 ml-auto shrink-0">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-3 py-1.5 rounded-xl capitalize">
+            {period} <ChevronDown className="h-4 w-4" />
           </button>
-          <span className="text-xs font-semibold text-center min-w-0 truncate">{formatAnchorLabel(period, anchor)}</span>
-          <button type="button"
-            onClick={() => setAnchor(navigateAnchor(period, anchor, 1))}
-            className="h-7 w-7 flex items-center justify-center rounded-full bg-secondary text-foreground shrink-0">
-            <ChevronRight className="h-3.5 w-3.5" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-36">
+          {(["weekly", "monthly", "annually"] as Period[]).map((p) => (
+            <DropdownMenuItem key={p} onClick={() => { setPeriod(p); setAnchor(new Date()); }}
+              className={cn("capitalize py-3 text-base", period === p && "text-primary font-medium")}>
+              {p}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="flex items-center gap-1.5 bg-secondary text-foreground text-sm font-medium px-3 py-1.5 rounded-xl">
+            {statusFilter === "all" ? "All" : statusFilter === "unsettled" ? "Pending" : "Settled"}
+            <ChevronDown className="h-4 w-4" />
           </button>
-
-          <div className="flex items-center gap-1.5 ml-auto shrink-0">
-            {/* Period dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-0.5 bg-primary text-white text-xs font-medium px-2.5 py-1.5 rounded-lg capitalize">
-                  {period === "weekly" ? "Wk" : period === "monthly" ? "Mo" : "Yr"} <ChevronDown className="h-3 w-3" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-28">
-                {(["weekly", "monthly", "annually"] as Period[]).map((p) => (
-                  <DropdownMenuItem key={p} onClick={() => { setPeriod(p); setAnchor(new Date()); }}
-                    className={cn("capitalize py-2", period === p && "text-primary font-medium")}>
-                    {p}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Status filter dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-0.5 bg-secondary text-foreground text-xs font-medium px-2.5 py-1.5 rounded-lg">
-                  {statusFilter === "all" ? "All" : statusFilter === "unsettled" ? "Pending" : "Done"}
-                  <ChevronDown className="h-3 w-3" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-28">
-                {(["all", "unsettled", "settled"] as StatusFilter[]).map((s) => (
-                  <DropdownMenuItem key={s} onClick={() => setStatusFilter(s)}
-                    className={cn("py-2", statusFilter === s && "text-primary font-medium")}>
-                    {s === "all" ? "All" : s === "unsettled" ? "Pending" : "Settled"}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-          {filteredSplits.length === 0 ? <Empty text="No splits for this period" /> : (
-            <div className="divide-y divide-border">
-              {filteredSplits.map((s) => {
-                const unsettled = firstUnsettledShare(s);
-                const totalShares = (s.split_shares ?? []).length;
-                const settledShares = (s.split_shares ?? []).filter((sh: any) => sh.is_settled).length;
-                const isFullySettled = totalShares > 0 && settledShares === totalShares;
-                const label = getSplitLabel(s);
-
-                return (
-                  <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
-                    <div className="flex items-center gap-3 px-4 py-3 bg-card">
-                      <div className="h-9 w-9 rounded-full bg-split/20 flex items-center justify-center text-split shrink-0">
-                        <Users className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{label}</p>
-                        <p className="text-xs text-muted-foreground font-mono">
-                          {s.date} · paid by {s.paid_by}
-                          {isFullySettled ? " · ✓" : unsettled ? ` · ${settledShares}/${totalShares}` : ""}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-sm font-mono font-semibold text-split">{formatMoney(s.total_amount)}</p>
-                        {!isFullySettled && unsettled && (
-                          <button type="button"
-                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); setSettleItem({ share: unsettled, split: s }); }}
-                            className="text-[10px] text-primary underline mt-0.5">
-                            Settle up
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </SwipeRow>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <AddPersonDialog open={addPerson} onOpenChange={setAddPerson} initial={scanned} />
-      <AddGroupDialog open={addGroup} onOpenChange={setAddGroup} />
-      <QrScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScan} />
-
-      <AlertDialog open={!!deleteSplit} onOpenChange={(o) => { if (!o) setDeleteSplit(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete split?</AlertDialogTitle>
-            <AlertDialogDescription>This will delete the split and all its shares. Cannot be undone.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
-              if (!deleteSplit) return;
-              const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
-              if (error) toast.error(error.message);
-              else { toast.success("Split deleted"); qc.invalidateQueries({ queryKey: ["splits"] }); }
-              setDeleteSplit(null);
-            }}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {editSplit && (
-        <EditSplitSheet split={editSplit} open={!!editSplit} onOpenChange={(o) => { if (!o) setEditSplit(null); }} />
-      )}
-
-      {settleItem && (
-        <SettleUpDialog open={!!settleItem} onOpenChange={(o) => { if (!o) setSettleItem(null); }}
-          share={settleItem.share} split={settleItem.split} />
-      )}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-36">
+          {(["all", "unsettled", "settled"] as StatusFilter[]).map((s) => (
+            <DropdownMenuItem key={s} onClick={() => setStatusFilter(s)}
+              className={cn("py-3 text-base", statusFilter === s && "text-primary font-medium")}>
+              {s === "all" ? "All" : s === "unsettled" ? "Pending" : "Settled"}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
-  );
+  </div>
+
+  <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+    {filteredSplits.length === 0 ? <Empty text="No splits for this period" /> : (
+      <div className="divide-y divide-border">
+        {filteredSplits.map((s) => {
+          const unsettled = firstUnsettledShare(s);
+          const totalShares = (s.split_shares ?? []).length;
+          const settledShares = (s.split_shares ?? []).filter((sh: any) => sh.is_settled).length;
+          const isFullySettled = totalShares > 0 && settledShares === totalShares;
+          const label = getSplitLabel(s);
+
+          return (
+            <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
+              <div className="flex items-center gap-3 px-4 py-3 bg-card">
+                <div className="h-9 w-9 rounded-full bg-split/20 flex items-center justify-center text-split shrink-0">
+                  <Users className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{label}</p>
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {s.date} · paid by {s.paid_by}
+                    {isFullySettled ? " · ✓ settled" : unsettled ? ` · ${settledShares}/${totalShares} settled` : ""}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-mono font-semibold text-split">{formatMoney(s.total_amount)}</p>
+                  {!isFullySettled && unsettled && (
+                    <button type="button"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); setSettleItem({ share: unsettled, split: s }); }}
+                      className="text-[10px] text-primary underline mt-0.5">
+                      Settle up
+                    </button>
+                  )}
+                </div>
+              </div>
+            </SwipeRow>
+          );
+        })}
+      </div>
+    )}
+  </div>
+</div>
+
+<AddPersonDialog open={addPerson} onOpenChange={setAddPerson} initial={scanned} />
+<AddGroupDialog open={addGroup} onOpenChange={setAddGroup} />
+<QrScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScan} />
+
+<AlertDialog open={!!deleteSplit} onOpenChange={(o) => { if (!o) setDeleteSplit(null); }}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Delete split?</AlertDialogTitle>
+      <AlertDialogDescription>This will delete the split and all its shares. Cannot be undone.</AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancel</AlertDialogCancel>
+      <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
+        if (!deleteSplit) return;
+        const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
+        if (error) toast.error(error.message);
+        else { toast.success("Split deleted"); qc.invalidateQueries({ queryKey: ["splits"] }); }
+        setDeleteSplit(null);
+      }}>Delete</AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+
+{editSplit && (
+  <EditSplitSheet split={editSplit} open={!!editSplit} onOpenChange={(o) => { if (!o) setEditSplit(null); }} />
+)}
+
+{settleItem && (
+  <SettleUpDialog open={!!settleItem} onOpenChange={(o) => { if (!o) setSettleItem(null); }}
+    share={settleItem.share} split={settleItem.split} />
+)}
+</div>
+);
 }
 
 // ─── Full Edit Split Sheet ─────────────────────────────────────────────────
