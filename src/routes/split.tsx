@@ -63,6 +63,8 @@ export default function SplitPage() {
   const { data: groups = [] } = useQuery(groupsQuery());
   const { data: splits = [] } = useQuery(splitsQuery());
   const { data: incomingSplits = [] } = useQuery(incomingSplitsQuery());
+  console.log("incomingSplits:", incomingSplits);
+  console.log("splits:", splits);
   const qc = useQueryClient();
   const [addPerson, setAddPerson] = useState(false);
   const [addGroup, setAddGroup] = useState(false);
