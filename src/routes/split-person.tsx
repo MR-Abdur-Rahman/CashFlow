@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { personQuery, personSplitsQuery, peopleQuery, groupsQuery, accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
-import { ArrowLeft, Bell, Plus, Users, CheckCircle2, ChevronRight, QrCode, X, GripVertical, Check } from "lucide-react";
+import { ArrowLeft, Bell, Plus, Users, CheckCircle2, ChevronRight, QrCode, X, Check } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { SendReminderDialog } from "@/components/SendReminderDialog";
@@ -9,10 +9,9 @@ import { SettleUpDialog } from "@/components/SettleUpDialog";
 import { SwipeRow } from "@/components/SwipeRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +19,6 @@ import { cn } from "@/lib/utils";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { QrScannerDialog } from "@/components/QrScannerDialog";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -39,28 +37,25 @@ export default function PersonDetail() {
   const [editSplit, setEditSplit] = useState<any | null>(null);
   const [settleItem, setSettleItem] = useState<{ share: any; split: any } | null>(null);
 
-const totals = (splits as any[]).reduce((acc, s) => {
-  // For incoming splits, use the mirror person ID
-  const targetPersonId = s._isIncoming ? s._myPersonId : personId;
-  if (!targetPersonId) return acc;
-  
-  for (const sh of (s.split_shares ?? [])) {
-    if (sh.person_id !== targetPersonId) continue;
-    const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
-      .reduce((a: number, x: any) => a + Number(x.amount), 0);
-    if (s._isIncoming) {
-      acc.iOwe += Number(sh.share_amount) - settled;
-    } else {
-      acc.owed += Number(sh.share_amount);
-      acc.paid += settled;
+  const totals = (splits as any[]).reduce((acc, s) => {
+    const targetPersonId = s._isIncoming ? s._myPersonId : personId;
+    if (!targetPersonId) return acc;
+    for (const sh of (s.split_shares ?? [])) {
+      if (sh.person_id !== targetPersonId) continue;
+      const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
+        .reduce((a: number, x: any) => a + Number(x.amount), 0);
+      if (s._isIncoming) {
+        acc.iOwe += Number(sh.share_amount) - settled;
+      } else {
+        acc.owed += Number(sh.share_amount);
+        acc.paid += settled;
+      }
     }
-  }
-  return acc;
-}, { owed: 0, paid: 0, iOwe: 0 });
+    return acc;
+  }, { owed: 0, paid: 0, iOwe: 0 });
 
-const balance = (totals.owed - totals.paid) - totals.iOwe;
+  const balance = (totals.owed - totals.paid) - totals.iOwe;
 
-  // All unsettled shares for multi-settle
   const unsettledItems = useMemo(() => {
     return (splits as any[]).flatMap((s) => {
       const targetPersonId = s._isIncoming ? s._myPersonId : personId;
@@ -73,7 +68,7 @@ const balance = (totals.owed - totals.paid) - totals.iOwe;
           return {
             shareId: sh.id,
             splitId: s.id,
-            description: getSplitLabel(s, personId),
+            description: getSplitLabel(s),
             date: s.date,
             shareAmount: Number(sh.share_amount),
             paidAmount: paid,
@@ -130,14 +125,12 @@ const balance = (totals.owed - totals.paid) - totals.iOwe;
       <div>
         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">History</p>
         {(splits as any[]).length === 0 ? (
-          <div className="surface-card p-6 text-center text-sm text-muted-foreground">No splits yet</div>
+          <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">No splits yet</div>
         ) : (
-          <div className="rounded-xl overflow-hidden border border-border divide-y divide-border">
+          <div className="rounded-2xl overflow-hidden border border-border divide-y divide-border">
             {(splits as any[]).map((s) => {
-              const myShares = (s.split_shares ?? []).filter((sh: any) => {
-                const targetPersonId = s._isIncoming ? s._myPersonId : personId;
-                  return sh.person_id === targetPersonId;
-              });
+              const targetPersonId = s._isIncoming ? s._myPersonId : personId;
+              const myShares = (s.split_shares ?? []).filter((sh: any) => sh.person_id === targetPersonId);
               const totalSettled = myShares.reduce((acc: number, sh: any) => {
                 return acc + (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
                   .reduce((a: number, x: any) => a + Number(x.amount), 0);
@@ -146,7 +139,7 @@ const balance = (totals.owed - totals.paid) - totals.iOwe;
               const remaining = myTotal - totalSettled;
               const isSettled = remaining <= 0.005;
               const unsettledShare = myShares.find((sh: any) => !sh.is_settled);
-              const label = getSplitLabel(s, personId);
+              const label = getSplitLabel(s);
 
               return (
                 <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
@@ -155,7 +148,6 @@ const balance = (totals.owed - totals.paid) - totals.iOwe;
                       <Users className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      {/* Issue 3 fix: show person/group/people names */}
                       <p className="text-sm font-medium truncate">{label}</p>
                       <p className="text-xs text-muted-foreground">{s.date} · paid by {s.paid_by}</p>
                       <p className="text-xs text-muted-foreground">
@@ -183,7 +175,6 @@ const balance = (totals.owed - totals.paid) - totals.iOwe;
         )}
       </div>
 
-      {/* Dialogs */}
       {splits[0] && (
         <SendReminderDialog
           open={reminderOpen}
@@ -197,7 +188,6 @@ const balance = (totals.owed - totals.paid) - totals.iOwe;
 
       <AddTransactionSheet open={addSplitOpen} onOpenChange={setAddSplitOpen} defaultTab="split" />
 
-      {/* Issue 1 fix: multi-split settle up */}
       {unsettledItems.length > 0 && (
         <SettleUpDialog
           open={settleOpen}
@@ -216,7 +206,6 @@ const balance = (totals.owed - totals.paid) - totals.iOwe;
         />
       )}
 
-      {/* Delete split confirm */}
       <AlertDialog open={!!deleteSplit} onOpenChange={(o) => { if (!o) setDeleteSplit(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -229,14 +218,18 @@ const balance = (totals.owed - totals.paid) - totals.iOwe;
               if (!deleteSplit) return;
               const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
               if (error) toast.error(error.message);
-              else { toast.success("Split deleted"); qc.invalidateQueries({ queryKey: ["splits"] }); }
+              else {
+                toast.success("Split deleted");
+                qc.invalidateQueries({ queryKey: ["splits"] });
+                qc.invalidateQueries({ queryKey: ["transactions"] });
+                qc.invalidateQueries({ queryKey: ["accounts"] });
+              }
               setDeleteSplit(null);
             }}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Issue 2 & 4 fix: full split edit form */}
       {editSplit && (
         <EditSplitSheet
           split={editSplit}
@@ -249,20 +242,20 @@ const balance = (totals.owed - totals.paid) - totals.iOwe;
 }
 
 // ─── Helper: get display label for a split ────────────────────────────────
-function getSplitLabel(s: any, currentPersonId?: string): string {
-  // For incoming splits (created by someone else), show creator's people name
-  if (s._isIncoming) {
-    // Show description or "Split" for incoming
-    return s.description || "Split from others";
-  }
+function getSplitLabel(s: any): string {
+  // Incoming split — show description
+  if (s._isIncoming) return s.description || "Split";
+  // Group split
   if (s.type === "group" && s.groups?.name) return s.groups.name;
+  // Individual split — show person name
   if (s.type === "individual" && s.people?.name) return s.people.name;
+  // Multi-person
   const names = (s.split_shares ?? []).map((sh: any) => sh.person_name).filter(Boolean);
   if (names.length > 0) return names.join(", ");
   return s.description || "Split";
 }
 
-// ─── Full Edit Split Sheet (same fields as + button Split tab) ────────────
+// ─── Full Edit Split Sheet ────────────────────────────────────────────────
 function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient();
   const { data: accounts = [] } = useQuery(accountsQuery());
@@ -302,8 +295,6 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
   const [groupPickerOpen, setGroupPickerOpen] = useState(false);
 
   useEffect(() => { if (accounts[0]?.id && !accountId) setAccountId(accounts[0].id); }, [accounts]);
-
-  // Load category name from cats
   useEffect(() => {
     if (categoryId && cats.length > 0) {
       const cat = (cats as any[]).find((c) => c.id === categoryId);
@@ -331,7 +322,6 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
       const paidByName = whoPaid === "me" ? "me"
         : target === "person" ? personName
         : participants.find((p) => p.id === otherPayerId)?.name ?? "other";
-
       const { error } = await supabase.from("splits").update({
         total_amount: total,
         type: target === "group" ? "group" : "individual",
@@ -342,14 +332,14 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
         category_id: categoryId || null,
         sub_category_id: subCatId || null,
         account_id: whoPaid === "me" && accountId ? accountId : null,
-        date, time,
-        description: note || null,
+        date, time, description: note || null,
       }).eq("id", split.id);
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Split updated");
       qc.invalidateQueries({ queryKey: ["splits"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
       onOpenChange(false);
     },
     onError: (e: any) => toast.error(e.message),
@@ -364,7 +354,6 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
             <span className="text-base font-semibold">Edit Split</span>
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-            {/* Amount */}
             <div className="text-center py-2">
               <input inputMode="decimal" value={amount}
                 onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
@@ -372,7 +361,6 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
               <p className="text-xs text-muted-foreground mt-1 font-mono">LKR</p>
             </div>
 
-            {/* Split with */}
             <div className="space-y-1.5">
               <Label>Split with</Label>
               <div className="flex gap-2 rounded-lg bg-secondary p-1">
@@ -408,7 +396,6 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
               )}
             </div>
 
-            {/* Who paid */}
             <div className="space-y-1.5">
               <Label>Who paid?</Label>
               <div className="flex gap-2 rounded-lg bg-secondary p-1">
@@ -420,15 +407,9 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
                 ))}
               </div>
               {whoPaid === "other" && target === "person" && personName && (
-                <p className="text-xs text-muted-foreground px-1">{personName} paid for this expense</p>
+                <p className="text-xs text-muted-foreground px-1">{personName} paid</p>
               )}
-              {whoPaid === "other" && target === "multi" && multiPeople.length > 0 && (
-                <Select value={otherPayerId} onValueChange={setOtherPayerId}>
-                  <SelectTrigger><SelectValue placeholder="Select who paid" /></SelectTrigger>
-                  <SelectContent>{multiPeople.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
-                </Select>
-              )}
-              {whoPaid === "other" && target === "group" && participants.length > 0 && (
+              {whoPaid === "other" && (target === "multi" || target === "group") && participants.length > 0 && (
                 <Select value={otherPayerId} onValueChange={setOtherPayerId}>
                   <SelectTrigger><SelectValue placeholder="Select who paid" /></SelectTrigger>
                   <SelectContent>{participants.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
@@ -436,7 +417,6 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
               )}
             </div>
 
-            {/* Paid from account */}
             {whoPaid === "me" && (
               <div className="space-y-1.5">
                 <Label>Paid from</Label>
@@ -447,7 +427,6 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
               </div>
             )}
 
-            {/* Split type */}
             <div className="space-y-1.5">
               <Label>Split type</Label>
               <div className="flex gap-2 rounded-lg bg-secondary p-1">
@@ -461,7 +440,6 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
               )}
             </div>
 
-            {/* Category */}
             <div className="space-y-1.5">
               <Label>Category</Label>
               <button type="button" onClick={() => setCatPickerOpen(true)}
@@ -473,7 +451,6 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
               </button>
             </div>
 
-            {/* Date + Time */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Date</Label>
@@ -487,7 +464,6 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
               </div>
             </div>
 
-            {/* Note */}
             <div className="space-y-1.5">
               <Label>Note</Label>
               <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
@@ -503,29 +479,21 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
         </SheetContent>
       </Sheet>
 
-      {/* Category picker */}
       <CategoryPickerSheet open={catPickerOpen} onOpenChange={setCatPickerOpen}
         onSelect={(cId, cName, cIcon, sId, sName) => {
           setCategoryId(cId); setCategoryName(cName); setCategoryIcon(cIcon);
           setSubCatId(sId ?? ""); setSubCatName(sName ?? "");
         }} />
-
-      {/* Person picker */}
       <SimplePersonPicker open={personPickerOpen} onOpenChange={setPersonPickerOpen}
         onSelect={(id, name) => { setPersonId(id); setPersonName(name); }} />
-
-      {/* Multi person picker */}
       <MultiPersonPicker open={multiPickerOpen} onOpenChange={setMultiPickerOpen}
         selected={multiPeople} onConfirm={setMultiPeople} />
-
-      {/* Group picker */}
       <SimpleGroupPicker open={groupPickerOpen} onOpenChange={setGroupPickerOpen}
         onSelect={(id, name) => { setGroupId(id); setGroupName(name); }} />
     </>
   );
 }
 
-// ─── Category Picker Sheet ─────────────────────────────────────────────────
 function CategoryPickerSheet({ open, onOpenChange, onSelect }: {
   open: boolean; onOpenChange: (o: boolean) => void;
   onSelect: (catId: string, catName: string, catIcon: string, subId?: string, subName?: string) => void;
@@ -535,7 +503,6 @@ function CategoryPickerSheet({ open, onOpenChange, onSelect }: {
   const { data: subs = [] } = useQuery(subCategoriesQuery(activeCatId || null));
   useEffect(() => { if (cats.length > 0 && !activeCatId) setActiveCatId((cats[0] as any).id); }, [cats]);
   const activeCat = (cats as any[]).find((c) => c.id === activeCatId);
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
@@ -576,7 +543,6 @@ function CategoryPickerSheet({ open, onOpenChange, onSelect }: {
   );
 }
 
-// ─── Simple Person Picker ─────────────────────────────────────────────────
 function SimplePersonPicker({ open, onOpenChange, onSelect }: {
   open: boolean; onOpenChange: (o: boolean) => void;
   onSelect: (id: string, name: string) => void;
@@ -584,7 +550,6 @@ function SimplePersonPicker({ open, onOpenChange, onSelect }: {
   const { data: people = [] } = useQuery(peopleQuery());
   const [addOpen, setAddOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
-
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
@@ -618,7 +583,6 @@ function SimplePersonPicker({ open, onOpenChange, onSelect }: {
   );
 }
 
-// ─── Multi Person Picker ──────────────────────────────────────────────────
 function MultiPersonPicker({ open, onOpenChange, selected, onConfirm }: {
   open: boolean; onOpenChange: (o: boolean) => void;
   selected: { id: string; name: string }[];
@@ -627,18 +591,9 @@ function MultiPersonPicker({ open, onOpenChange, selected, onConfirm }: {
   const { data: people = [] } = useQuery(peopleQuery());
   const [checked, setChecked] = useState<Set<string>>(new Set(selected.map((p) => p.id)));
   const [addOpen, setAddOpen] = useState(false);
-
   useEffect(() => { if (open) setChecked(new Set(selected.map((p) => p.id))); }, [open]);
-
-  function toggle(id: string) {
-    setChecked((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
-  }
-
-  function confirm() {
-    const result = (people as any[]).filter((p) => checked.has(p.id)).map((p) => ({ id: p.id, name: p.name }));
-    onConfirm(result); onOpenChange(false);
-  }
-
+  function toggle(id: string) { setChecked((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
+  function confirm() { onConfirm((people as any[]).filter((p) => checked.has(p.id)).map((p) => ({ id: p.id, name: p.name }))); onOpenChange(false); }
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
@@ -678,14 +633,12 @@ function MultiPersonPicker({ open, onOpenChange, selected, onConfirm }: {
   );
 }
 
-// ─── Simple Group Picker ──────────────────────────────────────────────────
 function SimpleGroupPicker({ open, onOpenChange, onSelect }: {
   open: boolean; onOpenChange: (o: boolean) => void;
   onSelect: (id: string, name: string) => void;
 }) {
   const { data: groups = [] } = useQuery(groupsQuery());
   const [addOpen, setAddOpen] = useState(false);
-
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>

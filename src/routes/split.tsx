@@ -43,15 +43,20 @@ function navigateAnchor(period: Period, anchor: Date, dir: -1 | 1): Date {
 }
 
 function formatAnchorLabel(period: Period, anchor: Date) {
-  if (period === "weekly") return `${format(startOfWeek(anchor, { weekStartsOn: 1 }), "MMM d")}–${format(endOfWeek(anchor, { weekStartsOn: 1 }), "d")}`;
+  if (period === "weekly") return `${format(startOfWeek(anchor, { weekStartsOn: 1 }), "MMM d")} – ${format(endOfWeek(anchor, { weekStartsOn: 1 }), "MMM d, yyyy")}`;
   if (period === "monthly") return format(anchor, "MMM yyyy");
   return format(anchor, "yyyy");
 }
 
 // ─── Helper: get display label for a split ────────────────────────────────
+// For own splits: show who you split WITH (not yourself)
+// For group: show group name
+// For multi-person: show all share names joined
 function getSplitLabel(s: any): string {
   if (s.type === "group" && s.groups?.name) return s.groups.name;
+  // Individual split — show the person you split with
   if (s.type === "individual" && s.people?.name) return s.people.name;
+  // Multi-person — show all names from split_shares
   const names = (s.split_shares ?? []).map((sh: any) => sh.person_name).filter(Boolean);
   if (names.length > 0) return names.join(", ");
   return s.description || "Split";
@@ -94,16 +99,6 @@ export default function SplitPage() {
     toast.success("QR scanned — review and save");
   }
 
-  // Build a map: people record id -> linked_user_id
-  // This lets us check if an incoming split involves a person linked to someone in our people list
-  const linkedPersonMap = useMemo(() => {
-    const map = new Map<string, string>(); // linked_user_id -> person.id (our people list)
-    for (const p of people as any[]) {
-      if (p.linked_user_id) map.set(p.linked_user_id, p.id);
-    }
-    return map;
-  }, [people]);
-
   function personBalance(personId: string) {
     let owed = 0;
 
@@ -117,16 +112,12 @@ export default function SplitPage() {
       }
     }
 
-    // Incoming splits — check if this incoming split was created by the person linked to personId
-    // personId is our people record (e.g. Rahman M.R.A under User B's account)
-    // The person in our list has linked_user_id = User A
-    // incomingSplits._createdByUserId = User A
+    // Incoming splits — I owe them (negative)
+    // Match by linked_user_id: person.linked_user_id = creator of incoming split
     const person = (people as any[]).find((p) => p.id === personId);
     if (person?.linked_user_id) {
       for (const s of incomingSplits as any[]) {
-        // This incoming split was created by person.linked_user_id (User A)
         if (s._createdByUserId !== person.linked_user_id) continue;
-        // Get my share amount
         const myPersonId = s._myPersonId;
         if (!myPersonId) continue;
         for (const sh of (s.split_shares ?? [])) {
@@ -218,136 +209,141 @@ export default function SplitPage() {
       </Section>
 
       {/* History Section */}
-<div>
-  <div className="flex items-center justify-between mb-3 px-1">
-    <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">History</p>
-  </div>
+      <div>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">History</p>
+        </div>
 
-  {/* Filter bar */}
-  <div className="flex items-center gap-2 mb-3">
-    <button type="button"
-      onClick={() => setAnchor(navigateAnchor(period, anchor, -1))}
-      className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary text-foreground shrink-0">
-      <ChevronLeft className="h-4 w-4" />
-    </button>
-    <span className="text-sm font-semibold shrink-0">{formatAnchorLabel(period, anchor)}</span>
-    <button type="button"
-      onClick={() => setAnchor(navigateAnchor(period, anchor, 1))}
-      className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary text-foreground shrink-0">
-      <ChevronRight className="h-4 w-4" />
-    </button>
-
-    <div className="flex items-center gap-2 ml-auto shrink-0">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-3 py-1.5 rounded-xl capitalize">
-            {period} <ChevronDown className="h-4 w-4" />
+        {/* Filter bar */}
+        <div className="flex items-center gap-2 mb-3">
+          <button type="button"
+            onClick={() => setAnchor(navigateAnchor(period, anchor, -1))}
+            className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary text-foreground shrink-0">
+            <ChevronLeft className="h-4 w-4" />
           </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-36">
-          {(["weekly", "monthly", "annually"] as Period[]).map((p) => (
-            <DropdownMenuItem key={p} onClick={() => { setPeriod(p); setAnchor(new Date()); }}
-              className={cn("capitalize py-3 text-base", period === p && "text-primary font-medium")}>
-              {p}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-1.5 bg-secondary text-foreground text-sm font-medium px-3 py-1.5 rounded-xl">
-            {statusFilter === "all" ? "All" : statusFilter === "unsettled" ? "Pending" : "Settled"}
-            <ChevronDown className="h-4 w-4" />
+          <span className="text-sm font-semibold shrink-0">{formatAnchorLabel(period, anchor)}</span>
+          <button type="button"
+            onClick={() => setAnchor(navigateAnchor(period, anchor, 1))}
+            className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary text-foreground shrink-0">
+            <ChevronRight className="h-4 w-4" />
           </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-36">
-          {(["all", "unsettled", "settled"] as StatusFilter[]).map((s) => (
-            <DropdownMenuItem key={s} onClick={() => setStatusFilter(s)}
-              className={cn("py-3 text-base", statusFilter === s && "text-primary font-medium")}>
-              {s === "all" ? "All" : s === "unsettled" ? "Pending" : "Settled"}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  </div>
 
-  <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-    {filteredSplits.length === 0 ? <Empty text="No splits for this period" /> : (
-      <div className="divide-y divide-border">
-        {filteredSplits.map((s) => {
-          const unsettled = firstUnsettledShare(s);
-          const totalShares = (s.split_shares ?? []).length;
-          const settledShares = (s.split_shares ?? []).filter((sh: any) => sh.is_settled).length;
-          const isFullySettled = totalShares > 0 && settledShares === totalShares;
-          const label = getSplitLabel(s);
+          <div className="flex items-center gap-2 ml-auto shrink-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-3 py-1.5 rounded-xl capitalize">
+                  {period} <ChevronDown className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36">
+                {(["weekly", "monthly", "annually"] as Period[]).map((p) => (
+                  <DropdownMenuItem key={p} onClick={() => { setPeriod(p); setAnchor(new Date()); }}
+                    className={cn("capitalize py-3 text-base", period === p && "text-primary font-medium")}>
+                    {p}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          return (
-            <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
-              <div className="flex items-center gap-3 px-4 py-3 bg-card">
-                <div className="h-9 w-9 rounded-full bg-split/20 flex items-center justify-center text-split shrink-0">
-                  <Users className="h-4 w-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{label}</p>
-                  <p className="text-xs text-muted-foreground font-mono">
-                    {s.date} · paid by {s.paid_by}
-                    {isFullySettled ? " · ✓ settled" : unsettled ? ` · ${settledShares}/${totalShares} settled` : ""}
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-sm font-mono font-semibold text-split">{formatMoney(s.total_amount)}</p>
-                  {!isFullySettled && unsettled && (
-                    <button type="button"
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); setSettleItem({ share: unsettled, split: s }); }}
-                      className="text-[10px] text-primary underline mt-0.5">
-                      Settle up
-                    </button>
-                  )}
-                </div>
-              </div>
-            </SwipeRow>
-          );
-        })}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 bg-secondary text-foreground text-sm font-medium px-3 py-1.5 rounded-xl">
+                  {statusFilter === "all" ? "All" : statusFilter === "unsettled" ? "Pending" : "Settled"}
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36">
+                {(["all", "unsettled", "settled"] as StatusFilter[]).map((s) => (
+                  <DropdownMenuItem key={s} onClick={() => setStatusFilter(s)}
+                    className={cn("py-3 text-base", statusFilter === s && "text-primary font-medium")}>
+                    {s === "all" ? "All" : s === "unsettled" ? "Pending" : "Settled"}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+          {filteredSplits.length === 0 ? <Empty text="No splits for this period" /> : (
+            <div className="divide-y divide-border">
+              {filteredSplits.map((s) => {
+                const unsettled = firstUnsettledShare(s);
+                const totalShares = (s.split_shares ?? []).length;
+                const settledShares = (s.split_shares ?? []).filter((sh: any) => sh.is_settled).length;
+                const isFullySettled = totalShares > 0 && settledShares === totalShares;
+                const label = getSplitLabel(s);
+
+                return (
+                  <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
+                    <div className="flex items-center gap-3 px-4 py-3 bg-card">
+                      <div className="h-9 w-9 rounded-full bg-split/20 flex items-center justify-center text-split shrink-0">
+                        <Users className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{label}</p>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {s.date} · paid by {s.paid_by}
+                          {isFullySettled ? " · ✓ settled" : unsettled ? ` · ${settledShares}/${totalShares} settled` : ""}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-mono font-semibold text-split">{formatMoney(s.total_amount)}</p>
+                        {!isFullySettled && unsettled && (
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); setSettleItem({ share: unsettled, split: s }); }}
+                            className="text-[10px] text-primary underline mt-0.5">
+                            Settle up
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </SwipeRow>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
-    )}
-  </div>
-</div>
 
-<AddPersonDialog open={addPerson} onOpenChange={setAddPerson} initial={scanned} />
-<AddGroupDialog open={addGroup} onOpenChange={setAddGroup} />
-<QrScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScan} />
+      <AddPersonDialog open={addPerson} onOpenChange={setAddPerson} initial={scanned} />
+      <AddGroupDialog open={addGroup} onOpenChange={setAddGroup} />
+      <QrScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScan} />
 
-<AlertDialog open={!!deleteSplit} onOpenChange={(o) => { if (!o) setDeleteSplit(null); }}>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>Delete split?</AlertDialogTitle>
-      <AlertDialogDescription>This will delete the split and all its shares. Cannot be undone.</AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel>Cancel</AlertDialogCancel>
-      <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
-        if (!deleteSplit) return;
-        const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
-        if (error) toast.error(error.message);
-        else { toast.success("Split deleted"); qc.invalidateQueries({ queryKey: ["splits"] }); }
-        setDeleteSplit(null);
-      }}>Delete</AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
+      <AlertDialog open={!!deleteSplit} onOpenChange={(o) => { if (!o) setDeleteSplit(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete split?</AlertDialogTitle>
+            <AlertDialogDescription>This will delete the split and all its shares. Cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
+              if (!deleteSplit) return;
+              const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
+              if (error) toast.error(error.message);
+              else {
+                toast.success("Split deleted");
+                qc.invalidateQueries({ queryKey: ["splits"] });
+                qc.invalidateQueries({ queryKey: ["transactions"] });
+                qc.invalidateQueries({ queryKey: ["accounts"] });
+              }
+              setDeleteSplit(null);
+            }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-{editSplit && (
-  <EditSplitSheet split={editSplit} open={!!editSplit} onOpenChange={(o) => { if (!o) setEditSplit(null); }} />
-)}
+      {editSplit && (
+        <EditSplitSheet split={editSplit} open={!!editSplit} onOpenChange={(o) => { if (!o) setEditSplit(null); }} />
+      )}
 
-{settleItem && (
-  <SettleUpDialog open={!!settleItem} onOpenChange={(o) => { if (!o) setSettleItem(null); }}
-    share={settleItem.share} split={settleItem.split} />
-)}
-</div>
-);
+      {settleItem && (
+        <SettleUpDialog open={!!settleItem} onOpenChange={(o) => { if (!o) setSettleItem(null); }}
+          share={settleItem.share} split={settleItem.split} />
+      )}
+    </div>
+  );
 }
 
 // ─── Full Edit Split Sheet ─────────────────────────────────────────────────
@@ -434,6 +430,7 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
     onSuccess: () => {
       toast.success("Split updated");
       qc.invalidateQueries({ queryKey: ["splits"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
       onOpenChange(false);
     },
     onError: (e: any) => toast.error(e.message),

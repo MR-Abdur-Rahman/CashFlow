@@ -14,14 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 
@@ -31,11 +25,12 @@ export default function HistoryPage() {
   const [type, setType] = useState<string>("all");
   const [editTxn, setEditTxn] = useState<any | null>(null);
   const [deleteTxn, setDeleteTxn] = useState<any | null>(null);
+  const qc = useQueryClient();
 
   const filtered = useMemo(() => {
     return (txns as any[]).filter((t) => {
-      if (type !== "all" && t.type !== type) return false;
-      if (type === "split" && !t.is_split) return false;
+      if (type === "split") { if (!t.is_split) return false; }
+      else if (type !== "all" && t.type !== type) return false;
       if (!q) return true;
       const hay = [
         t.note,
@@ -82,11 +77,7 @@ export default function HistoryPage() {
           <p className="text-xs uppercase text-muted-foreground mb-2 px-1 font-mono">{date}</p>
           <div className="rounded-xl overflow-hidden divide-y divide-border border border-border">
             {items.map((t) => (
-              <SwipeRow
-                key={t.id}
-                onEdit={() => setEditTxn(t)}
-                onDelete={() => setDeleteTxn(t)}
-              >
+              <SwipeRow key={t.id} onEdit={() => setEditTxn(t)} onDelete={() => setDeleteTxn(t)}>
                 <Row t={t} />
               </SwipeRow>
             ))}
@@ -94,16 +85,10 @@ export default function HistoryPage() {
         </div>
       ))}
 
-      {/* Edit Sheet */}
       {editTxn && (
-        <EditTransactionSheet
-          txn={editTxn}
-          open={!!editTxn}
-          onOpenChange={(o) => { if (!o) setEditTxn(null); }}
-        />
+        <EditTransactionSheet txn={editTxn} open={!!editTxn} onOpenChange={(o) => { if (!o) setEditTxn(null); }} />
       )}
 
-      {/* Delete Confirm */}
       <AlertDialog open={!!deleteTxn} onOpenChange={(o) => { if (!o) setDeleteTxn(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -120,7 +105,12 @@ export default function HistoryPage() {
                 if (!deleteTxn) return;
                 const { error } = await supabase.from("transactions").delete().eq("id", deleteTxn.id);
                 if (error) toast.error(error.message);
-                else toast.success("Transaction deleted");
+                else {
+                  toast.success("Transaction deleted");
+                  qc.invalidateQueries({ queryKey: ["transactions"] });
+                  qc.invalidateQueries({ queryKey: ["accounts"] });
+                  qc.invalidateQueries({ queryKey: ["splits"] });
+                }
                 setDeleteTxn(null);
               }}
             >
@@ -145,12 +135,9 @@ function Row({ t }: { t: any }) {
 
   const title = t.categories
     ? `${t.categories.icon ?? ""} ${t.categories.name}${t.sub_categories ? " · " + t.sub_categories.name : ""}`
-    : isIncome
-    ? (t.income_source_text ?? "Income")
-    : isTransfer
-    ? "Transfer"
-    : isSplit
-    ? "Split"
+    : isIncome ? (t.income_source_text ?? "Income")
+    : isTransfer ? "Transfer"
+    : isSplit ? "Split"
     : "Expense";
 
   const sub = isTransfer
@@ -184,6 +171,10 @@ function EditTransactionSheet({ txn, open, onOpenChange }: { txn: any; open: boo
   const [note, setNote] = useState(txn.note ?? "");
   const [date, setDate] = useState(txn.date ?? format(new Date(), "yyyy-MM-dd"));
   const [time, setTime] = useState(txn.time?.slice(0, 5) ?? format(new Date(), "HH:mm"));
+  const [accountId, setAccountId] = useState(txn.account_id ?? "");
+  const [categoryId, setCategoryId] = useState(txn.category_id ?? "");
+  const [subCatId, setSubCatId] = useState(txn.sub_category_id ?? "");
+  const [toAccountId, setToAccountId] = useState(txn.to_account_id ?? "");
 
   const { data: accounts = [] } = useQuery({
     queryKey: ["accounts"],
@@ -202,11 +193,6 @@ function EditTransactionSheet({ txn, open, onOpenChange }: { txn: any; open: boo
       return data;
     },
   });
-
-  const [accountId, setAccountId] = useState(txn.account_id ?? "");
-  const [categoryId, setCategoryId] = useState(txn.category_id ?? "");
-  const [subCatId, setSubCatId] = useState(txn.sub_category_id ?? "");
-  const [toAccountId, setToAccountId] = useState(txn.to_account_id ?? "");
 
   const { data: subs = [] } = useQuery({
     queryKey: ["sub_categories", categoryId || "none"],
@@ -228,8 +214,7 @@ function EditTransactionSheet({ txn, open, onOpenChange }: { txn: any; open: boo
         category_id: categoryId || null,
         sub_category_id: subCatId || null,
         note: note || null,
-        date,
-        time,
+        date, time,
       }).eq("id", txn.id);
       if (error) throw error;
     },
@@ -250,18 +235,13 @@ function EditTransactionSheet({ txn, open, onOpenChange }: { txn: any; open: boo
           <span className="capitalize text-base font-semibold">{txn.is_split ? "Split" : txn.type} — Edit</span>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {/* Amount */}
           <div className="text-center py-2">
-            <input
-              inputMode="decimal"
-              value={amount}
+            <input inputMode="decimal" value={amount}
               onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
-              className="w-full bg-transparent text-center text-5xl font-mono font-semibold outline-none text-foreground"
-            />
+              className="w-full bg-transparent text-center text-5xl font-mono font-semibold outline-none text-foreground" />
             <p className="text-xs text-muted-foreground mt-1 font-mono">LKR</p>
           </div>
 
-          {/* Account */}
           <div className="space-y-1.5">
             <Label>{txn.type === "transfer" ? "From account" : "Account"}</Label>
             <Select value={accountId} onValueChange={setAccountId}>
@@ -274,7 +254,6 @@ function EditTransactionSheet({ txn, open, onOpenChange }: { txn: any; open: boo
             </Select>
           </div>
 
-          {/* To Account (transfer only) */}
           {txn.type === "transfer" && (
             <div className="space-y-1.5">
               <Label>To account</Label>
@@ -289,7 +268,6 @@ function EditTransactionSheet({ txn, open, onOpenChange }: { txn: any; open: boo
             </div>
           )}
 
-          {/* Category (expense only) */}
           {(txn.type === "expense" || txn.is_split) && (
             <>
               <div className="space-y-1.5">
@@ -319,7 +297,6 @@ function EditTransactionSheet({ txn, open, onOpenChange }: { txn: any; open: boo
             </>
           )}
 
-          {/* Date + Time */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Date</Label>
@@ -333,7 +310,6 @@ function EditTransactionSheet({ txn, open, onOpenChange }: { txn: any; open: boo
             </div>
           </div>
 
-          {/* Note */}
           <div className="space-y-1.5">
             <Label>Note</Label>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />

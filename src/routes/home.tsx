@@ -150,12 +150,10 @@ export default function Home() {
       <Fab onClick={() => setOpen(true)} />
       <AddTransactionSheet open={open} onOpenChange={setOpen} />
 
-      {/* Full edit sheet */}
       {editTxn && (
         <EditTxSheet txn={editTxn} open={!!editTxn} onOpenChange={(o) => { if (!o) setEditTxn(null); }} />
       )}
 
-      {/* Delete confirm */}
       <AlertDialog open={!!deleteTxn} onOpenChange={(o) => { if (!o) setDeleteTxn(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -172,6 +170,7 @@ export default function Home() {
                 toast.success("Deleted");
                 qc.invalidateQueries({ queryKey: ["transactions"] });
                 qc.invalidateQueries({ queryKey: ["accounts"] });
+                qc.invalidateQueries({ queryKey: ["splits"] });
               }
               setDeleteTxn(null);
             }}>Delete</AlertDialogAction>
@@ -220,7 +219,6 @@ function TxRowInner({ t, onClick }: { t: any; onClick: () => void }) {
   );
 }
 
-// ─── Full Edit Transaction Sheet ───────────────────────────────────────────
 function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient();
   const [amount, setAmount] = useState(String(txn.amount));
@@ -282,7 +280,6 @@ function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onO
           <span className="capitalize text-base font-semibold">{txn.is_split ? "Split" : txn.type} — Edit</span>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {/* Amount */}
           <div className="text-center py-2">
             <input inputMode="decimal" value={amount}
               onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
@@ -290,7 +287,6 @@ function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onO
             <p className="text-xs text-muted-foreground mt-1 font-mono">LKR</p>
           </div>
 
-          {/* Account */}
           <div className="space-y-1.5">
             <Label>{txn.type === "transfer" ? "From account" : "Account"}</Label>
             <Select value={accountId} onValueChange={setAccountId}>
@@ -303,7 +299,6 @@ function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onO
             </Select>
           </div>
 
-          {/* To Account (transfer) */}
           {txn.type === "transfer" && (
             <div className="space-y-1.5">
               <Label>To account</Label>
@@ -318,7 +313,6 @@ function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onO
             </div>
           )}
 
-          {/* Category (expense/split) */}
           {(txn.type === "expense" || txn.is_split) && (
             <>
               <div className="space-y-1.5">
@@ -348,7 +342,6 @@ function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onO
             </>
           )}
 
-          {/* Date + Time */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Date</Label>
@@ -362,7 +355,6 @@ function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onO
             </div>
           </div>
 
-          {/* Note */}
           <div className="space-y-1.5">
             <Label>Note</Label>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
