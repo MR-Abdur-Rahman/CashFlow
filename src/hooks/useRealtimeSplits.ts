@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 export function useRealtimeSplits() {
   const qc = useQueryClient();
@@ -11,20 +10,21 @@ export function useRealtimeSplits() {
       .channel("split-updates")
       .on("postgres_changes", { event: "*", schema: "public", table: "splits" }, () => {
         qc.invalidateQueries({ queryKey: ["splits"] });
-        qc.invalidateQueries({ queryKey: ["splits", "incoming"] });
+        qc.invalidateQueries({ queryKey: ["transactions"] });
+        qc.invalidateQueries({ queryKey: ["accounts"] });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "split_shares" }, () => {
         qc.invalidateQueries({ queryKey: ["splits"] });
-        qc.invalidateQueries({ queryKey: ["splits", "incoming"] });
+        qc.invalidateQueries({ queryKey: ["transactions"] });
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "settlements" }, (payload) => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "settlements" }, () => {
         qc.invalidateQueries({ queryKey: ["splits"] });
-        qc.invalidateQueries({ queryKey: ["splits", "incoming"] });
-        if ((payload.new as any)?.created_by) toast.info("Split updated");
+        qc.invalidateQueries({ queryKey: ["transactions"] });
+        qc.invalidateQueries({ queryKey: ["accounts"] });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "people" }, () => {
         qc.invalidateQueries({ queryKey: ["people"] });
-        qc.invalidateQueries({ queryKey: ["splits", "incoming"] });
+        qc.invalidateQueries({ queryKey: ["splits"] });
       })
       .subscribe();
 
