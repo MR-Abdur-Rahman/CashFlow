@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Html5Qrcode } from "html5-qrcode";
 
@@ -18,32 +18,57 @@ export function QrScannerDialog({
   const [error, setError] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
 
+  const stopScanner = useCallback(async () => {
+    const s = scannerRef.current;
+    if (s) {
+      try {
+        await s.stop();
+        s.clear();
+      } catch {}
+      scannerRef.current = null;
+    }
+    // Force stop ALL video tracks to prevent black screen
+    try {
+      const videos = document.querySelectorAll("video");
+      videos.forEach((v) => {
+        const stream = v.srcObject as MediaStream | null;
+        stream?.getTracks().forEach((t) => t.stop());
+        v.srcObject = null;
+      });
+    } catch {}
+  }, []);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      stopScanner();
+      return;
+    }
+
     setError(null);
     setHasPermission(null);
     let stopped = false;
 
     const start = async () => {
-      // Check if running on HTTPS or localhost
       const isSecure = location.protocol === "https:" || location.hostname === "localhost";
       if (!isSecure) {
-        setError("Camera requires HTTPS. Please open the app on your phone via the live URL.");
+        setError("Camera requires HTTPS. Please open the app via the live URL.");
         return;
       }
 
-      // Request camera permission explicitly first
       try {
         await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         setHasPermission(true);
-      } catch (e: any) {
+      } catch {
         setError("Camera access denied. Please allow camera permission and try again.");
         return;
       }
 
       try {
-        // Small delay to ensure DOM element is ready
-        await new Promise((r) => setTimeout(r, 100));
+        await new Promise((r) => setTimeout(r, 150));
+
+        // Make sure element exists
+        const el = document.getElementById(elId);
+        if (!el) { setError("Scanner element not found. Please try again."); return; }
 
         const scanner = new Html5Qrcode(elId, { verbose: false });
         scannerRef.current = scanner;
@@ -51,16 +76,15 @@ export function QrScannerDialog({
         await scanner.start(
           { facingMode: "environment" },
           { fps: 10, qrbox: { width: 240, height: 240 } },
-          (decoded) => {
+          async (decoded) => {
             if (stopped) return;
             stopped = true;
-            // Support both prop names
+            await stopScanner();
             onScan?.(decoded);
             onResult?.(decoded);
-            void scanner.stop().then(() => scanner.clear()).catch(() => {});
             onOpenChange(false);
           },
-          () => {}, // ignore per-frame errors
+          () => {},
         );
       } catch (e: any) {
         setError(e?.message ?? "Could not start camera. Please try again.");
@@ -71,16 +95,15 @@ export function QrScannerDialog({
 
     return () => {
       stopped = true;
-      const s = scannerRef.current;
-      if (s) {
-        s.stop().then(() => s.clear()).catch(() => {});
-        scannerRef.current = null;
-      }
+      stopScanner();
     };
   }, [open]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={async (o) => {
+      if (!o) await stopScanner();
+      onOpenChange(o);
+    }}>
       <DialogContent className="max-w-sm">
         <DialogTitle>Scan QR code</DialogTitle>
         <div
