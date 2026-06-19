@@ -1,6 +1,6 @@
 import { useRealtimeSplits } from "@/hooks/useRealtimeSplits";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { peopleQuery, groupsQuery, splitsQuery, accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
+import { peopleQuery, groupsQuery, splitsQuery, incomingSplitsQuery, accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
 import { Users, Plus, ChevronRight, Archive, QrCode, X, Check } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,7 @@ export default function SplitPage() {
   const { data: people = [] } = useQuery(peopleQuery());
   const { data: groups = [] } = useQuery(groupsQuery());
   const { data: splits = [] } = useQuery(splitsQuery());
+  const { data: incomingSplits = [] } = useQuery(incomingSplitsQuery());
   const qc = useQueryClient();
   const [addPerson, setAddPerson] = useState(false);
   const [addGroup, setAddGroup] = useState(false);
@@ -60,18 +61,33 @@ export default function SplitPage() {
     toast.success("QR scanned — review and save");
   }
 
-  function personBalance(personId: string) {
-    let owed = 0;
-    for (const s of splits as any[]) {
-      for (const sh of (s.split_shares ?? [])) {
-        if (sh.person_id !== personId) continue;
-        const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
-          .reduce((a: number, x: any) => a + Number(x.amount), 0);
-        owed += Number(sh.share_amount) - settled;
-      }
+function personBalance(personId: string) {
+  let owed = 0;
+  // Own splits — person owes me
+  for (const s of splits as any[]) {
+    for (const sh of (s.split_shares ?? [])) {
+      if (sh.person_id !== personId) continue;
+      const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
+        .reduce((a: number, x: any) => a + Number(x.amount), 0);
+      owed += Number(sh.share_amount) - settled;
     }
-    return owed;
   }
+  // Incoming splits — I owe them (negative)
+  for (const s of incomingSplits as any[]) {
+    const myPersonId = s._myPersonId;
+    if (!myPersonId) continue;
+    // Check if this incoming split is from this person
+    const isFromThisPerson = (s.split_shares ?? []).some((sh: any) => sh.person_id === personId);
+    if (!isFromThisPerson) continue;
+    for (const sh of (s.split_shares ?? [])) {
+      if (sh.person_id !== myPersonId) continue;
+      const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
+        .reduce((a: number, x: any) => a + Number(x.amount), 0);
+      owed -= Number(sh.share_amount) - settled;
+    }
+  }
+  return owed;
+}
 
   function firstUnsettledShare(s: any) {
     return (s.split_shares ?? []).find((sh: any) => !sh.is_settled);
