@@ -427,7 +427,19 @@ function SplitDirectRow({ s }: { s: any }) {
   );
 
   if (isOtherPaid) {
-    const paidByName = s.paid_by === "me" ? "Other" : (s.paid_by ?? "Other");
+    // Resolve payer name:
+    // - Incoming split: creator paid ("me" from their perspective) → use their profile full_name
+    // - Own split with explicit name: paid_by is the person's name string
+    // - Own split with fallback "other": look at split_shares for the first other person's name
+    let paidByName: string;
+    if (isIncoming) {
+      paidByName = s.creator?.full_name ?? (s.paid_by !== "me" ? s.paid_by : "Other");
+    } else if (s.paid_by === "other" || !s.paid_by) {
+      paidByName = shares.find((sh: any) => sh.person_name)?.person_name ?? "Other";
+    } else {
+      paidByName = s.paid_by;
+    }
+
     let youOwe: number;
     if (isIncoming && s._myPersonId) {
       const myShareRecord = shares.find((sh: any) => sh.person_id === s._myPersonId);

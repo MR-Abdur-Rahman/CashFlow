@@ -142,7 +142,7 @@ export const splitsQuery = () =>
     queryFn: async () => {
       const { data, error } = await supabase
         .from("splits")
-        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name)")
+        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name)")
         .order("date", { ascending: false })
         .order("time", { ascending: false });
       if (error) throw error;
@@ -186,7 +186,7 @@ export const incomingSplitsQuery = () =>
       // Step 3: fetch those splits, excluding ones the current user created
       const { data, error: e3 } = await supabase
         .from("splits")
-        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name)")
+        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name)")
         .in("id", splitIds)
         .neq("created_by", u.user.id)
         .order("date", { ascending: false });
