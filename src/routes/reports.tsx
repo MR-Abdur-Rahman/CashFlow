@@ -407,20 +407,24 @@ export default function ReportsPage() {
         </div>
 
         {/* Income / Expense tab toggle */}
-        <div className="flex border-b border-border">
-          <button type="button"
+        <div className="flex rounded-xl bg-secondary p-1 gap-1">
+          <button
+            type="button"
             onClick={() => { setTab("income"); setActiveSlice(null); }}
-            className={cn("flex-1 py-3 text-sm font-medium transition-colors",
-              tab === "income" ? "text-income border-b-2 border-income" : "text-muted-foreground")}>
-            Income &nbsp;
-            <span className="font-mono text-xs">{formatMoney(income)}</span>
+            className={cn(
+              "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
+              tab === "income" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+            )}>
+            Income <span className="font-mono text-xs ml-1">{formatMoney(income)}</span>
           </button>
-          <button type="button"
+          <button
+            type="button"
             onClick={() => { setTab("expense"); setActiveSlice(null); }}
-            className={cn("flex-1 py-3 text-sm font-medium transition-colors",
-              tab === "expense" ? "text-expense border-b-2 border-expense" : "text-muted-foreground")}>
-            Expenses &nbsp;
-            <span className="font-mono text-xs">{formatMoney(expense)}</span>
+            className={cn(
+              "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
+              tab === "expense" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+            )}>
+            Expenses <span className="font-mono text-xs ml-1">{formatMoney(expense)}</span>
           </button>
         </div>
       </div>

@@ -599,7 +599,12 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
   return (
     <>
       <FormShell color="bg-[oklch(0.40_0.13_145)] hover:bg-[oklch(0.45_0.13_145)]" button="Save income"
-        onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
+        onSubmit={(e) => {
+          e.preventDefault();
+          const amt = Number(amount);
+          if (!amount || isNaN(amt) || amt <= 0) { toast.error("Please enter a valid amount greater than 0"); return; }
+          mutation.mutate();
+        }}>
         <AmountInput value={amount} onChange={setAmount} accent="text-income" />
         <div className="space-y-1.5">
           <Label>From</Label>
@@ -676,7 +681,12 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
   return (
     <>
       <FormShell color="bg-[oklch(0.40_0.18_25)] hover:bg-[oklch(0.45_0.18_25)]" button="Save expense"
-        onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
+        onSubmit={(e) => {
+          e.preventDefault();
+          const amt = Number(amount);
+          if (!amount || isNaN(amt) || amt <= 0) { toast.error("Please enter a valid amount greater than 0"); return; }
+          mutation.mutate();
+        }}>
         <AmountInput value={amount} onChange={setAmount} accent="text-expense" />
         <div className="space-y-1.5">
           <Label>From account</Label>
@@ -734,7 +744,12 @@ function TransferForm({ onClose }: { onClose: () => void }) {
 
   return (
     <FormShell color="bg-[oklch(0.40_0.13_252)] hover:bg-[oklch(0.45_0.13_252)]" button="Save transfer"
-      onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
+      onSubmit={(e) => {
+        e.preventDefault();
+        const amt = Number(amount);
+        if (!amount || isNaN(amt) || amt <= 0) { toast.error("Please enter a valid amount greater than 0"); return; }
+        mutation.mutate();
+      }}>
       <AmountInput value={amount} onChange={setAmount} accent="text-transfer" />
       <div className="space-y-1.5">
         <Label>From account</Label>
@@ -888,7 +903,12 @@ function SplitForm({ onClose }: { onClose: () => void }) {
   return (
     <>
       <FormShell color="bg-[oklch(0.40_0.13_70)] hover:bg-[oklch(0.45_0.13_70)]" button="Save split"
-        onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
+        onSubmit={(e) => {
+          e.preventDefault();
+          const amt = Number(amount);
+          if (!amount || isNaN(amt) || amt <= 0) { toast.error("Please enter a valid amount greater than 0"); return; }
+          mutation.mutate();
+        }}>
         <AmountInput value={amount} onChange={setAmount} accent="text-split" />
 
         {/* Split with */}

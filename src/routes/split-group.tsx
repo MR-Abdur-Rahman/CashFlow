@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { groupQuery, groupSplitsQuery, accountsQuery, categoriesQuery, subCategoriesQuery, peopleQuery, groupsQuery } from "@/lib/queries";
-import { ArrowLeft, Archive, Pencil, Trash2, Plus, Users, CheckCircle2, ChevronRight, X, Check } from "lucide-react";
+import { ArrowLeft, Archive, Pencil, Trash2, Plus, Users, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SettleUpDialog } from "@/components/SettleUpDialog";
 import { SwipeRow } from "@/components/SwipeRow";
@@ -17,7 +17,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfYear, endOfYear, subMonths, addMonths, subWeeks, addWeeks, subYears, addYears } from "date-fns";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -32,6 +35,23 @@ function getSplitLabel(s: any): string {
   return s.description || "Split";
 }
 
+type Period = "weekly" | "monthly" | "annually";
+function getPeriodRange(period: Period, anchor: Date) {
+  if (period === "weekly") return { from: startOfWeek(anchor, { weekStartsOn: 1 }), to: endOfWeek(anchor, { weekStartsOn: 1 }) };
+  if (period === "monthly") return { from: startOfMonth(anchor), to: endOfMonth(anchor) };
+  return { from: startOfYear(anchor), to: endOfYear(anchor) };
+}
+function navigateAnchor(period: Period, anchor: Date, dir: -1 | 1): Date {
+  if (period === "weekly") return dir === -1 ? subWeeks(anchor, 1) : addWeeks(anchor, 1);
+  if (period === "monthly") return dir === -1 ? subMonths(anchor, 1) : addMonths(anchor, 1);
+  return dir === -1 ? subYears(anchor, 1) : addYears(anchor, 1);
+}
+function formatAnchorLabel(period: Period, anchor: Date) {
+  if (period === "weekly") return `${format(startOfWeek(anchor, { weekStartsOn: 1 }), "MMM d")} – ${format(endOfWeek(anchor, { weekStartsOn: 1 }), "MMM d, yyyy")}`;
+  if (period === "monthly") return format(anchor, "MMM yyyy");
+  return format(anchor, "yyyy");
+}
+
 export default function GroupDetail() {
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
@@ -40,6 +60,8 @@ export default function GroupDetail() {
   const { data: splits = [] } = useQuery(groupSplitsQuery(groupId!));
   const [edit, setEdit] = useState(false);
   const [addSplitOpen, setAddSplitOpen] = useState(false);
+  const [period, setPeriod] = useState<Period>("monthly");
+  const [anchor, setAnchor] = useState(new Date());
   const [deleteSplit, setDeleteSplit] = useState<any | null>(null);
   const [editSplit, setEditSplit] = useState<any | null>(null);
   const [settleItem, setSettleItem] = useState<{ share: any; split: any } | null>(null);
@@ -73,6 +95,18 @@ export default function GroupDetail() {
     }
     return { name: m.people?.name ?? "?", balance: owed };
   }) ?? [];
+
+  const { from: periodFrom, to: periodTo } = useMemo(
+    () => getPeriodRange(period, anchor),
+    [period, anchor]
+  );
+  const fromStr = useMemo(() => format(periodFrom, "yyyy-MM-dd"), [periodFrom]);
+  const toStr = useMemo(() => format(periodTo, "yyyy-MM-dd"), [periodTo]);
+
+  const filteredSplits = useMemo(() =>
+    (splits as any[]).filter((s) => s.date >= fromStr && s.date <= toStr),
+    [splits, fromStr, toStr]
+  );
 
   if (!group) return <div className="p-6">Group not found</div>;
 
@@ -114,18 +148,48 @@ export default function GroupDetail() {
       </div>
 
       <div>
-        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">History</p>
-        {(splits as any[]).length === 0 ? (
-          <div className="surface-card p-6 text-center text-sm text-muted-foreground">No splits yet</div>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3 px-1">History</p>
+
+        {/* Period filter bar */}
+        <div className="flex items-center gap-2 mb-3">
+          <button onClick={() => setAnchor((a) => navigateAnchor(period, a, -1))} className="p-1 rounded-md hover:bg-secondary">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="text-sm font-semibold">{formatAnchorLabel(period, anchor)}</span>
+          <button onClick={() => setAnchor((a) => navigateAnchor(period, a, 1))} className="p-1 rounded-md hover:bg-secondary">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <div className="ml-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-3 py-1.5 rounded-xl capitalize">
+                  {period} <ChevronDown className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36">
+                {(["weekly", "monthly", "annually"] as Period[]).map((p) => (
+                  <DropdownMenuItem key={p} onClick={() => { setPeriod(p); setAnchor(new Date()); }}
+                    className={cn("capitalize py-3 text-base", period === p && "text-primary font-medium")}>
+                    {p}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {filteredSplits.length === 0 ? (
+          <div className="surface-card p-6 text-center text-sm text-muted-foreground">
+            {(splits as any[]).length === 0 ? "No splits yet" : "No splits this period"}
+          </div>
         ) : (
           <div className="rounded-xl overflow-hidden border border-border divide-y divide-border">
-            {(splits as any[]).map((s) => {
+            {filteredSplits.map((s: any) => {
               const totalShares = (s.split_shares ?? []).length;
               const settledShares = (s.split_shares ?? []).filter((sh: any) => sh.is_settled).length;
               const isFullySettled = totalShares > 0 && settledShares === totalShares;
               const unsettledShare = (s.split_shares ?? []).find((sh: any) => !sh.is_settled);
               const label = getSplitLabel(s);
-
               return (
                 <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
                   <div className="flex items-center gap-3 px-4 py-3 bg-card">

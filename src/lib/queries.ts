@@ -30,7 +30,7 @@ export const transactionsQuery = (opts?: { dateFrom?: string; dateTo?: string; a
     queryFn: async () => {
       let q = supabase
         .from("transactions")
-        .select("*, accounts:account_id(label,institution,icon_name,icon_color,icon_url,icon_type), to_account:to_account_id(label,institution), categories:category_id(name,icon), sub_categories:sub_category_id(name)")
+        .select("*, accounts:account_id(label,institution,icon_name,icon_color,icon_url,icon_type), to_account:to_account_id(label,institution), categories:category_id(name,icon), sub_categories:sub_category_id(name), split:split_id(total_amount,paid_by,type,description,split_shares(share_amount,person_name,person_id),people:person_id(name),groups:group_id(name))")
         .order("date", { ascending: false })
         .order("time", { ascending: false });
       if (opts?.dateFrom) q = q.gte("date", opts.dateFrom);
@@ -276,6 +276,22 @@ export const groupSplitsQuery = (groupId: string) =>
         .order("date", { ascending: false });
       if (error) throw error;
       return data;
+    },
+  });
+
+export const notificationsQuery = () =>
+  queryOptions({
+    queryKey: ["notifications"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", u.user.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
     },
   });
 

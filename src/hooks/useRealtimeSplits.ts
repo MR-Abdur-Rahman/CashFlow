@@ -6,25 +6,21 @@ export function useRealtimeSplits() {
   const qc = useQueryClient();
 
   useEffect(() => {
+    const invalidateAll = () => {
+      qc.invalidateQueries({ queryKey: ["splits"], exact: false });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+      qc.invalidateQueries({ queryKey: ["people"] });
+    };
+
     const channel = supabase
       .channel("split-updates")
-      .on("postgres_changes", { event: "*", schema: "public", table: "splits" }, () => {
-        qc.invalidateQueries({ queryKey: ["splits"] });
-        qc.invalidateQueries({ queryKey: ["transactions"] });
-        qc.invalidateQueries({ queryKey: ["accounts"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "split_shares" }, () => {
-        qc.invalidateQueries({ queryKey: ["splits"] });
-        qc.invalidateQueries({ queryKey: ["transactions"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "settlements" }, () => {
-        qc.invalidateQueries({ queryKey: ["splits"] });
-        qc.invalidateQueries({ queryKey: ["transactions"] });
-        qc.invalidateQueries({ queryKey: ["accounts"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "people" }, () => {
-        qc.invalidateQueries({ queryKey: ["people"] });
-        qc.invalidateQueries({ queryKey: ["splits"] });
+      .on("postgres_changes", { event: "*", schema: "public", table: "splits" }, invalidateAll)
+      .on("postgres_changes", { event: "*", schema: "public", table: "split_shares" }, invalidateAll)
+      .on("postgres_changes", { event: "*", schema: "public", table: "settlements" }, invalidateAll)
+      .on("postgres_changes", { event: "*", schema: "public", table: "people" }, invalidateAll)
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => {
+        qc.invalidateQueries({ queryKey: ["notifications"] });
       })
       .subscribe();
 

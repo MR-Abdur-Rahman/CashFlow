@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { personQuery, personSplitsQuery, peopleQuery, groupsQuery, accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
-import { ArrowLeft, Bell, Plus, Users, CheckCircle2, ChevronRight, QrCode, X, Check } from "lucide-react";
+import { ArrowLeft, Bell, Plus, Users, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, QrCode, X, Check } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { SendReminderDialog } from "@/components/SendReminderDialog";
@@ -9,13 +9,16 @@ import { SettleUpDialog } from "@/components/SettleUpDialog";
 import { SwipeRow } from "@/components/SwipeRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { QrScannerDialog } from "@/components/QrScannerDialog";
@@ -23,19 +26,43 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfYear, endOfYear, subMonths, addMonths, subWeeks, addWeeks, subYears, addYears } from "date-fns";
+
+type Period = "weekly" | "monthly" | "annually";
+function getPeriodRange(period: Period, anchor: Date) {
+  if (period === "weekly") return { from: startOfWeek(anchor, { weekStartsOn: 1 }), to: endOfWeek(anchor, { weekStartsOn: 1 }) };
+  if (period === "monthly") return { from: startOfMonth(anchor), to: endOfMonth(anchor) };
+  return { from: startOfYear(anchor), to: endOfYear(anchor) };
+}
+function navigateAnchor(period: Period, anchor: Date, dir: -1 | 1): Date {
+  if (period === "weekly") return dir === -1 ? subWeeks(anchor, 1) : addWeeks(anchor, 1);
+  if (period === "monthly") return dir === -1 ? subMonths(anchor, 1) : addMonths(anchor, 1);
+  return dir === -1 ? subYears(anchor, 1) : addYears(anchor, 1);
+}
+function formatAnchorLabel(period: Period, anchor: Date) {
+  if (period === "weekly") return `${format(startOfWeek(anchor, { weekStartsOn: 1 }), "MMM d")} – ${format(endOfWeek(anchor, { weekStartsOn: 1 }), "MMM d, yyyy")}`;
+  if (period === "monthly") return format(anchor, "MMM yyyy");
+  return format(anchor, "yyyy");
+}
 
 export default function PersonDetail() {
   const { personId } = useParams<{ personId: string }>();
   const qc = useQueryClient();
   const { data: person } = useQuery(personQuery(personId!));
   const { data: splits = [] } = useQuery(personSplitsQuery(personId!));
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [period, setPeriod] = useState<Period>("monthly");
+  const [anchor, setAnchor] = useState(new Date());
   const [reminderOpen, setReminderOpen] = useState(false);
   const [addSplitOpen, setAddSplitOpen] = useState(false);
   const [settleOpen, setSettleOpen] = useState(false);
   const [deleteSplit, setDeleteSplit] = useState<any | null>(null);
   const [editSplit, setEditSplit] = useState<any | null>(null);
   const [settleItem, setSettleItem] = useState<{ share: any; split: any } | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
+  }, []);
 
   const totals = (splits as any[]).reduce((acc, s) => {
     const targetPersonId = s._isIncoming ? s._myPersonId : personId;
@@ -77,6 +104,18 @@ export default function PersonDetail() {
         });
     }).filter((item) => item.remaining > 0.005);
   }, [splits, personId]);
+
+  const { from: periodFrom, to: periodTo } = useMemo(
+    () => getPeriodRange(period, anchor),
+    [period, anchor]
+  );
+  const fromStr = useMemo(() => format(periodFrom, "yyyy-MM-dd"), [periodFrom]);
+  const toStr = useMemo(() => format(periodTo, "yyyy-MM-dd"), [periodTo]);
+
+  const filteredSplits = useMemo(() =>
+    (splits as any[]).filter((s) => s.date >= fromStr && s.date <= toStr),
+    [splits, fromStr, toStr]
+  );
 
   if (!person) return <div className="p-6">Person not found</div>;
 
@@ -123,52 +162,106 @@ export default function PersonDetail() {
 
       {/* History list */}
       <div>
-        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">History</p>
-        {(splits as any[]).length === 0 ? (
-          <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">No splits yet</div>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3 px-1">History</p>
+
+        {/* Period filter bar */}
+        <div className="flex items-center gap-2 mb-3">
+          <button onClick={() => setAnchor((a) => navigateAnchor(period, a, -1))} className="p-1 rounded-md hover:bg-secondary">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="text-sm font-semibold">{formatAnchorLabel(period, anchor)}</span>
+          <button onClick={() => setAnchor((a) => navigateAnchor(period, a, 1))} className="p-1 rounded-md hover:bg-secondary">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <div className="ml-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-3 py-1.5 rounded-xl capitalize">
+                  {period} <ChevronDown className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36">
+                {(["weekly", "monthly", "annually"] as Period[]).map((p) => (
+                  <DropdownMenuItem key={p} onClick={() => { setPeriod(p); setAnchor(new Date()); }}
+                    className={cn("capitalize py-3 text-base", period === p && "text-primary font-medium")}>
+                    {p}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {filteredSplits.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+            {(splits as any[]).length === 0 ? "No splits yet" : "No splits this period"}
+          </div>
         ) : (
           <div className="rounded-2xl overflow-hidden border border-border divide-y divide-border">
-            {(splits as any[]).map((s) => {
+            {filteredSplits.map((s: any) => {
               const targetPersonId = s._isIncoming ? s._myPersonId : personId;
               const myShares = (s.split_shares ?? []).filter((sh: any) => sh.person_id === targetPersonId);
-              const totalSettled = myShares.reduce((acc: number, sh: any) => {
-                return acc + (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
-                  .reduce((a: number, x: any) => a + Number(x.amount), 0);
-              }, 0);
               const myTotal = myShares.reduce((a: number, sh: any) => a + Number(sh.share_amount), 0);
+              const totalSettled = myShares.reduce((acc: number, sh: any) =>
+                acc + (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
+                  .reduce((a: number, x: any) => a + Number(x.amount), 0), 0);
               const remaining = myTotal - totalSettled;
               const isSettled = remaining <= 0.005;
               const unsettledShare = myShares.find((sh: any) => !sh.is_settled);
-              const label = getSplitLabel(s);
+              const label = getSplitLabel(s, person?.name);
+
+              const shareSettlements = myShares.flatMap((sh: any) =>
+                (s.settlements ?? []).filter((st: any) => st.split_share_id === sh.id)
+              ).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+              let runningPaid = 0;
+              const settlementRows = shareSettlements.map((st: any) => {
+                runningPaid += Number(st.amount);
+                const bal = myTotal - runningPaid;
+                const done = bal <= 0.005;
+                const settlerName = st.created_by === currentUserId ? "You" : (person?.name ?? "");
+                return { st, bal, done, settlerName };
+              });
 
               return (
-                <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
-                  <div className="flex items-center gap-3 px-4 py-3 bg-card">
-                    <div className="h-9 w-9 rounded-full bg-split/20 flex items-center justify-center text-split shrink-0">
-                      <Users className="h-4 w-4" />
+                <Fragment key={s.id}>
+                  <SwipeRow onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
+                    <div className="flex items-center gap-3 px-4 py-3 bg-card">
+                      <div className="h-9 w-9 rounded-full bg-split/20 flex items-center justify-center text-split shrink-0">
+                        <Users className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{label}</p>
+                        <p className="text-xs text-muted-foreground">paid by {s.paid_by}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-mono font-semibold text-split">{formatMoney(myTotal)}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{formatMoney(s.total_amount)}</p>
+                        {!isSettled && unsettledShare && (
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); setSettleItem({ share: unsettledShare, split: s }); }}
+                            className="text-[10px] text-primary underline mt-0.5">
+                            Settle up
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{label}</p>
-                      <p className="text-xs text-muted-foreground">{s.date} · paid by {s.paid_by}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Your share: {formatMoney(myTotal)}
-                        {isSettled
-                          ? <span className="text-income ml-1 inline-flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3" /> settled</span>
-                          : <span className="text-expense ml-1">· {formatMoney(remaining)} remaining</span>}
-                      </p>
+                  </SwipeRow>
+                  {settlementRows.map(({ st, bal, done, settlerName }) => (
+                    <div key={st.id} className="flex items-center gap-3 px-4 py-2 bg-secondary/30 pl-16">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-foreground">{settlerName}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-mono font-semibold text-income">+{formatMoney(Number(st.amount))}</p>
+                        {done
+                          ? <p className="text-xs text-income inline-flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3" /> Settled</p>
+                          : <p className="text-xs text-muted-foreground font-mono">{formatMoney(bal)} remaining</p>
+                        }
+                      </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-mono font-semibold text-split">{formatMoney(s.total_amount)}</p>
-                      {!isSettled && unsettledShare && (
-                        <button type="button"
-                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); setSettleItem({ share: unsettledShare, split: s }); }}
-                          className="text-[10px] text-primary underline mt-0.5">
-                          Settle up
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </SwipeRow>
+                  ))}
+                </Fragment>
               );
             })}
           </div>
@@ -216,6 +309,50 @@ export default function PersonDetail() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
               if (!deleteSplit) return;
+              const { data: u } = await supabase.auth.getUser();
+              if (!u.user) return;
+
+              const isCreator = deleteSplit.created_by === u.user.id;
+
+              if (!isCreator) {
+                toast.error("Only the creator can delete this split");
+                const { data: myProfile } = await supabase
+                  .from("profiles").select("full_name").eq("id", u.user.id).maybeSingle();
+                await supabase.from("notifications").insert({
+                  user_id: deleteSplit.created_by,
+                  type: "delete_attempt",
+                  title: "Delete attempt",
+                  message: `${myProfile?.full_name ?? "Someone"} tried to delete: ${deleteSplit.description || "Split"}`,
+                  related_split_id: deleteSplit.id,
+                  is_read: false,
+                });
+                setDeleteSplit(null);
+                return;
+              }
+
+              // Notify linked participants BEFORE deleting (so FK is valid)
+              const personIds = (deleteSplit.split_shares ?? []).map((sh: any) => sh.person_id).filter(Boolean);
+              if (personIds.length > 0) {
+                const { data: linked } = await supabase
+                  .from("people").select("linked_user_id")
+                  .in("id", personIds).not("linked_user_id", "is", null);
+                if (linked && linked.length > 0) {
+                  const { data: creatorProfile } = await supabase
+                    .from("profiles").select("full_name").eq("id", u.user.id).maybeSingle();
+                  const creatorName = creatorProfile?.full_name ?? "Someone";
+                  await supabase.from("notifications").insert(
+                    linked.map((p: any) => ({
+                      user_id: p.linked_user_id,
+                      type: "split_deleted",
+                      title: "Split deleted",
+                      message: `${creatorName} deleted the split: ${deleteSplit.description || "Split"}`,
+                      related_split_id: deleteSplit.id,
+                      is_read: false,
+                    }))
+                  );
+                }
+              }
+
               const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
               if (error) toast.error(error.message);
               else {
@@ -242,14 +379,10 @@ export default function PersonDetail() {
 }
 
 // ─── Helper: get display label for a split ────────────────────────────────
-function getSplitLabel(s: any): string {
-  // Incoming split — show description
-  if (s._isIncoming) return s.description || "Split";
-  // Group split
+function getSplitLabel(s: any, creatorName?: string): string {
+  if (s._isIncoming) return creatorName || s.description || "Split";
   if (s.type === "group" && s.groups?.name) return s.groups.name;
-  // Individual split — show person name
   if (s.type === "individual" && s.people?.name) return s.people.name;
-  // Multi-person
   const names = (s.split_shares ?? []).map((sh: any) => sh.person_name).filter(Boolean);
   if (names.length > 0) return names.join(", ");
   return s.description || "Split";
@@ -316,6 +449,7 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
 
   const total = Number(amount);
   const equalShare = participants.length > 0 ? total / (participants.length + 1) : 0;
+  const currencySymbol = (window as any).__currencySymbol ?? "LKR";
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -358,7 +492,7 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
               <input inputMode="decimal" value={amount}
                 onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
                 className="w-full bg-transparent text-center text-5xl font-mono font-semibold outline-none text-split" />
-              <p className="text-xs text-muted-foreground mt-1 font-mono">LKR</p>
+              <p className="text-xs text-muted-foreground mt-1 font-mono">{currencySymbol}</p>
             </div>
 
             <div className="space-y-1.5">
@@ -472,7 +606,14 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
 
           <div className="p-4 border-t border-border">
             <Button className="w-full bg-[oklch(0.40_0.13_70)] hover:bg-[oklch(0.45_0.13_70)] text-white"
-              onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+              onClick={() => {
+                const amt = Number(amount);
+                if (!amount || isNaN(amt) || amt <= 0) {
+                  toast.error("Please enter a valid amount greater than 0");
+                  return;
+                }
+                mutation.mutate();
+              }} disabled={mutation.isPending}>
               {mutation.isPending ? "Saving..." : "Save changes"}
             </Button>
           </div>

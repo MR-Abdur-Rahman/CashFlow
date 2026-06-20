@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { useRealtimeSplits } from './hooks/useRealtimeSplits'
 import './index.css'
 import Home from './routes/home'
 import Accounts from './routes/accounts'
@@ -13,10 +14,12 @@ import SplitPerson from './routes/split-person'
 import SplitGroup from './routes/split-group'
 import SettingsProfile from './routes/settings-profile'
 import SettingsHistory from './routes/settings-history'
+import SettingsNotifications from './routes/settings-notifications'
 import { BottomNav } from './components/BottomNav'
 import { supabase } from './integrations/supabase/client'
 
 function App() {
+  useRealtimeSplits()
   const [session, setSession] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
@@ -56,6 +59,7 @@ function App() {
           <Route path="/settings" element={session ? <Settings /> : <Navigate to="/auth" />} />
           <Route path="/settings/profile" element={session ? <SettingsProfile /> : <Navigate to="/auth" />} />
           <Route path="/settings/history" element={session ? <SettingsHistory /> : <Navigate to="/auth" />} />
+          <Route path="/settings/notifications" element={session ? <SettingsNotifications /> : <Navigate to="/auth" />} />
         </Routes>
         {session && <BottomNav />}
       </div>

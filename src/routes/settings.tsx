@@ -9,8 +9,8 @@ import { toast } from "sonner";
 import { useState, useEffect, useRef } from "react";
 import { profileQuery } from "@/lib/queries";
 import { QRCodeSVG } from "qrcode.react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { ChevronRight, Download, Upload, QrCode, ScanLine, Sun, Moon, LogOut, Pencil } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ChevronRight, Download, Upload, QrCode, ScanLine, Sun, Moon, LogOut, Pencil, Bell } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { QrScannerDialog } from "@/components/QrScannerDialog";
 import { CURRENCY_PRESETS, setMoneyFormat } from "@/lib/format";
@@ -57,6 +57,17 @@ export default function SettingsPage() {
   const notifySettle = (profile as any)?.notify_settlement ?? true;
   const notifyDaily = (profile as any)?.notify_daily ?? false;
   const dailyTime = (profile as any)?.daily_reminder_time ?? "20:00";
+
+  const defaultPrefs = {
+    split_added: true, split_deleted: true,
+    settlement_cash: false, settlement_bank: true, settlement_ewallet: true,
+    delete_attempt: true, account_needed: true, reminder: true,
+  };
+  const notifPrefs: Record<string, boolean> = { ...defaultPrefs, ...((profile as any)?.notification_prefs ?? {}) };
+
+  const [pendingToggle, setPendingToggle] = useState<{
+    key: string; newValue: boolean; label: string; description: string;
+  } | null>(null);
 
   const updateProfile = useMutation({
     mutationFn: async (patch: Record<string, any>) => {
@@ -239,6 +250,9 @@ export default function SettingsPage() {
       </Section>
 
       <Section label="Notifications">
+        <Link to="/settings/notifications">
+          <Row icon={<Bell className="h-4 w-4" />} label="Notification history" />
+        </Link>
         <ToggleRow label="Split notifications" checked={notifySplits} onChange={(v) => updateProfile.mutate({ notify_splits: v })} />
         <ToggleRow label="Settlement reminders" checked={notifySettle} onChange={(v) => updateProfile.mutate({ notify_settlement: v })} />
         <ToggleRow label="Daily expense reminder" checked={notifyDaily} onChange={(v) => updateProfile.mutate({ notify_daily: v })} />
@@ -250,6 +264,27 @@ export default function SettingsPage() {
               className="bg-secondary text-foreground rounded-md px-3 py-1.5 text-sm font-mono" />
           </div>
         )}
+      </Section>
+
+      <Section label="Toast preferences">
+        {([
+          { key: "split_added",       label: "Split added",              description: "someone adds a split with you" },
+          { key: "split_deleted",     label: "Split deleted",            description: "a split you're part of is deleted" },
+          { key: "settlement_cash",   label: "Settlement — Cash",        description: "someone settles with cash" },
+          { key: "settlement_bank",   label: "Settlement — Bank Transfer", description: "someone settles via bank transfer" },
+          { key: "settlement_ewallet",label: "Settlement — E-wallet",    description: "someone settles via e-wallet" },
+          { key: "delete_attempt",    label: "Delete attempt",           description: "someone tries to delete your split" },
+          { key: "account_needed",    label: "Account selection needed", description: "you need to select an account for a received settlement" },
+          { key: "reminder",          label: "Payment reminder received",description: "someone sends you a payment reminder" },
+        ] as const).map(({ key, label, description }) => (
+          <div key={key} className="flex items-center justify-between p-4">
+            <span className="text-sm">{label}</span>
+            <Switch
+              checked={!!notifPrefs[key]}
+              onCheckedChange={(newValue) => setPendingToggle({ key, newValue, label, description })}
+            />
+          </div>
+        ))}
       </Section>
 
       <Section label="Data & backup">
@@ -271,6 +306,28 @@ export default function SettingsPage() {
           Delete account
         </button>
       </div>
+
+      {/* Toast preference confirmation dialog */}
+      <Dialog open={!!pendingToggle} onOpenChange={(o) => { if (!o) setPendingToggle(null); }}>
+        <DialogContent>
+          <DialogTitle>{pendingToggle?.label}</DialogTitle>
+          <DialogDescription>
+            {pendingToggle?.newValue
+              ? `ON: You'll see a toast popup when ${pendingToggle.description}.`
+              : "OFF: Notification saved silently in bell icon."}
+          </DialogDescription>
+          <div className="flex justify-end mt-2">
+            <Button onClick={() => {
+              if (!pendingToggle || !userId) return;
+              const newPrefs = { ...notifPrefs, [pendingToggle.key]: pendingToggle.newValue };
+              updateProfile.mutate({ notification_prefs: newPrefs });
+              setPendingToggle(null);
+            }}>
+              OK
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={qrOpen} onOpenChange={setQrOpen}>
         <DialogContent>

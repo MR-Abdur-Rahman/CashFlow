@@ -1,12 +1,12 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { accountsQuery, transactionsQuery, profileQuery } from "@/lib/queries";
+import { Link, useNavigate } from "react-router-dom";
+import { accountsQuery, transactionsQuery, profileQuery, notificationsQuery } from "@/lib/queries";
 import { formatMoney, greeting } from "@/lib/format";
 import { AccountIcon } from "@/components/AccountIcon";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
 import { Fab } from "@/components/Fab";
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users, ChevronDown } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users, ChevronDown, Bell, History, X } from "lucide-react";
 import { format, startOfWeek, startOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -42,10 +42,12 @@ const PERIOD_LABELS: { key: FilterPeriod; label: string }[] = [
 ];
 
 export default function Home() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [editTxn, setEditTxn] = useState<any>(null);
   const [deleteTxn, setDeleteTxn] = useState<any>(null);
   const [period, setPeriod] = useState<FilterPeriod>("today");
+  const [notifOpen, setNotifOpen] = useState(false);
   const qc = useQueryClient();
 
   const { dateFrom, dateTo } = getDateRange(period);
@@ -57,6 +59,20 @@ export default function Home() {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
   }, []);
   const { data: profile } = useQuery(profileQuery(userId));
+  const { data: notifications = [] } = useQuery(notificationsQuery());
+  const unreadCount = (notifications as any[]).filter((n: any) => !n.is_read).length;
+
+  // Auto-mark non-settlement notifications as read when bell opens
+  useEffect(() => {
+    if (!notifOpen) return;
+    const ids = (notifications as any[])
+      .filter((n: any) => !n.is_read && n.type !== "settlement_account_needed")
+      .map((n: any) => n.id);
+    if (ids.length === 0) return;
+    supabase.from("notifications").update({ is_read: true }).in("id", ids)
+      .then(() => qc.invalidateQueries({ queryKey: ["notifications"] }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifOpen]);
 
   const total = accounts.reduce((s, a) => s + Number(a.current_balance), 0);
   const displayName = profile?.full_name
@@ -79,9 +95,23 @@ export default function Home() {
           <p className="text-sm text-muted-foreground">{greeting()},</p>
           <h1 className="text-xl font-semibold">{displayName}</h1>
         </div>
-        <Link to="/settings" aria-label="Profile">
-          <UserAvatar url={profile?.avatar_url} name={profile?.full_name} size={40} />
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setNotifOpen(true)}
+            className="relative h-10 w-10 flex items-center justify-center rounded-full bg-secondary"
+          >
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-0.5 right-0.5 h-4 min-w-4 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center px-0.5 leading-none">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+          <Link to="/settings" aria-label="Profile">
+            <UserAvatar url={profile?.avatar_url} name={profile?.full_name} size={40} />
+          </Link>
+        </div>
       </div>
 
       {/* Balance Card */}
@@ -149,6 +179,13 @@ export default function Home() {
 
       <Fab onClick={() => setOpen(true)} />
       <AddTransactionSheet open={open} onOpenChange={setOpen} />
+
+      <NotificationSheet
+        open={notifOpen}
+        onOpenChange={setNotifOpen}
+        notifications={notifications as any[]}
+        onNavigate={(path) => { setNotifOpen(false); navigate(path); }}
+      />
 
       {editTxn && (
         <EditTxSheet txn={editTxn} open={!!editTxn} onOpenChange={(o) => { if (!o) setEditTxn(null); }} />
@@ -364,6 +401,84 @@ function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onO
           <Button className="w-full bg-primary text-white" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
             {mutation.isPending ? "Saving..." : "Save changes"}
           </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function NotificationSheet({ open, onOpenChange, notifications, onNavigate }: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  notifications: any[];
+  onNavigate: (path: string) => void;
+}) {
+  const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
+
+  const visible = notifications.filter((n: any) => {
+    if (filter === "unread") return !n.is_read;
+    if (filter === "read") return n.is_read;
+    return true;
+  });
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
+        <SheetTitle className="sr-only">Notifications</SheetTitle>
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => onNavigate("/settings/notifications")}
+              className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary">
+              <History className="h-4 w-4" />
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="flex items-center gap-1 text-sm font-medium bg-secondary px-3 py-1.5 rounded-xl capitalize">
+                  {filter === "all" ? "All" : filter === "unread" ? "Unread" : "Read"}
+                  <ChevronDown className="h-3.5 w-3.5 ml-0.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-28">
+                {(["all", "unread", "read"] as const).map((f) => (
+                  <DropdownMenuItem key={f} onClick={() => setFilter(f)}
+                    className={cn("capitalize", filter === f && "text-primary font-medium")}>
+                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <button type="button" onClick={() => onOpenChange(false)}
+            className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto divide-y divide-border">
+          {visible.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-12">
+              {filter === "all" ? "All caught up!" : `No ${filter} notifications`}
+            </p>
+          ) : (
+            visible.slice(0, 20).map((n: any) => (
+              <div
+                key={n.id}
+                className={`flex items-start gap-3 px-5 py-4 ${!n.is_read ? "bg-primary/5" : "bg-card"} ${n.type === "settlement_account_needed" ? "cursor-pointer active:bg-secondary/40" : ""}`}
+                onClick={n.type === "settlement_account_needed" ? () => onNavigate("/accounts") : undefined}
+              >
+                <div className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${!n.is_read ? "bg-primary" : "bg-transparent border border-border"}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{n.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{n.message}</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {format(new Date(n.created_at), "MMM d · h:mm a")}
+                  </p>
+                  {n.type === "settlement_account_needed" && (
+                    <p className="text-xs text-primary mt-1">Tap to go to Accounts →</p>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </SheetContent>
     </Sheet>

@@ -42,9 +42,20 @@ export function SettleUpDialog({
 }) {
   const qc = useQueryClient();
   const { data: accounts = [] } = useQuery(accountsQuery());
-  const [method, setMethod] = useState<"cash" | "bank_transfer">("cash");
+  const [method, setMethod] = useState<"cash" | "bank_transfer" | "e-wallet">("cash");
   const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
+
+  const methodToAccountType: Record<string, string> = {
+    cash: "cash",
+    bank_transfer: "bank",
+    "e-wallet": "e-wallet",
+  };
+
+  const filteredAccounts = useMemo(
+    () => (accounts as any[]).filter((a) => a.type === methodToAccountType[method]),
+    [accounts, method]
+  );
 
   // Build items list — support both multi and legacy single
   const items: UnsettledItem[] = useMemo(() => {
@@ -76,8 +87,8 @@ export function SettleUpDialog({
   }, [open, items]);
 
   useEffect(() => {
-    if (accounts[0]?.id) setAccountId(accounts[0].id);
-  }, [accounts]);
+    setAccountId((filteredAccounts as any[])[0]?.id ?? "");
+  }, [filteredAccounts]);
 
   const totalSettling = Object.values(selected)
     .filter((_, i) => Object.keys(selected)[i] !== undefined)
@@ -103,6 +114,10 @@ export function SettleUpDialog({
       const entries = Object.entries(selected).filter(([, v]) => Number(v) > 0);
       if (entries.length === 0) throw new Error("Select at least one split to settle");
 
+      const today = new Date();
+      const dateStr = today.toISOString().split("T")[0];
+      const timeStr = today.toTimeString().split(" ")[0];
+
       for (const [shareId, amtStr] of entries) {
         const amt = Number(amtStr);
         const item = items.find((i) => i.shareId === shareId);
@@ -113,17 +128,56 @@ export function SettleUpDialog({
           split_share_id: shareId,
           amount: amt,
           method,
-          account_id: method === "bank_transfer" && accountId ? accountId : null,
+          account_id: accountId || null,
           note: note || null,
           created_by: u.user.id,
         });
         if (error) throw error;
 
-        if (amt >= item.remaining) {
+        if ((method === "bank_transfer" || method === "e-wallet") && accountId) {
+          const txLabel = personName || item.description || "Split";
+          const { error: txError } = await supabase.from("transactions").insert({
+            type: "expense",
+            amount: amt,
+            account_id: accountId,
+            note: `Settlement — ${txLabel}`,
+            date: dateStr,
+            time: timeStr,
+            is_split: false,
+            user_id: u.user.id,
+          });
+          if (txError) throw txError;
+        }
+
+        const totalSettled = item.paidAmount + amt;
+        if (totalSettled >= item.shareAmount) {
           await supabase.from("split_shares").update({
             is_settled: true,
             settled_at: new Date().toISOString(),
           }).eq("id", shareId);
+        } else {
+          await supabase.from("split_shares").update({
+            is_settled: false,
+          }).eq("id", shareId);
+        }
+
+        // Notify split creator when settled via bank_transfer or e-wallet
+        if (method === "bank_transfer" || method === "e-wallet") {
+          const { data: splitData } = await supabase
+            .from("splits").select("created_by").eq("id", item.splitId).maybeSingle();
+          if (splitData && splitData.created_by !== u.user.id) {
+            const { data: settlerProfile } = await supabase
+              .from("profiles").select("full_name").eq("id", u.user.id).maybeSingle();
+            const settlerName = settlerProfile?.full_name ?? personName ?? "Someone";
+            await supabase.from("notifications").insert({
+              user_id: splitData.created_by,
+              type: "settlement_account_needed",
+              title: "Settlement received",
+              message: `${settlerName} settled LKR ${amt} — tap to select which account to credit`,
+              related_split_id: item.splitId,
+              is_read: false,
+            });
+          }
         }
       }
     },
@@ -131,6 +185,8 @@ export function SettleUpDialog({
       toast.success("Settled successfully");
       qc.invalidateQueries({ queryKey: ["splits"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
       onOpenChange(false);
     },
     onError: (e: any) => toast.error(e.message),
@@ -225,23 +281,28 @@ export function SettleUpDialog({
               <SelectContent>
                 <SelectItem value="cash">Cash</SelectItem>
                 <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+                <SelectItem value="e-wallet">E-wallet</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {method === "bank_transfer" && (
-            <div className="space-y-1.5">
-              <Label>Account</Label>
+          <div className="space-y-1.5">
+            <Label>Account</Label>
+            {(filteredAccounts as any[]).length === 0 ? (
+              <p className="text-xs text-muted-foreground px-1 py-1">
+                No {methodToAccountType[method]} accounts found — add one in the Accounts tab.
+              </p>
+            ) : (
               <Select value={accountId} onValueChange={setAccountId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                 <SelectContent>
-                  {accounts.map((a) => (
+                  {(filteredAccounts as any[]).map((a) => (
                     <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="space-y-1.5">
             <Label>Note (optional)</Label>
@@ -250,7 +311,13 @@ export function SettleUpDialog({
         </div>
 
         <div className="p-4 border-t border-border">
-          <Button className="w-full bg-primary text-white" onClick={() => mutation.mutate()} disabled={mutation.isPending || Object.keys(selected).length === 0}>
+          <Button className="w-full bg-primary text-white" onClick={() => {
+            if (!totalSettling || isNaN(totalSettling) || totalSettling <= 0) {
+              toast.error("Please enter a valid amount greater than 0");
+              return;
+            }
+            mutation.mutate();
+          }} disabled={mutation.isPending || Object.keys(selected).length === 0}>
             {mutation.isPending ? "Settling..." : `Confirm${totalSettling > 0 ? " — " + formatMoney(totalSettling) : ""}`}
           </Button>
         </div>
