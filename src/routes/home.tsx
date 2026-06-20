@@ -47,6 +47,8 @@ export default function Home() {
   const [open, setOpen] = useState(false);
   const [editTxn, setEditTxn] = useState<any>(null);
   const [deleteTxn, setDeleteTxn] = useState<any>(null);
+  const [editSplit, setEditSplit] = useState<any>(null);
+  const [deleteSplit, setDeleteSplit] = useState<any>(null);
   const [period, setPeriod] = useState<FilterPeriod>("today");
   const [notifOpen, setNotifOpen] = useState(false);
   const [txnTab, setTxnTab] = useState<"transactions" | "splits">("transactions");
@@ -209,7 +211,9 @@ export default function Home() {
                 ) : (
                   <div className="divide-y divide-border">
                     {allSplitsForTab.map((s) => (
-                      <SplitDirectRow key={s.id} s={s} />
+                      <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
+                        <SplitDirectRow s={s} />
+                      </SwipeRow>
                     ))}
                   </div>
                 )}
@@ -268,6 +272,34 @@ export default function Home() {
                 qc.invalidateQueries({ queryKey: ["splits"] });
               }
               setDeleteTxn(null);
+            }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {editSplit && (
+        <EditSplitSheet split={editSplit} open={!!editSplit} onOpenChange={(o) => { if (!o) setEditSplit(null); }} />
+      )}
+
+      <AlertDialog open={!!deleteSplit} onOpenChange={(o) => { if (!o) setDeleteSplit(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete split?</AlertDialogTitle>
+            <AlertDialogDescription>Are you sure you want to delete this split?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
+              if (!deleteSplit) return;
+              const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
+              if (error) toast.error(error.message);
+              else {
+                toast.success("Split deleted");
+                qc.invalidateQueries({ queryKey: ["splits"] });
+                qc.invalidateQueries({ queryKey: ["transactions"] });
+                qc.invalidateQueries({ queryKey: ["accounts"] });
+              }
+              setDeleteSplit(null);
             }}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -427,10 +459,7 @@ function SplitDirectRow({ s }: { s: any }) {
   );
 
   if (isOtherPaid) {
-    // Resolve payer name:
-    // - Incoming split: creator paid ("me" from their perspective) → use their profile full_name
-    // - Own split with explicit name: paid_by is the person's name string
-    // - Own split with fallback "other": look at split_shares for the first other person's name
+    // Resolve payer name
     let paidByName: string;
     if (isIncoming) {
       paidByName = s.creator?.full_name ?? (s.paid_by !== "me" ? s.paid_by : "Other");
@@ -440,6 +469,7 @@ function SplitDirectRow({ s }: { s: any }) {
       paidByName = s.paid_by;
     }
 
+    // Resolve how much the current user owes
     let youOwe: number;
     if (isIncoming && s._myPersonId) {
       const myShareRecord = shares.find((sh: any) => sh.person_id === s._myPersonId);
@@ -447,19 +477,54 @@ function SplitDirectRow({ s }: { s: any }) {
     } else {
       youOwe = myShare;
     }
+
+    // Participant names for multi/group line 2 — exclude current user's own share record
+    const otherShares = shares.filter((sh: any) => sh.person_id !== s._myPersonId);
+    const participantNames = otherShares.map((sh: any) => sh.person_name).filter(Boolean) as string[];
+    const participantsDisplay = participantNames.length > 2
+      ? `${participantNames[0]}, ${participantNames[1]} +${participantNames.length - 2} more`
+      : participantNames.join(", ") || paidByName;
+    const groupName = s.groups?.name ?? "Group";
+
     return (
       <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
         <div className="px-4 py-3">
+          {/* Line 1: description + total */}
           <div className="flex items-start justify-between gap-2">
             <p className="text-sm font-medium truncate flex-1">{description}</p>
             <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">{formatMoney(total)}</p>
           </div>
-          <div className="flex items-center justify-between gap-2 mt-0.5">
-            <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{paidByName}</p>
-            <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">
-              You owe {formatMoney(youOwe)}
-            </p>
-          </div>
+
+          {/* Person split — 2 lines */}
+          {isPerson && (
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{paidByName}</p>
+              <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">
+                You owe {formatMoney(youOwe)}
+              </p>
+            </div>
+          )}
+
+          {/* People / Group split — 3 lines */}
+          {(isMulti || isGroup) && (
+            <>
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
+                  {isGroup ? groupName : participantsDisplay}
+                </p>
+                <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+                  {formatMoney(youOwe)}
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">Paid by {paidByName}</p>
+                <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">
+                  You owe {formatMoney(youOwe)}
+                </p>
+              </div>
+            </>
+          )}
+
           <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{s.time?.slice(0, 5)}</p>
         </div>
       </div>
@@ -509,6 +574,73 @@ function SplitDirectRow({ s }: { s: any }) {
         <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{s.time?.slice(0, 5)}</p>
       </div>
     </div>
+  );
+}
+
+function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boolean; onOpenChange: (o: boolean) => void }) {
+  const qc = useQueryClient();
+  const [amount, setAmount] = useState(String(split.total_amount));
+  const [description, setDescription] = useState(split.description ?? "");
+  const [date, setDate] = useState(split.date ?? format(new Date(), "yyyy-MM-dd"));
+  const [time, setTime] = useState(split.time?.slice(0, 5) ?? format(new Date(), "HH:mm"));
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("splits").update({
+        total_amount: Number(amount),
+        description: description || null,
+        date,
+        time,
+      }).eq("id", split.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Split updated");
+      qc.invalidateQueries({ queryKey: ["splits"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[60dvh] flex flex-col">
+        <SheetTitle className="sr-only">Edit split</SheetTitle>
+        <div className="px-5 pt-5 pb-3 border-b border-border">
+          <span className="text-base font-semibold">Split — Edit</span>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          <div className="text-center py-2">
+            <input inputMode="decimal" value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+              className="w-full bg-transparent text-center text-5xl font-mono font-semibold outline-none text-foreground" />
+            <p className="text-xs text-muted-foreground mt-1 font-mono">LKR</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Dinner, Groceries" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Date</Label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground outline-none" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Time</Label>
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)}
+                className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground outline-none" />
+            </div>
+          </div>
+        </div>
+        <div className="p-4 pt-2 border-t border-border bg-card">
+          <Button className="w-full bg-primary text-white" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+            {mutation.isPending ? "Saving..." : "Save changes"}
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
