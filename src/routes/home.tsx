@@ -577,7 +577,7 @@ function SplitDirectRow({ s }: { s: any }) {
             </div>
           </>
         )}
-        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{s.time?.slice(0, 5)}</p>
+        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{formatDateTime(s.date, s.time)}</p>
       </div>
     </div>
   );
