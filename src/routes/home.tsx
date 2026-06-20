@@ -36,6 +36,12 @@ function getDateRange(period: FilterPeriod): { dateFrom: string; dateTo: string 
   return { dateFrom: format(startOfMonth(new Date()), "yyyy-MM-dd"), dateTo: today };
 }
 
+function formatDateTime(date?: string, time?: string): string {
+  if (!date) return "";
+  const t = time?.slice(0, 5) ?? "00:00";
+  return format(new Date(`${date}T${t}`), "MMM dd, yyyy · hh:mm a");
+}
+
 const PERIOD_LABELS: { key: FilterPeriod; label: string }[] = [
   { key: "today", label: "Today" },
   { key: "week", label: "Weekly" },
@@ -341,7 +347,7 @@ function TxRowInner({ t, onClick }: { t: any; onClick: () => void }) {
       </div>
       <div className="text-right">
         <p className={`text-sm font-mono font-semibold ${colorClass}`}>{sign}{formatMoney(t.amount)}</p>
-        <p className="text-[10px] text-muted-foreground font-mono">{t.time?.slice(0, 5)}</p>
+        <p className="text-[10px] text-muted-foreground font-mono">{formatDateTime(t.date, t.time)}</p>
       </div>
     </div>
   );
@@ -434,7 +440,7 @@ function SplitRowContent({ t, onClick }: { t: any; onClick: () => void }) {
         )}
 
         {/* Time */}
-        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{t.time?.slice(0, 5)}</p>
+        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{formatDateTime(t.date, t.time)}</p>
       </div>
     </div>
   );
@@ -525,7 +531,7 @@ function SplitDirectRow({ s }: { s: any }) {
             </>
           )}
 
-          <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{s.time?.slice(0, 5)}</p>
+          <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{formatDateTime(s.date, s.time)}</p>
         </div>
       </div>
     );
