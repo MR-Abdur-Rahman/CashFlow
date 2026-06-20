@@ -685,6 +685,7 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
           e.preventDefault();
           const amt = Number(amount);
           if (!amount || isNaN(amt) || amt <= 0) { toast.error("Please enter a valid amount greater than 0"); return; }
+          if (!accountId) { toast.error("Please select an account"); return; }
           mutation.mutate();
         }}>
         <AmountInput value={amount} onChange={setAmount} accent="text-expense" />
@@ -748,6 +749,8 @@ function TransferForm({ onClose }: { onClose: () => void }) {
         e.preventDefault();
         const amt = Number(amount);
         if (!amount || isNaN(amt) || amt <= 0) { toast.error("Please enter a valid amount greater than 0"); return; }
+        if (!fromId) { toast.error("Please select a from account"); return; }
+        if (!toId) { toast.error("Please select a to account"); return; }
         mutation.mutate();
       }}>
       <AmountInput value={amount} onChange={setAmount} accent="text-transfer" />

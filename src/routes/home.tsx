@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { accountsQuery, transactionsQuery, profileQuery, notificationsQuery } from "@/lib/queries";
+import { accountsQuery, transactionsQuery, profileQuery, notificationsQuery, peopleQuery } from "@/lib/queries";
 import { formatMoney, greeting } from "@/lib/format";
 import { AccountIcon } from "@/components/AccountIcon";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
@@ -14,6 +14,7 @@ import { SwipeRow } from "@/components/SwipeRow";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -48,6 +49,7 @@ export default function Home() {
   const [deleteTxn, setDeleteTxn] = useState<any>(null);
   const [period, setPeriod] = useState<FilterPeriod>("today");
   const [notifOpen, setNotifOpen] = useState(false);
+  const [txnTab, setTxnTab] = useState<"transactions" | "splits">("transactions");
   const qc = useQueryClient();
 
   const { dateFrom, dateTo } = getDateRange(period);
@@ -162,19 +164,45 @@ export default function Home() {
           </DropdownMenu>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-          {txns.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-10 px-4">{emptyMessages[period]}</p>
-          ) : (
-            <div className="divide-y divide-border">
-              {(txns as any[]).map((t) => (
-                <SwipeRow key={t.id} onEdit={() => setEditTxn(t)} onDelete={() => setDeleteTxn(t)}>
-                  <TxRowInner t={t} onClick={() => setEditTxn(t)} />
-                </SwipeRow>
-              ))}
-            </div>
-          )}
+        {/* Transactions | Splits tab switcher */}
+        <div className="flex gap-2 mb-3">
+          {(["transactions", "splits"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setTxnTab(tab)}
+              className="flex-1 py-2 text-sm font-medium rounded-lg capitalize transition-colors"
+              style={
+                txnTab === tab
+                  ? { background: "#1A1A1A", color: "white", border: "1px solid #7C3AED" }
+                  : { background: "#2A2A2A", color: "#9CA3AF", border: "1px solid transparent" }
+              }
+            >
+              {tab === "transactions" ? "Transactions" : "Splits"}
+            </button>
+          ))}
         </div>
+
+        {(() => {
+          const visibleTxns = (txns as any[]).filter((t) =>
+            txnTab === "splits" ? !!t.is_split : !t.is_split
+          );
+          return (
+            <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+              {visibleTxns.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-10 px-4">{emptyMessages[period]}</p>
+              ) : (
+                <div className="divide-y divide-border">
+                  {visibleTxns.map((t) => (
+                    <SwipeRow key={t.id} onEdit={() => setEditTxn(t)} onDelete={() => setDeleteTxn(t)}>
+                      <TxRowInner t={t} onClick={() => setEditTxn(t)} />
+                    </SwipeRow>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       <Fab onClick={() => setOpen(true)} />
@@ -219,14 +247,15 @@ export default function Home() {
 }
 
 function TxRowInner({ t, onClick }: { t: any; onClick: () => void }) {
+  if (t.is_split) return <SplitRowContent t={t} onClick={onClick} />;
+
   const isIncome = t.type === "income";
   const isExpense = t.type === "expense";
   const isTransfer = t.type === "transfer";
-  const isSplit = t.is_split;
 
-  const colorClass = isSplit ? "text-split" : isIncome ? "text-income" : isExpense ? "text-expense" : "text-transfer";
-  const bgClass = isSplit ? "bg-[var(--color-split-bg)]" : isIncome ? "bg-[var(--color-income-bg)]" : isExpense ? "bg-[var(--color-expense-bg)]" : "bg-[var(--color-transfer-bg)]";
-  const Icon = isSplit ? Users : isIncome ? ArrowDownLeft : isExpense ? ArrowUpRight : ArrowLeftRight;
+  const colorClass = isIncome ? "text-income" : isExpense ? "text-expense" : "text-transfer";
+  const bgClass = isIncome ? "bg-[var(--color-income-bg)]" : isExpense ? "bg-[var(--color-expense-bg)]" : "bg-[var(--color-transfer-bg)]";
+  const Icon = isIncome ? ArrowDownLeft : isExpense ? ArrowUpRight : ArrowLeftRight;
   const sign = isIncome ? "+" : isTransfer ? "" : "-";
 
   const title = t.categories
@@ -256,6 +285,99 @@ function TxRowInner({ t, onClick }: { t: any; onClick: () => void }) {
   );
 }
 
+function SplitRowContent({ t, onClick }: { t: any; onClick: () => void }) {
+  const s = t.split;
+
+  // Fallback if split data not joined
+  if (!s) {
+    return (
+      <div className="flex items-center gap-3 p-4 bg-card cursor-pointer active:bg-secondary/40"
+        style={{ borderLeft: "3px solid #F59E0B" }} onClick={onClick}>
+        <div className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--color-split-bg)] text-split shrink-0">
+          <Users className="h-5 w-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">Split expense</p>
+        </div>
+        <p className="text-sm font-mono font-semibold text-[#F59E0B]">-{formatMoney(t.amount)}</p>
+      </div>
+    );
+  }
+
+  const shares = (s.split_shares ?? []) as any[];
+  const total = Number(s.total_amount ?? t.amount);
+  const totalShares = shares.reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
+  const myShare = total - totalShares;
+  const isMePaid = s.paid_by === "me";
+  const isGroup = s.type === "group";
+  const isMulti = !isGroup && shares.length > 1;
+  const isPerson = !isGroup && shares.length <= 1;
+
+  const description = s.description
+    || (isGroup ? (s.groups?.name ?? "Group split")
+      : isPerson ? `Split w/ ${shares[0]?.person_name ?? s.people?.name ?? ""}`
+      : "Split");
+
+  const personName = s.people?.name ?? shares[0]?.person_name ?? "";
+  const peopleName = shares.length > 2
+    ? `${shares[0]?.person_name}, ${shares[1]?.person_name} +${shares.length - 2} more`
+    : shares.map((sh: any) => sh.person_name).filter(Boolean).join(", ");
+  const groupName = s.groups?.name ?? "Group";
+  const shareCount = shares.length + 1;
+  const perShare = shareCount > 0 ? total / shareCount : 0;
+
+  return (
+    <div className="bg-card cursor-pointer active:bg-secondary/40" style={{ borderLeft: "3px solid #F59E0B" }} onClick={onClick}>
+      <div className="px-4 py-3">
+        {/* Line 1: description + total */}
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium truncate flex-1">{description}</p>
+          <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">{formatMoney(total)}</p>
+        </div>
+
+        {/* Person split: 2 lines */}
+        {isPerson && (
+          <div className="flex items-center justify-between gap-2 mt-0.5">
+            <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{personName}</p>
+            <div className="text-right shrink-0">
+              {isMePaid ? (
+                <p className="text-[12px] font-mono font-semibold text-[#10B981]">You lent {formatMoney(totalShares)}</p>
+              ) : (
+                <p className="text-[12px] font-mono font-semibold text-[#F59E0B]">You owe {formatMoney(myShare)}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* People / Group split: 3 lines */}
+        {(isMulti || isGroup) && (
+          <>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{isGroup ? groupName : peopleName}</p>
+              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+                {isMePaid
+                  ? `${shares.length} × ${formatMoney(perShare)}`
+                  : formatMoney(perShare)}
+              </p>
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <p className="text-[12px] text-[#9CA3AF]">
+                {isMePaid ? "Paid by You" : `Paid by ${s.paid_by}`}
+              </p>
+              <p className={`text-[12px] font-mono font-semibold shrink-0 ${isMePaid ? "text-[#10B981]" : "text-[#F59E0B]"}`}>
+                {isMePaid ? `You lent ${formatMoney(totalShares)}` : `You owe ${formatMoney(myShare > 0 ? myShare : perShare)}`}
+              </p>
+            </div>
+          </>
+        )}
+
+        {/* Time */}
+        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{t.time?.slice(0, 5)}</p>
+      </div>
+    </div>
+  );
+}
+
 function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient();
   const [amount, setAmount] = useState(String(txn.amount));
@@ -267,7 +389,13 @@ function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onO
   const [categoryId, setCategoryId] = useState(txn.category_id ?? "");
   const [subCatId, setSubCatId] = useState(txn.sub_category_id ?? "");
 
+  // Income source fields
+  const [sourceType, setSourceType] = useState<"person" | "source">(txn.income_source_type ?? "source");
+  const [personId, setPersonId] = useState(txn.income_person_id ?? "");
+  const [sourceText, setSourceText] = useState(txn.income_source_text ?? "");
+
   const { data: accounts = [] } = useQuery(accountsQuery());
+  const { data: people = [] } = useQuery(peopleQuery());
   const { data: cats = [] } = useQuery({
     queryKey: ["categories", "expense"],
     queryFn: async () => {
@@ -297,6 +425,11 @@ function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onO
         sub_category_id: subCatId || null,
         note: note || null,
         date, time,
+        ...(txn.type === "income" ? {
+          income_source_type: sourceType,
+          income_person_id: sourceType === "person" && personId ? personId : null,
+          income_source_text: sourceType === "source" ? sourceText : null,
+        } : {}),
       }).eq("id", txn.id);
       if (error) throw error;
     },
@@ -335,6 +468,37 @@ function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onO
               </SelectContent>
             </Select>
           </div>
+
+          {txn.type === "income" && (
+            <div className="space-y-1.5">
+              <Label>From</Label>
+              <div className="flex gap-2 rounded-lg bg-secondary p-1">
+                {(["person", "source"] as const).map((m) => (
+                  <button type="button" key={m} onClick={() => setSourceType(m)}
+                    className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", sourceType === m && "bg-primary text-white")}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+              {sourceType === "person" && (
+                <Select value={personId} onValueChange={setPersonId}>
+                  <SelectTrigger><SelectValue placeholder="Select person" /></SelectTrigger>
+                  <SelectContent>
+                    {(people as any[]).map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {sourceType === "source" && (
+                <Input
+                  value={sourceText}
+                  onChange={(e) => setSourceText(e.target.value)}
+                  placeholder="e.g. Salary, Freelance, Gift"
+                />
+              )}
+            </div>
+          )}
 
           {txn.type === "transfer" && (
             <div className="space-y-1.5">
