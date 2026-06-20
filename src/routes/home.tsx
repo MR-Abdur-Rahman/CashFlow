@@ -1,12 +1,12 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { accountsQuery, transactionsQuery, profileQuery, notificationsQuery, peopleQuery, splitsQuery, incomingSplitsQuery } from "@/lib/queries";
+import { accountsQuery, transactionsQuery, profileQuery, notificationsQuery, peopleQuery, splitsQuery, incomingSplitsQuery, groupsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
 import { formatMoney, greeting } from "@/lib/format";
 import { AccountIcon } from "@/components/AccountIcon";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
 import { Fab } from "@/components/Fab";
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users, ChevronDown, Bell, History, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users, ChevronDown, ChevronRight, Check, Bell, History, X } from "lucide-react";
 import { format, startOfWeek, startOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -577,70 +577,411 @@ function SplitDirectRow({ s }: { s: any }) {
   );
 }
 
+function EditMultiPickerSheet({
+  open, onOpenChange, selected, onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  selected: { id: string; name: string }[];
+  onConfirm: (people: { id: string; name: string }[]) => void;
+}) {
+  const { data: people = [] } = useQuery(peopleQuery());
+  const [checked, setChecked] = useState<Set<string>>(new Set(selected.map((p) => p.id)));
+
+  useEffect(() => { if (open) setChecked(new Set(selected.map((p) => p.id))); }, [open]);
+
+  function toggle(id: string) {
+    setChecked((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  }
+
+  function confirm() {
+    const result = (people as any[]).filter((p) => checked.has(p.id)).map((p) => ({ id: p.id, name: p.name }));
+    onConfirm(result);
+    onOpenChange(false);
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
+        <SheetTitle className="sr-only">Select People</SheetTitle>
+        <div className="px-5 pt-5 pb-3 border-b border-border shrink-0">
+          <span className="text-base font-semibold">Select People</span>
+        </div>
+        <div className="flex-1 overflow-y-auto divide-y divide-border">
+          {(people as any[]).length === 0 && <p className="text-sm text-muted-foreground text-center py-10">No people yet.</p>}
+          {(people as any[]).map((p) => (
+            <div key={p.id} onClick={() => toggle(p.id)}
+              className="flex items-center gap-3 px-5 py-4 bg-card active:bg-secondary/40 cursor-pointer">
+              <div className={cn("h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
+                checked.has(p.id) ? "bg-primary border-primary" : "border-border")}>
+                {checked.has(p.id) && <Check className="h-3 w-3 text-white" />}
+              </div>
+              <p className="text-sm font-medium flex-1">{p.name}</p>
+            </div>
+          ))}
+        </div>
+        <div className="p-4 border-t border-border shrink-0">
+          <Button className="w-full bg-primary text-white" onClick={confirm} disabled={checked.size === 0}>
+            Confirm ({checked.size} selected)
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient();
+
+  const { data: accounts = [] } = useQuery(accountsQuery());
+  const { data: people = [] } = useQuery(peopleQuery());
+  const { data: groups = [] } = useQuery(groupsQuery());
+  const { data: cats = [] } = useQuery(categoriesQuery("expense"));
+
   const [amount, setAmount] = useState(String(split.total_amount));
   const [description, setDescription] = useState(split.description ?? "");
+
+  const [target, setTarget] = useState<"person" | "multi" | "group">(() => {
+    if (split.type === "group") return "group";
+    if (split.person_id) return "person";
+    return "multi";
+  });
+  const [personId, setPersonId] = useState<string>(split.person_id ?? "");
+  const [multiPeople, setMultiPeople] = useState<{ id: string; name: string }[]>(() => {
+    if (split.type === "individual" && !split.person_id) {
+      return (split.split_shares ?? [])
+        .filter((sh: any) => sh.person_id)
+        .map((sh: any) => ({ id: sh.person_id as string, name: sh.person_name as string }));
+    }
+    return [];
+  });
+  const [multiPickerOpen, setMultiPickerOpen] = useState(false);
+  const [groupId, setGroupId] = useState<string>(split.group_id ?? "");
+
+  const [whoPaid, setWhoPaid] = useState<"me" | "other">(split.paid_by === "me" ? "me" : "other");
+  const [otherPayerId, setOtherPayerId] = useState<string>(() => {
+    if (split.paid_by === "me") return "";
+    const matched = (split.split_shares ?? []).find((sh: any) => sh.person_name === split.paid_by);
+    return (matched?.person_id as string) ?? "";
+  });
+  const [accountId, setAccountId] = useState<string>(split.account_id ?? "");
+
+  const [splitType, setSplitType] = useState<"equal" | "custom">(
+    split.split_type === "custom" ? "custom" : "equal"
+  );
+  const [customAmounts, setCustomAmounts] = useState<Record<string, number>>(() => {
+    const amounts: Record<string, number> = {};
+    (split.split_shares ?? []).forEach((sh: any) => {
+      if (sh.person_id) amounts[sh.person_id as string] = Number(sh.share_amount);
+    });
+    return amounts;
+  });
+
+  const [categoryId, setCategoryId] = useState<string>(split.category_id ?? "");
+  const [subCatId, setSubCatId] = useState<string>(split.sub_category_id ?? "");
   const [date, setDate] = useState(split.date ?? format(new Date(), "yyyy-MM-dd"));
   const [time, setTime] = useState(split.time?.slice(0, 5) ?? format(new Date(), "HH:mm"));
+  const [note, setNote] = useState("");
+
+  const { data: subs = [] } = useQuery(subCategoriesQuery(categoryId || null));
+
+  // Load note from linked transaction
+  useEffect(() => {
+    supabase.from("transactions").select("note").eq("split_id", split.id).maybeSingle()
+      .then(({ data }) => { if (data?.note) setNote(String(data.note).replace(/^Split: /, "")); });
+  }, [split.id]);
+
+  // Default to first account if me paid and no account saved
+  useEffect(() => {
+    if (!accountId && whoPaid === "me" && (accounts as any[]).length > 0) {
+      setAccountId((accounts as any[])[0].id as string);
+    }
+  }, [accounts, whoPaid]);
+
+  const catDisplay = useMemo(() => {
+    const c = (cats as any[]).find((x) => x.id === categoryId);
+    return c ? `${c.icon ?? ""} ${c.name}` : null;
+  }, [cats, categoryId]);
+
+  const subDisplay = useMemo(() => {
+    const s = (subs as any[]).find((x) => x.id === subCatId);
+    return s?.name ?? null;
+  }, [subs, subCatId]);
+
+  const participants = useMemo<{ id: string; name: string }[]>(() => {
+    if (target === "person" && personId) {
+      const p = (people as any[]).find((x) => x.id === personId);
+      return p ? [{ id: p.id as string, name: p.name as string }] : [];
+    }
+    if (target === "multi") return multiPeople;
+    if (target === "group") {
+      const g = (groups as any[]).find((x) => x.id === groupId);
+      return (g?.group_members ?? []).map((m: any) => ({ id: m.person_id as string, name: (m.people?.name ?? "?") as string }));
+    }
+    return [];
+  }, [target, personId, people, multiPeople, groupId, groups]);
+
+  const total = Number(amount);
+  const equalShare = participants.length > 0 ? total / (participants.length + 1) : 0;
+
+  const paidByValue = useMemo(() => {
+    if (whoPaid === "me") return "me";
+    if (target === "person") {
+      const p = (people as any[]).find((x) => x.id === personId);
+      return (p?.name as string) ?? split.paid_by ?? "other";
+    }
+    if (otherPayerId) {
+      const p = participants.find((x) => x.id === otherPayerId);
+      return p?.name ?? "other";
+    }
+    return "other";
+  }, [whoPaid, target, personId, people, otherPayerId, participants, split.paid_by]);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("splits").update({
-        total_amount: Number(amount),
-        description: description || null,
-        date,
-        time,
+      if (!total || total <= 0) throw new Error("Enter a valid amount");
+      if (!description.trim()) throw new Error("Please enter a description");
+      if (target === "group" && !groupId) throw new Error("Select a group");
+      if (target !== "group" && participants.length === 0) throw new Error("Select at least one person");
+
+      const { error: e1 } = await supabase.from("splits").update({
+        type: target === "group" ? "group" : "individual",
+        person_id: target === "person" ? personId || null : null,
+        group_id: target === "group" ? groupId || null : null,
+        description: description.trim(),
+        total_amount: total,
+        paid_by: paidByValue,
+        split_type: splitType,
+        category_id: categoryId || null,
+        sub_category_id: subCatId || null,
+        account_id: whoPaid === "me" ? accountId || null : null,
+        date, time,
       }).eq("id", split.id);
-      if (error) throw error;
+      if (e1) throw e1;
+
+      await supabase.from("split_shares").delete().eq("split_id", split.id);
+      if (participants.length > 0) {
+        const shares = participants.map((p) => ({
+          split_id: split.id,
+          person_name: p.name,
+          person_id: p.id || null,
+          share_amount: splitType === "custom" ? (customAmounts[p.id] ?? 0) : equalShare,
+        }));
+        const { error: e2 } = await supabase.from("split_shares").insert(shares);
+        if (e2) throw e2;
+      }
+
+      // Update linked transaction note (best-effort, no-op if no transaction exists)
+      await supabase.from("transactions")
+        .update({ note: note.trim() ? `Split: ${note.trim()}` : null, amount: total, category_id: categoryId || null, sub_category_id: subCatId || null, account_id: whoPaid === "me" ? accountId || null : null })
+        .eq("split_id", split.id);
     },
     onSuccess: () => {
       toast.success("Split updated");
       qc.invalidateQueries({ queryKey: ["splits"] });
       qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
       onOpenChange(false);
     },
     onError: (e: any) => toast.error(e.message),
   });
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[60dvh] flex flex-col">
-        <SheetTitle className="sr-only">Edit split</SheetTitle>
-        <div className="px-5 pt-5 pb-3 border-b border-border">
-          <span className="text-base font-semibold">Split — Edit</span>
-        </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          <div className="text-center py-2">
-            <input inputMode="decimal" value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
-              className="w-full bg-transparent text-center text-5xl font-mono font-semibold outline-none text-foreground" />
-            <p className="text-xs text-muted-foreground mt-1 font-mono">LKR</p>
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[88dvh] flex flex-col">
+          <SheetTitle className="sr-only">Edit split</SheetTitle>
+          <div className="px-5 pt-5 pb-3 border-b border-border shrink-0">
+            <span className="text-base font-semibold">Edit Split</span>
           </div>
-          <div className="space-y-1.5">
-            <Label>Description</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Dinner, Groceries" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Date</Label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground outline-none" />
+
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            {/* Amount */}
+            <div className="text-center py-2">
+              <input inputMode="decimal" value={amount} placeholder="0.00"
+                onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+                className="w-full bg-transparent text-center text-5xl font-mono font-semibold outline-none text-[#F59E0B]" />
+              <p className="text-xs text-muted-foreground mt-1 font-mono">LKR</p>
             </div>
+
+            {/* Description */}
             <div className="space-y-1.5">
-              <Label>Time</Label>
-              <input type="time" value={time} onChange={(e) => setTime(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground outline-none" />
+              <Label>Description</Label>
+              <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. Dinner, Groceries, Trip"
+                className="w-full text-sm text-white placeholder:text-muted-foreground outline-none px-3 py-2.5"
+                style={{ background: "#0A0A0A", border: "1px solid #2A2A2A", borderRadius: "8px" }} />
+            </div>
+
+            {/* Split with */}
+            <div className="space-y-1.5">
+              <Label>Split with</Label>
+              <div className="flex gap-2 rounded-lg bg-secondary p-1">
+                {(["person", "multi", "group"] as const).map((m) => (
+                  <button type="button" key={m} onClick={() => setTarget(m)}
+                    className={cn("flex-1 rounded-md py-1.5 text-xs font-medium capitalize", target === m && "bg-primary text-white")}>
+                    {m === "multi" ? "People" : m}
+                  </button>
+                ))}
+              </div>
+              {target === "person" && (
+                <Select value={personId} onValueChange={setPersonId}>
+                  <SelectTrigger><SelectValue placeholder="Select person" /></SelectTrigger>
+                  <SelectContent>
+                    {(people as any[]).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              {target === "multi" && (
+                <button type="button" onClick={() => setMultiPickerOpen(true)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
+                  <span className={multiPeople.length > 0 ? "text-foreground" : "text-muted-foreground"}>
+                    {multiPeople.length > 0 ? multiPeople.map((p) => p.name).join(", ") : "Select people"}
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
+              {target === "group" && (
+                <Select value={groupId} onValueChange={setGroupId}>
+                  <SelectTrigger><SelectValue placeholder="Select group" /></SelectTrigger>
+                  <SelectContent>
+                    {(groups as any[]).map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Who paid */}
+            <div className="space-y-1.5">
+              <Label>Who paid?</Label>
+              <div className="flex gap-2 rounded-lg bg-secondary p-1">
+                {(["me", "other"] as const).map((m) => (
+                  <button type="button" key={m} onClick={() => { setWhoPaid(m); setOtherPayerId(""); }}
+                    className={cn("flex-1 rounded-md py-1.5 text-sm", whoPaid === m && "bg-primary text-white")}>
+                    {m === "me" ? "You paid" : "Other paid"}
+                  </button>
+                ))}
+              </div>
+              {whoPaid === "other" && target === "person" && personId && (
+                <p className="text-xs text-muted-foreground px-1">
+                  {(people as any[]).find((p) => p.id === personId)?.name ?? "Other person"} paid for this expense
+                </p>
+              )}
+              {whoPaid === "other" && (target === "multi" || target === "group") && participants.length > 0 && (
+                <Select value={otherPayerId} onValueChange={setOtherPayerId}>
+                  <SelectTrigger><SelectValue placeholder="Select who paid" /></SelectTrigger>
+                  <SelectContent>
+                    {participants.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Account — only when you paid */}
+            {whoPaid === "me" && (
+              <div className="space-y-1.5">
+                <Label>Paid from</Label>
+                <Select value={accountId} onValueChange={setAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                  <SelectContent>
+                    {(accounts as any[]).map((a) => <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Split type */}
+            <div className="space-y-1.5">
+              <Label>Split type</Label>
+              <div className="flex gap-2 rounded-lg bg-secondary p-1">
+                {(["equal", "custom"] as const).map((m) => (
+                  <button type="button" key={m} onClick={() => setSplitType(m)}
+                    className={cn("flex-1 rounded-md py-1.5 text-sm capitalize", splitType === m && "bg-primary text-white")}>{m}</button>
+                ))}
+              </div>
+              {splitType === "equal" && participants.length > 0 && (
+                <p className="text-xs text-muted-foreground">Each person pays: {formatMoney(equalShare)}</p>
+              )}
+              {splitType === "custom" && participants.length > 0 && (
+                <div className="space-y-2 mt-1">
+                  {participants.map((p) => (
+                    <div key={p.id} className="flex items-center gap-3">
+                      <span className="text-sm flex-1 truncate">{p.name}</span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-xs text-muted-foreground font-mono">LKR</span>
+                        <input type="number" inputMode="decimal" placeholder="0.00"
+                          value={customAmounts[p.id] ?? ""}
+                          onChange={(e) => setCustomAmounts((prev) => ({ ...prev, [p.id]: Number(e.target.value) || 0 }))}
+                          className="w-28 bg-secondary rounded-md px-2 py-1.5 text-sm text-right font-mono outline-none border border-border focus:border-primary" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Category */}
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select value={categoryId || "none"} onValueChange={(v) => { setCategoryId(v === "none" ? "" : v); setSubCatId(""); }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category (optional)">
+                    {categoryId ? (catDisplay ?? "Category") : "Select category (optional)"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {(cats as any[]).map((c) => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {categoryId && (subs as any[]).length > 0 && (
+                <Select value={subCatId || "none"} onValueChange={(v) => setSubCatId(v === "none" ? "" : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sub-category (optional)">
+                      {subCatId ? (subDisplay ?? "Sub-category") : "Sub-category (optional)"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {(subs as any[]).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Date & Time */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Date</Label>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                  className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground outline-none" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Time</Label>
+                <input type="time" value={time} onChange={(e) => setTime(e.target.value)}
+                  className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground outline-none" />
+              </div>
+            </div>
+
+            {/* Note */}
+            <div className="space-y-1.5">
+              <Label>Note</Label>
+              <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Optional note" />
             </div>
           </div>
-        </div>
-        <div className="p-4 pt-2 border-t border-border bg-card">
-          <Button className="w-full bg-primary text-white" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-            {mutation.isPending ? "Saving..." : "Save changes"}
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+
+          <div className="p-4 pt-2 border-t border-border bg-card shrink-0">
+            <Button className="w-full text-white font-medium" style={{ background: "#78350F" }}
+              onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+              {mutation.isPending ? "Saving..." : "Save changes"}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <EditMultiPickerSheet open={multiPickerOpen} onOpenChange={setMultiPickerOpen}
+        selected={multiPeople} onConfirm={setMultiPeople} />
+    </>
   );
 }
 
