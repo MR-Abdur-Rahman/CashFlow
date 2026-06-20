@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { accountsQuery, transactionsQuery, profileQuery, notificationsQuery, peopleQuery } from "@/lib/queries";
+import { accountsQuery, transactionsQuery, profileQuery, notificationsQuery, peopleQuery, splitsQuery, incomingSplitsQuery } from "@/lib/queries";
 import { formatMoney, greeting } from "@/lib/format";
 import { AccountIcon } from "@/components/AccountIcon";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
@@ -55,6 +55,23 @@ export default function Home() {
   const { dateFrom, dateTo } = getDateRange(period);
   const { data: accounts = [] } = useQuery(accountsQuery());
   const { data: txns = [] } = useQuery(transactionsQuery({ dateFrom, dateTo }));
+  const { data: ownSplits = [] } = useQuery(splitsQuery());
+  const { data: incomingSplits = [] } = useQuery(incomingSplitsQuery());
+
+  const allSplitsForTab = useMemo(() => {
+    const seen = new Set<string>();
+    return [...(ownSplits as any[]), ...(incomingSplits as any[])]
+      .filter((s) => {
+        if (seen.has(s.id)) return false;
+        seen.add(s.id);
+        return s.date >= dateFrom && s.date <= dateTo;
+      })
+      .sort((a, b) =>
+        a.date !== b.date
+          ? b.date.localeCompare(a.date)
+          : (b.time || "").localeCompare(a.time || "")
+      );
+  }, [ownSplits, incomingSplits, dateFrom, dateTo]);
 
   const [userId, setUserId] = useState<string | undefined>();
   useEffect(() => {
@@ -184,9 +201,22 @@ export default function Home() {
         </div>
 
         {(() => {
-          const visibleTxns = (txns as any[]).filter((t) =>
-            txnTab === "splits" ? !!t.is_split : !t.is_split
-          );
+          if (txnTab === "splits") {
+            return (
+              <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+                {allSplitsForTab.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-10 px-4">{emptyMessages[period]}</p>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {allSplitsForTab.map((s) => (
+                      <SplitDirectRow key={s.id} s={s} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          }
+          const visibleTxns = (txns as any[]).filter((t) => !t.is_split);
           return (
             <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
               {visibleTxns.length === 0 ? (
@@ -373,6 +403,98 @@ function SplitRowContent({ t, onClick }: { t: any; onClick: () => void }) {
 
         {/* Time */}
         <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{t.time?.slice(0, 5)}</p>
+      </div>
+    </div>
+  );
+}
+
+function SplitDirectRow({ s }: { s: any }) {
+  const shares = (s.split_shares ?? []) as any[];
+  const total = Number(s.total_amount);
+  const totalShares = shares.reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
+  const myShare = total - totalShares;
+  const isMePaid = s.paid_by === "me";
+  const isGroup = s.type === "group";
+  const isMulti = !isGroup && shares.length > 1;
+  const isPerson = !isGroup && shares.length <= 1;
+  const isIncoming = !!s._isIncoming;
+  const isOtherPaid = !isMePaid || isIncoming;
+
+  const description = s.description || (
+    isGroup ? (s.groups?.name ?? "Group split")
+    : isPerson ? `Split w/ ${shares[0]?.person_name ?? s.people?.name ?? ""}`
+    : "Split"
+  );
+
+  if (isOtherPaid) {
+    const paidByName = s.paid_by === "me" ? "Other" : (s.paid_by ?? "Other");
+    let youOwe: number;
+    if (isIncoming && s._myPersonId) {
+      const myShareRecord = shares.find((sh: any) => sh.person_id === s._myPersonId);
+      youOwe = myShareRecord ? Number(myShareRecord.share_amount) : myShare;
+    } else {
+      youOwe = myShare;
+    }
+    return (
+      <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
+        <div className="px-4 py-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-medium truncate flex-1">{description}</p>
+            <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">{formatMoney(total)}</p>
+          </div>
+          <div className="flex items-center justify-between gap-2 mt-0.5">
+            <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{paidByName}</p>
+            <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">
+              You owe {formatMoney(youOwe)}
+            </p>
+          </div>
+          <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{s.time?.slice(0, 5)}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Me paid
+  const personName = s.people?.name ?? shares[0]?.person_name ?? "";
+  const peopleName = shares.length > 2
+    ? `${shares[0]?.person_name}, ${shares[1]?.person_name} +${shares.length - 2} more`
+    : shares.map((sh: any) => sh.person_name).filter(Boolean).join(", ");
+  const groupName = s.groups?.name ?? "Group";
+  const shareCount = shares.length + 1;
+  const perShare = shareCount > 0 ? total / shareCount : 0;
+
+  return (
+    <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
+      <div className="px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium truncate flex-1">{description}</p>
+          <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">{formatMoney(total)}</p>
+        </div>
+        {isPerson && (
+          <div className="flex items-center justify-between gap-2 mt-0.5">
+            <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{personName}</p>
+            <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
+              You lent {formatMoney(totalShares)}
+            </p>
+          </div>
+        )}
+        {(isMulti || isGroup) && (
+          <>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{isGroup ? groupName : peopleName}</p>
+              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+                {shares.length} × {formatMoney(perShare)}
+              </p>
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <p className="text-[12px] text-[#9CA3AF]">Paid by You</p>
+              <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
+                You lent {formatMoney(totalShares)}
+              </p>
+            </div>
+          </>
+        )}
+        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{s.time?.slice(0, 5)}</p>
       </div>
     </div>
   );
