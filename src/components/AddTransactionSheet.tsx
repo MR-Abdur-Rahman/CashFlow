@@ -818,6 +818,7 @@ function SplitForm({ onClose }: { onClose: () => void }) {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [time, setTime] = useState(format(new Date(), "HH:mm"));
   const [note, setNote] = useState("");
+  const [description, setDescription] = useState("");
 
   useEffect(() => { if (accounts[0]?.id) setAccountId(accounts[0].id); }, [accounts]);
 
@@ -861,7 +862,7 @@ function SplitForm({ onClose }: { onClose: () => void }) {
         type: target === "group" ? "group" : "individual",
         person_id: target === "person" && personId ? personId : null,
         group_id: target === "group" && groupId ? groupId : null,
-        description: note || null,
+        description: description.trim() || null,
         total_amount: total,
         paid_by: paidByValue,
         split_type: splitType,
@@ -910,9 +911,22 @@ function SplitForm({ onClose }: { onClose: () => void }) {
           e.preventDefault();
           const amt = Number(amount);
           if (!amount || isNaN(amt) || amt <= 0) { toast.error("Please enter a valid amount greater than 0"); return; }
+          if (!description.trim()) { toast.error("Please enter a description"); return; }
           mutation.mutate();
         }}>
         <AmountInput value={amount} onChange={setAmount} accent="text-split" />
+
+        <div className="space-y-1.5">
+          <Label>Description</Label>
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="e.g. Dinner, Groceries, Trip"
+            className="w-full text-sm text-white placeholder:text-muted-foreground outline-none px-3 py-2.5"
+            style={{ background: "#0A0A0A", border: "1px solid #2A2A2A", borderRadius: "8px" }}
+          />
+        </div>
 
         {/* Split with */}
         <div className="space-y-1.5">
