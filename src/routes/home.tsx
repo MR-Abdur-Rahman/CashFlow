@@ -66,6 +66,22 @@ export default function Home() {
   const { data: ownSplits = [] } = useQuery(splitsQuery());
   const { data: incomingSplits = [] } = useQuery(incomingSplitsQuery());
 
+  const { data: homeSettlements = [] } = useQuery({
+    queryKey: ["settlements", "home", dateFrom, dateTo],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("settlements")
+        .select("*, split_shares:split_share_id(person_name, share_amount)")
+        .eq("created_by", u.user.id)
+        .gte("created_at", dateFrom)
+        .lte("created_at", dateTo + "T23:59:59.999");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const allSplitsForTab = useMemo(() => {
     const seen = new Set<string>();
     return [...(ownSplits as any[]), ...(incomingSplits as any[])]
@@ -80,6 +96,20 @@ export default function Home() {
           : (b.time || "").localeCompare(a.time || "")
       );
   }, [ownSplits, incomingSplits, dateFrom, dateTo]);
+
+  const splitsTabItems = useMemo(() => {
+    const splitItems = allSplitsForTab.map((s: any) => ({
+      ...s,
+      _itemType: "split" as const,
+      _sortKey: `${s.date}T${s.time ?? "00:00"}`,
+    }));
+    const settlementItems = (homeSettlements as any[]).map((s) => ({
+      ...s,
+      _itemType: "settlement" as const,
+      _sortKey: s.created_at ?? "",
+    }));
+    return [...splitItems, ...settlementItems].sort((a, b) => b._sortKey.localeCompare(a._sortKey));
+  }, [allSplitsForTab, homeSettlements]);
 
   const [userId, setUserId] = useState<string | undefined>();
   useEffect(() => {
@@ -212,15 +242,19 @@ export default function Home() {
           if (txnTab === "splits") {
             return (
               <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-                {allSplitsForTab.length === 0 ? (
+                {splitsTabItems.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-10 px-4">{emptyMessages[period]}</p>
                 ) : (
                   <div className="divide-y divide-border">
-                    {allSplitsForTab.map((s) => (
-                      <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
-                        <SplitDirectRow s={s} />
-                      </SwipeRow>
-                    ))}
+                    {splitsTabItems.map((item: any) =>
+                      item._itemType === "settlement" ? (
+                        <HomeSettlementRow key={`set-${item.id}`} s={item} />
+                      ) : (
+                        <SwipeRow key={item.id} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}>
+                          <SplitDirectRow s={item} />
+                        </SwipeRow>
+                      )
+                    )}
                   </div>
                 )}
               </div>
@@ -578,6 +612,40 @@ function SplitDirectRow({ s }: { s: any }) {
           </>
         )}
         <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{formatDateTime(s.date, s.time)}</p>
+      </div>
+    </div>
+  );
+}
+
+function HomeSettlementRow({ s }: { s: any }) {
+  const share = s.split_shares as any;
+  const shareAmount = Number(share?.share_amount ?? 0);
+  const settled = Number(s.amount);
+  const remaining = Math.max(0, shareAmount - settled);
+  const isFullySettled = shareAmount > 0 && remaining === 0;
+  const payerName = share?.person_name ?? "Unknown";
+  const dateStr = s.created_at
+    ? format(new Date(s.created_at), "MMM dd, yyyy · hh:mm a")
+    : "";
+
+  return (
+    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
+      <div className="px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium">{payerName} → You</p>
+          <p className="text-sm font-mono text-[#9CA3AF] shrink-0">{formatMoney(settled)}</p>
+        </div>
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          {isFullySettled ? (
+            <p className="text-[12px] font-medium text-[#10B981]">Fully settled</p>
+          ) : (
+            <>
+              <p className="text-[12px] text-[#9CA3AF]">Still owes</p>
+              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">{formatMoney(remaining)} remaining</p>
+            </>
+          )}
+        </div>
+        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{dateStr}</p>
       </div>
     </div>
   );
