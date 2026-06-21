@@ -704,7 +704,7 @@ function EditMultiPickerSheet({
   );
 }
 
-function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boolean; onOpenChange: (o: boolean) => void }) {
+export function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient();
 
   const { data: accounts = [] } = useQuery(accountsQuery());

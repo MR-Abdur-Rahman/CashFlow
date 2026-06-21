@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { EditSplitSheet } from "@/routes/home";
 import {
   format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfYear, endOfYear, subDays, addDays, subWeeks, addWeeks,
@@ -95,6 +96,9 @@ export default function AccountDetail() {
   const [edit, setEdit] = useState(false);
   const [editTxn, setEditTxn] = useState<any | null>(null);
   const [deleteTxn, setDeleteTxn] = useState<any | null>(null);
+  const [editSplit, setEditSplit] = useState<any | null>(null);
+  const [deleteSplitItem, setDeleteSplitItem] = useState<any | null>(null);
+  const [deleteSettlement, setDeleteSettlement] = useState<any | null>(null);
 
   const { dateFrom, dateTo } = useMemo(() => getPeriodRange(period, anchor), [period, anchor]);
 
@@ -304,9 +308,13 @@ export default function AccountDetail() {
           ) : (
             splitsTabItems.map((item: any) =>
               item._itemType === "settlement" ? (
-                <SettlementRow key={`set-${item.id}`} s={item} />
+                <SwipeRow key={`set-${item.id}`} onDelete={() => setDeleteSettlement(item)}>
+                  <SettlementRow s={item} />
+                </SwipeRow>
               ) : (
-                <SplitRow key={`sp-${item.id}`} s={item} />
+                <SwipeRow key={`sp-${item.id}`} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplitItem(item)}>
+                  <SplitRow s={item} />
+                </SwipeRow>
               )
             )
           )}
@@ -314,6 +322,74 @@ export default function AccountDetail() {
       )}
 
       <AddAccountSheet open={edit} onOpenChange={setEdit} edit={account} />
+
+      {editSplit && (
+        <EditSplitSheet split={editSplit} open={!!editSplit} onOpenChange={(o) => { if (!o) setEditSplit(null); }} />
+      )}
+
+      <AlertDialog open={!!deleteSplitItem} onOpenChange={(o) => { if (!o) setDeleteSplitItem(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete split?</AlertDialogTitle>
+            <AlertDialogDescription>Are you sure you want to delete this split?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={async () => {
+                if (!deleteSplitItem) return;
+                await supabase.from("split_shares").delete().eq("split_id", deleteSplitItem.id);
+                const { error } = await supabase.from("splits").delete().eq("id", deleteSplitItem.id);
+                if (error) toast.error(error.message);
+                else {
+                  toast.success("Split deleted");
+                  qc.invalidateQueries({ queryKey: ["splits"] });
+                  qc.invalidateQueries({ queryKey: ["accounts"] });
+                }
+                setDeleteSplitItem(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteSettlement} onOpenChange={(o) => { if (!o) setDeleteSettlement(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete settlement?</AlertDialogTitle>
+            <AlertDialogDescription>Are you sure you want to delete this settlement?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={async () => {
+                if (!deleteSettlement) return;
+                const s = deleteSettlement;
+                const { error } = await supabase.from("settlements").delete().eq("id", s.id);
+                if (error) { toast.error(error.message); setDeleteSettlement(null); return; }
+                // Reverse the balance credit on the split's account
+                const { data: acct } = await supabase
+                  .from("accounts").select("current_balance").eq("id", accountId!).single();
+                if (acct) {
+                  await supabase.from("accounts")
+                    .update({ current_balance: Number(acct.current_balance) - Number(s.amount) })
+                    .eq("id", accountId!);
+                }
+                toast.success("Settlement deleted");
+                qc.invalidateQueries({ queryKey: ["settlements"] });
+                qc.invalidateQueries({ queryKey: ["accounts"] });
+                setDeleteSettlement(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {editTxn && (
         <EditTxSheet txn={editTxn} open={!!editTxn} onOpenChange={(o) => { if (!o) setEditTxn(null); }} />
