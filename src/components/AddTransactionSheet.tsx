@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
-import { Plus, QrCode, GripVertical, X, ChevronRight, Check } from "lucide-react";
+import { Plus, QrCode, GripVertical, ChevronRight, Check } from "lucide-react";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { QrScannerDialog } from "@/components/QrScannerDialog";
@@ -145,10 +145,7 @@ function CategoryPickerSheet({
           <SheetTitle className="sr-only">Select Category</SheetTitle>
           <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
             <span className="text-base font-semibold">Category</span>
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground"><Plus className="h-5 w-5" /></button>
-              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
-            </div>
+            <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground"><Plus className="h-5 w-5" /></button>
           </div>
           <div className="flex flex-1 min-h-0">
             <div className="w-[45%] border-r border-border overflow-y-auto">
@@ -263,7 +260,6 @@ function PersonPickerSheet({
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => setQrOpen(true)} className="text-muted-foreground hover:text-foreground"><QrCode className="h-5 w-5" /></button>
               <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground"><Plus className="h-5 w-5" /></button>
-              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-border">
@@ -328,7 +324,6 @@ function MultiPersonPickerSheet({
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => setQrOpen(true)} className="text-muted-foreground hover:text-foreground"><QrCode className="h-5 w-5" /></button>
               <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground"><Plus className="h-5 w-5" /></button>
-              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-border">
@@ -378,10 +373,7 @@ function GroupPickerSheet({
           <SheetTitle className="sr-only">Select Group</SheetTitle>
           <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
             <span className="text-base font-semibold">Group</span>
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground"><Plus className="h-5 w-5" /></button>
-              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
-            </div>
+            <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground"><Plus className="h-5 w-5" /></button>
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-border">
             {groups.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">No groups yet. Tap + to add.</p>}
@@ -440,7 +432,6 @@ function CustomSplitSheet({
         <SheetTitle className="sr-only">Custom Split</SheetTitle>
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
           <span className="text-base font-semibold">Custom Split</span>
-          <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
         </div>
 
         {/* Total summary */}
@@ -528,10 +519,7 @@ function SourcePickerSheet({
           <SheetTitle className="sr-only">Select Source</SheetTitle>
           <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
             <span className="text-base font-semibold">Source</span>
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground"><Plus className="h-5 w-5" /></button>
-              <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
-            </div>
+            <button type="button" onClick={() => setAddOpen(true)} className="text-muted-foreground hover:text-foreground"><Plus className="h-5 w-5" /></button>
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-border">
             {sources.map((s, idx) => (
