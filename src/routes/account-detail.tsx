@@ -272,7 +272,7 @@ export default function AccountDetail() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2">
+      <div className="flex rounded-xl bg-secondary p-1 gap-1">
         {(["transactions", "splits"] as const).map((t) => (
           <button
             key={t}

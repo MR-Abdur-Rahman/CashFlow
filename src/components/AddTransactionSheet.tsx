@@ -912,6 +912,7 @@ function SplitForm({ onClose }: { onClose: () => void }) {
           const amt = Number(amount);
           if (!amount || isNaN(amt) || amt <= 0) { toast.error("Please enter a valid amount greater than 0"); return; }
           if (!description.trim()) { toast.error("Please enter a description"); return; }
+          if (!categoryId) { toast.error("Please select a category"); return; }
           mutation.mutate();
         }}>
         <AmountInput value={amount} onChange={setAmount} accent="text-split" />
@@ -1056,7 +1057,7 @@ function SplitForm({ onClose }: { onClose: () => void }) {
           <button type="button" onClick={() => setCatPickerOpen(true)}
             className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
             <span className={categoryId ? "text-foreground" : "text-muted-foreground"}>
-              {categoryId ? `${categoryIcon} ${categoryName}${subCatName ? " · " + subCatName : ""}` : "Select category (optional)"}
+              {categoryId ? `${categoryIcon} ${categoryName}${subCatName ? " · " + subCatName : ""}` : "Select category"}
             </span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>

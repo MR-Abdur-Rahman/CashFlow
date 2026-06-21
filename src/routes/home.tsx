@@ -223,7 +223,7 @@ export default function Home() {
         </div>
 
         {/* Transactions | Splits tab switcher */}
-        <div className="flex gap-2 mb-3">
+        <div className="flex rounded-xl bg-secondary p-1 gap-1 mb-3">
           {(["transactions", "splits"] as const).map((tab) => (
             <button
               key={tab}

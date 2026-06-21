@@ -1,271 +1,101 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { transactionsQuery, peopleQuery } from "@/lib/queries";
 import { formatMoney } from "@/lib/format";
 import { useState, useMemo } from "react";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
-import { startOfWeek, startOfMonth, startOfYear, endOfWeek, endOfMonth, endOfYear, format, subMonths, addMonths, subWeeks, addWeeks, subYears, addYears, eachMonthOfInterval } from "date-fns";
+import {
+  PieChart, Pie, Cell, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+} from "recharts";
+import {
+  startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear,
+  format, subMonths, addMonths, subWeeks, addWeeks, subYears, addYears,
+  subDays, addDays, eachMonthOfInterval,
+} from "date-fns";
 import { ChevronLeft, ChevronRight, ChevronDown, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SwipeRow } from "@/components/SwipeRow";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
+// ─── Constants ──────────────────────────────────────────────────────────────
 const COLORS = [
   "#EF4444", "#F59E0B", "#10B981", "#3B82F6", "#8B5CF6",
   "#EC4899", "#14B8A6", "#F97316", "#6366F1", "#84CC16",
 ];
 
-type Period = "weekly" | "monthly" | "annually";
+type Period = "today" | "weekly" | "monthly" | "annually";
+type DrillType = "expense-category" | "expense-person" | "income-source" | "income-person";
 
-function getPeriodRange(period: Period, anchor: Date) {
-  if (period === "weekly") return { from: startOfWeek(anchor, { weekStartsOn: 1 }), to: endOfWeek(anchor, { weekStartsOn: 1 }) };
-  if (period === "monthly") return { from: startOfMonth(anchor), to: endOfMonth(anchor) };
-  return { from: startOfYear(anchor), to: endOfYear(anchor) };
+interface DrillItem {
+  name: string;
+  colorIdx: number;
+  drillType: DrillType;
+}
+
+const PERIOD_OPTIONS: { key: Period; label: string }[] = [
+  { key: "today", label: "Today" },
+  { key: "weekly", label: "Weekly" },
+  { key: "monthly", label: "Monthly" },
+  { key: "annually", label: "Annually" },
+];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function getPeriodRange(period: Period, anchor: Date): { dateFrom: string; dateTo: string } {
+  if (period === "today") {
+    const d = format(anchor, "yyyy-MM-dd");
+    return { dateFrom: d, dateTo: d };
+  }
+  if (period === "weekly") return {
+    dateFrom: format(startOfWeek(anchor, { weekStartsOn: 1 }), "yyyy-MM-dd"),
+    dateTo: format(endOfWeek(anchor, { weekStartsOn: 1 }), "yyyy-MM-dd"),
+  };
+  if (period === "monthly") return {
+    dateFrom: format(startOfMonth(anchor), "yyyy-MM-dd"),
+    dateTo: format(endOfMonth(anchor), "yyyy-MM-dd"),
+  };
+  return {
+    dateFrom: format(startOfYear(anchor), "yyyy-MM-dd"),
+    dateTo: format(endOfYear(anchor), "yyyy-MM-dd"),
+  };
 }
 
 function navigateAnchor(period: Period, anchor: Date, dir: -1 | 1): Date {
+  if (period === "today") return dir === -1 ? subDays(anchor, 1) : addDays(anchor, 1);
   if (period === "weekly") return dir === -1 ? subWeeks(anchor, 1) : addWeeks(anchor, 1);
   if (period === "monthly") return dir === -1 ? subMonths(anchor, 1) : addMonths(anchor, 1);
   return dir === -1 ? subYears(anchor, 1) : addYears(anchor, 1);
 }
 
-function formatAnchorLabel(period: Period, anchor: Date) {
-  if (period === "weekly") return `${format(startOfWeek(anchor, { weekStartsOn: 1 }), "MMM d")} – ${format(endOfWeek(anchor, { weekStartsOn: 1 }), "MMM d, yyyy")}`;
+function formatAnchorLabel(period: Period, anchor: Date): string {
+  if (period === "today") return format(anchor, "MMM d, yyyy");
+  if (period === "weekly") {
+    const s = startOfWeek(anchor, { weekStartsOn: 1 });
+    const e = endOfWeek(anchor, { weekStartsOn: 1 });
+    return `${format(s, "MMM d")} – ${format(e, "MMM d, yyyy")}`;
+  }
   if (period === "monthly") return format(anchor, "MMM yyyy");
   return format(anchor, "yyyy");
 }
 
-// ─── Drill-down page ───────────────────────────────────────────────────────
-function DrillPage({
-  title, total, items, txns, anchor, colorIdx, onBack, type,
-}: {
-  title: string;
-  total: number;
-  items: { name: string; value: number; id?: string }[];
-  txns: any[];
-  period: Period;
-  anchor: Date;
-  colorIdx: number;
-  onBack: () => void;
-  type: "income" | "expense";
-}) {
-  const qc = useQueryClient();
-  const [selectedSub, setSelectedSub] = useState<string | null>(null);
-  const [deleteTxn, setDeleteTxn] = useState<any | null>(null);
-  const [editTxn, setEditTxn] = useState<any | null>(null);
-  const [editNote, setEditNote] = useState("");
-
-  const filteredTxns = useMemo(() => {
-    if (!selectedSub) return txns;
-    return txns.filter((t) =>
-      type === "expense"
-        ? t.sub_categories?.name === selectedSub || t.categories?.name === selectedSub
-        : t.income_source_text === selectedSub || t.categories?.name === selectedSub
-    );
-  }, [txns, selectedSub, type]);
-
-  const grouped = useMemo(() => {
-    const map = new Map<string, any[]>();
-    for (const t of filteredTxns) {
-      if (!map.has(t.date)) map.set(t.date, []);
-      map.get(t.date)!.push(t);
-    }
-    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [filteredTxns]);
-
-  const trendData = useMemo(() => {
-    const months = eachMonthOfInterval({ start: subMonths(anchor, 7), end: anchor });
-    return months.map((m) => {
-      const label = format(m, "MMM");
-      const mFrom = format(startOfMonth(m), "yyyy-MM-dd");
-      const mTo = format(endOfMonth(m), "yyyy-MM-dd");
-      const val = txns.filter((t) => t.date >= mFrom && t.date <= mTo).reduce((s, t) => s + Number(t.amount), 0);
-      return { label, value: val };
-    });
-  }, [txns, anchor]);
-
-  async function deleteTx(t: any) {
-    const { error } = await supabase.from("transactions").delete().eq("id", t.id);
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Deleted");
-      qc.invalidateQueries({ queryKey: ["transactions"] });
-      qc.invalidateQueries({ queryKey: ["accounts"] });
-    }
-    setDeleteTxn(null);
-  }
-
-  async function saveEdit() {
-    if (!editTxn) return;
-    const { error } = await supabase.from("transactions").update({ note: editNote }).eq("id", editTxn.id);
-    if (error) toast.error(error.message);
-    else { toast.success("Updated"); qc.invalidateQueries({ queryKey: ["transactions"] }); }
-    setEditTxn(null);
-  }
-
-  const color = COLORS[colorIdx % COLORS.length];
-
-  return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-5 pb-3 border-b border-border">
-        <button type="button" onClick={onBack} className="text-muted-foreground">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <span className="text-base font-semibold flex-1">{title}</span>
-      </div>
-
-      <div className="flex-1 overflow-y-auto pb-24">
-        {/* Total */}
-        <div className="px-4 py-4">
-          <p className="text-xs text-muted-foreground">Total</p>
-          <p className="text-3xl font-mono font-bold" style={{ color }}>{formatMoney(total)}</p>
-        </div>
-
-        {/* Sub-items list */}
-        <div className="mx-4 rounded-xl overflow-hidden border border-border mb-4">
-          <button type="button" onClick={() => setSelectedSub(null)}
-            className={cn("w-full flex items-center justify-between px-4 py-3 text-sm border-b border-border",
-              selectedSub === null ? "bg-primary/10" : "bg-card")}>
-            <span className="font-medium">All</span>
-            <div className="flex items-center gap-4">
-              <span className="text-muted-foreground text-xs">100%</span>
-              <span className="font-mono text-xs">{formatMoney(total)}</span>
-            </div>
-          </button>
-          {items.map((item) => {
-            const pct = total > 0 ? (item.value / total) * 100 : 0;
-            return (
-              <button key={item.name} type="button"
-                onClick={() => setSelectedSub(selectedSub === item.name ? null : item.name)}
-                className={cn("w-full flex items-center justify-between px-4 py-3 text-sm border-b border-border last:border-0",
-                  selectedSub === item.name ? "bg-primary/10" : "bg-card")}>
-                <span>{item.name}</span>
-                <div className="flex items-center gap-4">
-                  <span className="text-muted-foreground text-xs">{pct.toFixed(0)}%</span>
-                  <span className="font-mono text-xs">{formatMoney(item.value)}</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Trend chart */}
-        <div className="mx-4 mb-4">
-          <ResponsiveContainer width="100%" height={160}>
-            <LineChart data={trendData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9CA3AF" }} />
-              <YAxis tick={{ fontSize: 10, fill: "#9CA3AF" }} width={40} />
-              <Tooltip contentStyle={{ background: "#1A1A1A", border: "1px solid #2A2A2A", fontSize: 11 }}
-                formatter={(v: any) => formatMoney(v)} />
-              <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Transaction list grouped by date */}
-        <div className="px-4 space-y-4">
-          {grouped.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-6">No transactions</p>
-          )}
-          {grouped.map(([date, dayTxns]) => {
-            const dayTotal = dayTxns.reduce((s, t) => s + Number(t.amount), 0);
-            return (
-              <div key={date}>
-                <div className="flex items-center justify-between mb-1 px-1">
-                  <p className="text-xs font-mono text-muted-foreground">{date}</p>
-                  <p className="text-xs font-mono" style={{ color }}>{formatMoney(dayTotal)}</p>
-                </div>
-                <div className="rounded-xl overflow-hidden border border-border divide-y divide-border">
-                  {dayTxns.map((t) => (
-                    <SwipeRow
-                      key={t.id}
-                      onEdit={() => { setEditTxn(t); setEditNote(t.note ?? ""); }}
-                      onDelete={() => setDeleteTxn(t)}
-                    >
-                      <div className="flex items-center justify-between px-4 py-3 bg-card">
-                        <div>
-                          <p className="text-sm font-medium">
-                            {type === "expense"
-                              ? (t.categories?.name ?? "Expense")
-                              : (t.income_source_text ?? "Income")}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {type === "expense"
-                              ? (t.sub_categories?.name ?? (t.accounts ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ") : ""))
-                              : (t.accounts ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ") : "")}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-mono font-semibold" style={{ color }}>
-                            {type === "income" ? "+" : "-"}{formatMoney(t.amount)}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground font-mono">{t.time?.slice(0, 5)}</p>
-                        </div>
-                      </div>
-                    </SwipeRow>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Delete confirm */}
-      <AlertDialog open={!!deleteTxn} onOpenChange={(o) => { if (!o) setDeleteTxn(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
-            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-white"
-              onClick={() => deleteTxn && deleteTx(deleteTxn)}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Edit note dialog */}
-      <AlertDialog open={!!editTxn} onOpenChange={(o) => { if (!o) setEditTxn(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Edit Note</AlertDialogTitle>
-            <AlertDialogDescription>
-              <input
-                value={editNote}
-                onChange={(e) => setEditNote(e.target.value)}
-                className="w-full bg-secondary rounded-md px-3 py-2 text-sm text-foreground outline-none mt-2"
-                placeholder="Add a note..."
-              />
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={saveEdit}>Save</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
+function fmtDT(date?: string, time?: string): string {
+  if (!date) return "";
+  const t = time?.slice(0, 5) ?? "00:00";
+  return format(new Date(`${date}T${t}`), "MMM dd · hh:mm a");
 }
 
-// ─── Custom Pie Label ──────────────────────────────────────────────────────
+function fmtCAT(createdAt?: string): string {
+  if (!createdAt) return "";
+  return format(new Date(createdAt), "MMM dd · hh:mm a");
+}
+
+// ─── Pie Label ────────────────────────────────────────────────────────────────
 function PieLabel({ cx, cy, midAngle, outerRadius, name, percent }: any) {
   const RADIAN = Math.PI / 180;
   const radius = outerRadius + 30;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  if (percent < 0.03) return null;
+  if (percent < 0.04) return null;
   return (
     <text x={x} y={y} fill="#9CA3AF" textAnchor={x > cx ? "start" : "end"} dominantBaseline="central" fontSize={10}>
       {name} {(percent * 100).toFixed(1)}%
@@ -273,158 +103,636 @@ function PieLabel({ cx, cy, midAngle, outerRadius, name, percent }: any) {
   );
 }
 
-// ─── Main Reports Page ─────────────────────────────────────────────────────
+// ─── Row Components ───────────────────────────────────────────────────────────
+
+function ExpenseRow({ t }: { t: any }) {
+  const catLabel = t.categories?.name
+    ? `${t.categories.name}${t.sub_categories?.name ? " · " + t.sub_categories.name : ""}`
+    : "Expense";
+  const account = t.accounts
+    ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ")
+    : "";
+  return (
+    <div className="flex items-start justify-between px-4 py-3 bg-card">
+      <div className="flex-1 min-w-0 pr-3">
+        <p className="text-sm text-[#EF4444] font-medium truncate">{catLabel}</p>
+        <p className="text-[12px] text-[#9CA3AF] truncate mt-0.5">{account}</p>
+      </div>
+      <div className="text-right shrink-0">
+        <p className="text-sm font-mono font-semibold text-[#EF4444]">{formatMoney(t.amount)}</p>
+        <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5">{fmtDT(t.date, t.time)}</p>
+      </div>
+    </div>
+  );
+}
+
+function SplitItemRow({ s, highlightPerson }: { s: any; highlightPerson?: string }) {
+  const shares = (s.split_shares ?? []) as any[];
+  const total = Number(s.total_amount);
+  const totalShares = shares.reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
+  const isGroup = s.type === "group";
+  const isMulti = !isGroup && shares.length > 1;
+  const isPerson = !isGroup && shares.length <= 1;
+  const shareCount = shares.length + 1;
+  const perShare = shareCount > 0 ? total / shareCount : 0;
+  const account = s.accounts
+    ? [s.accounts.institution, s.accounts.label].filter(Boolean).join(" · ")
+    : "";
+  const dateStr = fmtDT(s.date, s.time);
+  const description = s.description || (
+    isGroup ? (s.groups?.name ?? "Group split")
+    : isPerson ? `Split w/ ${shares[0]?.person_name ?? ""}`
+    : "Split"
+  );
+  const peopleLine = highlightPerson
+    ? highlightPerson
+    : isGroup
+    ? (s.groups?.name ?? "Group")
+    : shares.map((sh: any) => sh.person_name).filter(Boolean).join(", ");
+
+  return (
+    <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
+      <div className="px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium truncate flex-1">{description}</p>
+          <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">{formatMoney(total)}</p>
+        </div>
+        {isPerson && (
+          <>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{shares[0]?.person_name ?? ""}</p>
+              <p className="text-[12px] font-mono text-[#10B981] shrink-0">You lent {formatMoney(totalShares)}</p>
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
+              <p className="text-[10px] text-[#9CA3AF] font-mono shrink-0">{dateStr}</p>
+            </div>
+          </>
+        )}
+        {(isMulti || isGroup) && (
+          <>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{peopleLine}</p>
+              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">{shares.length} × {formatMoney(perShare)}</p>
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
+              <p className="text-[12px] font-mono text-[#10B981] shrink-0">You lent {formatMoney(totalShares)}</p>
+            </div>
+            <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5 text-right">{dateStr}</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SettlementExpenseRow({ s, personName }: { s: any; personName: string }) {
+  const account = s.accounts
+    ? [s.accounts.institution, s.accounts.label].filter(Boolean).join(" · ")
+    : "";
+  return (
+    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
+      <div className="px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium">You → {personName}</p>
+          <p className="text-sm font-mono font-semibold text-[#EF4444] shrink-0">{formatMoney(s.amount)}</p>
+        </div>
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
+          <p className="text-[10px] text-[#9CA3AF] font-mono shrink-0">{fmtCAT(s.created_at)}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IncomeRow({ t }: { t: any }) {
+  const label = t.income_source_text
+    ?? (t.people?.name ?? null)
+    ?? (t.categories?.name ?? "Income");
+  const account = t.accounts
+    ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ")
+    : "";
+  return (
+    <div className="flex items-start justify-between px-4 py-3 bg-card">
+      <div className="flex-1 min-w-0 pr-3">
+        <p className="text-sm font-medium truncate">{label}</p>
+        <p className="text-[12px] text-[#9CA3AF] truncate mt-0.5">{account}</p>
+      </div>
+      <div className="text-right shrink-0">
+        <p className="text-sm font-mono font-semibold text-[#22C55E]">+{formatMoney(t.amount)}</p>
+        <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5">{fmtDT(t.date, t.time)}</p>
+      </div>
+    </div>
+  );
+}
+
+function SettlementIncomeRow({ s }: { s: any }) {
+  const payerName = (s.split_shares as any)?.person_name ?? "Unknown";
+  const account = s.accounts
+    ? [s.accounts.institution, s.accounts.label].filter(Boolean).join(" · ")
+    : "";
+  return (
+    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
+      <div className="px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium">{payerName} → You</p>
+          <p className="text-sm font-mono font-semibold text-[#22C55E] shrink-0">+{formatMoney(s.amount)}</p>
+        </div>
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
+          <p className="text-[10px] text-[#9CA3AF] font-mono shrink-0">{fmtCAT(s.created_at)}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Period Nav (shared) ─────────────────────────────────────────────────────
+function PeriodNav({
+  period, anchor, onNavigate, onChangePeriod, compact = false,
+}: {
+  period: Period;
+  anchor: Date;
+  onNavigate: (dir: -1 | 1) => void;
+  onChangePeriod: (p: Period) => void;
+  compact?: boolean;
+}) {
+  const btnCls = compact
+    ? "h-7 w-7 flex items-center justify-center rounded-full bg-secondary"
+    : "h-8 w-8 flex items-center justify-center rounded-full bg-secondary";
+  const labelCls = compact ? "text-xs font-semibold whitespace-nowrap" : "text-sm font-semibold";
+  const dropCls = compact
+    ? "flex items-center gap-1 bg-primary text-white text-xs font-medium px-2.5 py-1.5 rounded-xl"
+    : "flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-3 py-1.5 rounded-xl";
+
+  return (
+    <div className="flex items-center gap-2">
+      <button type="button" onClick={() => onNavigate(-1)} className={btnCls}>
+        <ChevronLeft className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+      </button>
+      <span className={labelCls}>{formatAnchorLabel(period, anchor)}</span>
+      <button type="button" onClick={() => onNavigate(1)} className={btnCls}>
+        <ChevronRight className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className={dropCls}>
+            {PERIOD_OPTIONS.find(p => p.key === period)?.label}
+            <ChevronDown className={compact ? "h-3 w-3" : "h-4 w-4"} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-36">
+          {PERIOD_OPTIONS.map(p => (
+            <DropdownMenuItem key={p.key}
+              onClick={() => onChangePeriod(p.key)}
+              className={cn("py-3 text-base", period === p.key && "text-primary font-medium")}>
+              {p.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+// ─── Drill Page ───────────────────────────────────────────────────────────────
+function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => void }) {
+  const [drillPeriod, setDrillPeriod] = useState<Period>("monthly");
+  const [drillAnchor, setDrillAnchor] = useState(new Date());
+  const [selectedSub, setSelectedSub] = useState<string | null>(null);
+
+  const { dateFrom, dateTo } = useMemo(
+    () => getPeriodRange(drillPeriod, drillAnchor),
+    [drillPeriod, drillAnchor],
+  );
+
+  const color = COLORS[drillItem.colorIdx % COLORS.length];
+  const isExpenseCat = drillItem.drillType === "expense-category";
+  const isExpensePerson = drillItem.drillType === "expense-person";
+  const isIncomeSource = drillItem.drillType === "income-source";
+  const isIncomePerson = drillItem.drillType === "income-person";
+  const isExpense = isExpenseCat || isExpensePerson;
+  const isIncome = isIncomeSource || isIncomePerson;
+
+  // Expense transactions (non-split) for this category
+  const { data: expTxns = [] } = useQuery({
+    queryKey: ["drill", "exp-txns", drillItem.name, dateFrom, dateTo],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*, categories:category_id(name,icon), sub_categories:sub_category_id(name), accounts:account_id(label,institution)")
+        .eq("user_id", u.user.id)
+        .eq("type", "expense")
+        .eq("is_split", false)
+        .gte("date", dateFrom)
+        .lte("date", dateTo)
+        .order("date", { ascending: false })
+        .order("time", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).filter((t: any) =>
+        (t.categories?.name ?? "Other") === drillItem.name,
+      );
+    },
+    enabled: isExpenseCat,
+  });
+
+  // Splits (paid_by=me) for expense drills
+  const { data: drillSplits = [] } = useQuery({
+    queryKey: ["drill", "splits", drillItem.name, drillItem.drillType, dateFrom, dateTo],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("splits")
+        .select("*, categories:category_id(name,icon), split_shares(*), accounts:account_id(label,institution), groups:group_id(name), people:person_id(name)")
+        .eq("paid_by", "me")
+        .eq("created_by", u.user.id)
+        .gte("date", dateFrom)
+        .lte("date", dateTo)
+        .order("date", { ascending: false })
+        .order("time", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).filter((s: any) => {
+        if (isExpenseCat) return ((s.categories as any)?.name ?? "Uncategorized") === drillItem.name;
+        if (isExpensePerson) {
+          return (s.split_shares as any[]).some((sh: any) => sh.person_name === drillItem.name);
+        }
+        return false;
+      });
+    },
+    enabled: isExpense,
+  });
+
+  // Income transactions
+  const { data: incTxns = [] } = useQuery({
+    queryKey: ["drill", "inc-txns", drillItem.name, drillItem.drillType, dateFrom, dateTo],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*, categories:category_id(name), sub_categories:sub_category_id(name), accounts:account_id(label,institution), people:income_person_id(name)")
+        .eq("user_id", u.user.id)
+        .eq("type", "income")
+        .gte("date", dateFrom)
+        .lte("date", dateTo)
+        .order("date", { ascending: false })
+        .order("time", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).filter((t: any) => {
+        const label = t.income_source_type === "person"
+          ? (t.people?.name ?? "Unknown")
+          : (t.income_source_text ?? "Other");
+        return label === drillItem.name;
+      });
+    },
+    enabled: isIncome,
+  });
+
+  // Settlements for income-person drill
+  const { data: drillSettlements = [] } = useQuery({
+    queryKey: ["drill", "settlements", drillItem.name, dateFrom, dateTo],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("settlements")
+        .select("*, split_shares:split_share_id(person_name, share_amount), accounts:account_id(label,institution)")
+        .eq("created_by", u.user.id)
+        .gte("created_at", dateFrom)
+        .lte("created_at", dateTo + "T23:59:59.999");
+      if (error) throw error;
+      return (data ?? []).filter((s: any) =>
+        (s.split_shares as any)?.person_name === drillItem.name,
+      );
+    },
+    enabled: isIncomePerson,
+  });
+
+  // Trend chart: 8 months from drillAnchor using data already fetched
+  const trendMonths = useMemo(() =>
+    eachMonthOfInterval({ start: subMonths(drillAnchor, 7), end: drillAnchor }),
+    [drillAnchor],
+  );
+
+  const trendData = useMemo(() => {
+    return trendMonths.map((m) => {
+      const mF = format(startOfMonth(m), "yyyy-MM-dd");
+      const mT = format(endOfMonth(m), "yyyy-MM-dd");
+      let val = 0;
+      if (isExpenseCat) {
+        val += (expTxns as any[]).filter(t => t.date >= mF && t.date <= mT)
+          .reduce((s: number, t: any) => s + Number(t.amount), 0);
+        val += (drillSplits as any[]).filter(s => s.date >= mF && s.date <= mT)
+          .reduce((s: number, sp: any) => s + Number(sp.total_amount), 0);
+      } else if (isExpensePerson) {
+        val += (drillSplits as any[]).filter(s => s.date >= mF && s.date <= mT)
+          .reduce((s: number, sp: any) => s + Number(sp.total_amount), 0);
+      } else {
+        val += (incTxns as any[]).filter(t => t.date >= mF && t.date <= mT)
+          .reduce((s: number, t: any) => s + Number(t.amount), 0);
+        if (isIncomePerson) {
+          val += (drillSettlements as any[])
+            .filter(s => s.created_at >= mF && s.created_at <= mT)
+            .reduce((s: number, st: any) => s + Number(st.amount), 0);
+        }
+      }
+      return { label: format(m, "MMM"), value: val };
+    });
+  }, [trendMonths, expTxns, drillSplits, incTxns, drillSettlements, isExpenseCat, isExpensePerson, isIncomePerson]);
+
+  // Sub-categories for filter list (expense-category only, from expense txns)
+  const subItems = useMemo(() => {
+    if (!isExpenseCat) return [];
+    const map = new Map<string, number>();
+    for (const t of expTxns as any[]) {
+      const sub = t.sub_categories?.name ?? "Uncategorized";
+      map.set(sub, (map.get(sub) ?? 0) + Number(t.amount));
+    }
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [expTxns, isExpenseCat]);
+
+  const showSubFilter = isExpenseCat && subItems.length > 0;
+
+  // Merge all items, sorted by date
+  const allItems = useMemo(() => {
+    const items: any[] = [];
+    if (isExpenseCat) {
+      const filteredTxns = selectedSub
+        ? (expTxns as any[]).filter(t => (t.sub_categories?.name ?? "Uncategorized") === selectedSub)
+        : expTxns as any[];
+      filteredTxns.forEach(t => items.push({ ...t, _type: "exp", _sort: `${t.date}T${t.time ?? "00:00"}` }));
+      if (!selectedSub) {
+        (drillSplits as any[]).forEach(s => items.push({ ...s, _type: "split", _sort: `${s.date}T${s.time ?? "00:00"}` }));
+      }
+    } else if (isExpensePerson) {
+      (drillSplits as any[]).forEach(s => items.push({ ...s, _type: "split", _sort: `${s.date}T${s.time ?? "00:00"}` }));
+    } else if (isIncomeSource) {
+      (incTxns as any[]).forEach(t => items.push({ ...t, _type: "inc", _sort: `${t.date}T${t.time ?? "00:00"}` }));
+    } else if (isIncomePerson) {
+      (incTxns as any[]).forEach(t => items.push({ ...t, _type: "inc", _sort: `${t.date}T${t.time ?? "00:00"}` }));
+      (drillSettlements as any[]).forEach(s => items.push({ ...s, _type: "set-inc", _sort: s.created_at ?? "" }));
+    }
+    return items.sort((a, b) => b._sort.localeCompare(a._sort));
+  }, [expTxns, drillSplits, incTxns, drillSettlements, selectedSub, isExpenseCat, isExpensePerson, isIncomeSource, isIncomePerson]);
+
+  const total = useMemo(() => allItems.reduce((s, item) => {
+    if (item._type === "exp") return s + Number(item.amount);
+    if (item._type === "split") return s + Number(item.total_amount);
+    if (item._type === "inc") return s + Number(item.amount);
+    if (item._type === "set-inc") return s + Number(item.amount);
+    return s;
+  }, 0), [allItems]);
+
+  // Re-compute total for sub-filter "All" row
+  const totalAll = useMemo(() => {
+    let t = 0;
+    (expTxns as any[]).forEach(x => { t += Number(x.amount); });
+    (drillSplits as any[]).forEach(x => { t += Number(x.total_amount); });
+    return t;
+  }, [expTxns, drillSplits]);
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 pt-5 pb-3 border-b border-border">
+        <button type="button" onClick={onBack} className="text-muted-foreground mr-1">
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+        <span className="text-base font-semibold flex-1 truncate">{drillItem.name}</span>
+        <PeriodNav
+          period={drillPeriod}
+          anchor={drillAnchor}
+          compact
+          onNavigate={(dir) => setDrillAnchor(a => navigateAnchor(drillPeriod, a, dir))}
+          onChangePeriod={(p) => { setDrillPeriod(p); setDrillAnchor(new Date()); }}
+        />
+      </div>
+
+      <div className="flex-1 overflow-y-auto pb-24">
+        {/* Total */}
+        <div className="px-4 py-4">
+          <p className="text-xs text-muted-foreground">Total</p>
+          <p className="text-3xl font-mono font-bold" style={{ color }}>
+            {isIncome ? "+" : ""}{formatMoney(total)}
+          </p>
+        </div>
+
+        {/* Sub-category filter list (expense-category only) */}
+        {showSubFilter && (
+          <div className="mx-4 rounded-xl overflow-hidden border border-border mb-4">
+            <button type="button"
+              onClick={() => setSelectedSub(null)}
+              className={cn("w-full flex items-center justify-between px-4 py-3 text-sm border-b border-border",
+                selectedSub === null ? "bg-primary/10" : "bg-card")}>
+              <span className="font-medium">All</span>
+              <div className="flex items-center gap-4">
+                <span className="text-muted-foreground text-xs">100%</span>
+                <span className="font-mono text-xs">{formatMoney(totalAll)}</span>
+              </div>
+            </button>
+            {subItems.map(item => {
+              const pct = totalAll > 0 ? (item.value / totalAll) * 100 : 0;
+              return (
+                <button key={item.name} type="button"
+                  onClick={() => setSelectedSub(selectedSub === item.name ? null : item.name)}
+                  className={cn("w-full flex items-center justify-between px-4 py-3 text-sm border-b border-border last:border-0",
+                    selectedSub === item.name ? "bg-primary/10" : "bg-card")}>
+                  <span>{item.name}</span>
+                  <div className="flex items-center gap-4">
+                    <span className="text-muted-foreground text-xs">{pct.toFixed(0)}%</span>
+                    <span className="font-mono text-xs">{formatMoney(item.value)}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Trend line chart */}
+        <div className="mx-4 mb-4">
+          <ResponsiveContainer width="100%" height={160}>
+            <LineChart data={trendData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9CA3AF" }} />
+              <YAxis tick={{ fontSize: 10, fill: "#9CA3AF" }} width={40} />
+              <Tooltip
+                contentStyle={{ background: "#1A1A1A", border: "1px solid #2A2A2A", fontSize: 11 }}
+                formatter={(v: any) => formatMoney(v)}
+              />
+              <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Transaction list */}
+        <div className="mx-4 rounded-xl overflow-hidden border border-border divide-y divide-border">
+          {allItems.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-8">No data for this period</p>
+          )}
+          {allItems.map((item) => {
+            if (item._type === "exp") return <ExpenseRow key={item.id} t={item} />;
+            if (item._type === "split") {
+              const highlight = isExpensePerson ? drillItem.name : undefined;
+              return <SplitItemRow key={item.id} s={item} highlightPerson={highlight} />;
+            }
+            if (item._type === "inc") return <IncomeRow key={item.id} t={item} />;
+            if (item._type === "set-inc") return <SettlementIncomeRow key={item.id} s={item} />;
+            return null;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Reports Page ────────────────────────────────────────────────────────
 export default function ReportsPage() {
   const [period, setPeriod] = useState<Period>("monthly");
   const [anchor, setAnchor] = useState(new Date());
   const [tab, setTab] = useState<"income" | "expense">("expense");
-  const [drillItem, setDrillItem] = useState<{ name: string; colorIdx: number } | null>(null);
+  const [drillItem, setDrillItem] = useState<DrillItem | null>(null);
   const [activeSlice, setActiveSlice] = useState<{ name: string; value: number; color: string } | null>(null);
 
-  const { from, to } = getPeriodRange(period, anchor);
-  const dateFrom = format(from, "yyyy-MM-dd");
-  const dateTo = format(to, "yyyy-MM-dd");
+  const { dateFrom, dateTo } = useMemo(() => getPeriodRange(period, anchor), [period, anchor]);
 
   const { data: txns = [] } = useQuery(transactionsQuery({ dateFrom, dateTo }));
   const { data: people = [] } = useQuery(peopleQuery());
 
-  const income = useMemo(() => (txns as any[]).filter((t) => t.type === "income").reduce((s, t) => s + Number(t.amount), 0), [txns]);
-  const expense = useMemo(() => (txns as any[]).filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0), [txns]);
+  // Splits paid by me in this period
+  const { data: mySplits = [] } = useQuery({
+    queryKey: ["splits", "reports-main", dateFrom, dateTo],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("splits")
+        .select("*, categories:category_id(name,icon)")
+        .eq("paid_by", "me")
+        .eq("created_by", u.user.id)
+        .gte("date", dateFrom)
+        .lte("date", dateTo);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 
+  // Settlements received (income) in this period
+  const { data: incomeSettlements = [] } = useQuery({
+    queryKey: ["settlements", "reports-main", dateFrom, dateTo],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("settlements")
+        .select("*, split_shares:split_share_id(person_name, share_amount)")
+        .eq("created_by", u.user.id)
+        .gte("created_at", dateFrom)
+        .lte("created_at", dateTo + "T23:59:59.999");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // ── Expense pie: normal expenses (non-split) + splits grouped by category
   const expenseData = useMemo(() => {
     const map = new Map<string, number>();
-    for (const t of txns as any[]) {
-      if (t.type !== "expense") continue;
+    (txns as any[]).forEach(t => {
+      if (t.type !== "expense" || t.is_split) return;
       const name = t.categories?.name ?? "Other";
       map.set(name, (map.get(name) ?? 0) + Number(t.amount));
-    }
-    return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [txns]);
+    });
+    (mySplits as any[]).forEach(s => {
+      const name = (s.categories as any)?.name ?? "Uncategorized";
+      map.set(name, (map.get(name) ?? 0) + Number(s.total_amount));
+    });
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value, drillType: "expense-category" as DrillType }))
+      .sort((a, b) => b.value - a.value);
+  }, [txns, mySplits]);
 
+  const expenseTotal = useMemo(
+    () => expenseData.reduce((s, d) => s + d.value, 0),
+    [expenseData],
+  );
+
+  // ── Income pie: income transactions + settlements received grouped by source/person
   const incomeData = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const t of txns as any[]) {
-      if (t.type !== "income") continue;
-      let name = "Other";
+    const map = new Map<string, { value: number; drillType: DrillType }>();
+    (txns as any[]).forEach(t => {
+      if (t.type !== "income") return;
+      let name: string;
+      let dt: DrillType;
       if (t.income_source_type === "person") {
-        const person = (people as any[]).find((p) => p.id === t.income_person_id);
+        const person = (people as any[]).find(p => p.id === t.income_person_id);
         name = person?.name ?? "Unknown";
+        dt = "income-person";
       } else {
         name = t.income_source_text ?? "Other";
+        dt = "income-source";
       }
-      map.set(name, (map.get(name) ?? 0) + Number(t.amount));
-    }
-    return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [txns, people]);
+      const ex = map.get(name);
+      map.set(name, { value: (ex?.value ?? 0) + Number(t.amount), drillType: ex?.drillType ?? dt });
+    });
+    (incomeSettlements as any[]).forEach(s => {
+      const name = (s.split_shares as any)?.person_name ?? "Unknown";
+      const ex = map.get(name);
+      // settlement overrides drillType to income-person
+      map.set(name, { value: (ex?.value ?? 0) + Number(s.amount), drillType: "income-person" });
+    });
+    return Array.from(map.entries())
+      .map(([name, { value, drillType }]) => ({ name, value, drillType }))
+      .sort((a, b) => b.value - a.value);
+  }, [txns, incomeSettlements, people]);
+
+  const incomeTotal = useMemo(
+    () => incomeData.reduce((s, d) => s + d.value, 0),
+    [incomeData],
+  );
 
   const chartData = tab === "expense" ? expenseData : incomeData;
-  const chartTotal = tab === "expense" ? expense : income;
+  const chartTotal = tab === "expense" ? expenseTotal : incomeTotal;
 
-  const drillTxns = useMemo(() => {
-    if (!drillItem) return [];
-    return (txns as any[]).filter((t) => {
-      if (tab === "expense") {
-        return t.type === "expense" && (t.categories?.name ?? "Other") === drillItem.name;
-      } else {
-        if (t.type !== "income") return false;
-        if (t.income_source_type === "person") {
-          const person = (people as any[]).find((p) => p.id === t.income_person_id);
-          return (person?.name ?? "Unknown") === drillItem.name;
-        }
-        return (t.income_source_text ?? "Other") === drillItem.name;
-      }
-    });
-  }, [drillItem, txns, tab, people]);
-
-  const drillSubItems = useMemo(() => {
-    if (!drillItem) return [];
-    const map = new Map<string, number>();
-    for (const t of drillTxns) {
-      const name = tab === "expense"
-        ? (t.sub_categories?.name ?? "Uncategorized")
-        : (t.income_source_text ?? "Other");
-      map.set(name, (map.get(name) ?? 0) + Number(t.amount));
-    }
-    return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [drillTxns, drillItem, tab]);
-
-  // If drill page is open
   if (drillItem) {
     return (
       <div className="h-full flex flex-col">
-        <DrillPage
-          title={drillItem.name}
-          total={drillTxns.reduce((s, t) => s + Number(t.amount), 0)}
-          items={drillSubItems}
-          txns={drillTxns}
-          period={period}
-          anchor={anchor}
-          colorIdx={drillItem.colorIdx}
-          onBack={() => setDrillItem(null)}
-          type={tab}
-        />
+        <DrillPage drillItem={drillItem} onBack={() => { setDrillItem(null); }} />
       </div>
     );
   }
 
   return (
     <div className="pb-24">
-      {/* Top header */}
       <div className="px-4 pt-5 pb-0 space-y-3">
-        {/* Period navigation */}
+        {/* Period nav */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button type="button"
-              onClick={() => { setAnchor(navigateAnchor(period, anchor, -1)); setActiveSlice(null); }}
-              className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary text-foreground">
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="text-sm font-semibold">{formatAnchorLabel(period, anchor)}</span>
-            <button type="button"
-              onClick={() => { setAnchor(navigateAnchor(period, anchor, 1)); setActiveSlice(null); }}
-              className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary text-foreground">
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Period dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-3 py-1.5 rounded-xl capitalize">
-                {period} <ChevronDown className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-36">
-              {(["weekly", "monthly", "annually"] as Period[]).map((p) => (
-                <DropdownMenuItem key={p}
-                  onClick={() => { setPeriod(p); setAnchor(new Date()); setActiveSlice(null); }}
-                  className={cn("capitalize py-3 text-base", period === p && "text-primary font-medium")}>
-                  {p}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <PeriodNav
+            period={period}
+            anchor={anchor}
+            onNavigate={(dir) => { setAnchor(a => navigateAnchor(period, a, dir)); setActiveSlice(null); }}
+            onChangePeriod={(p) => { setPeriod(p); setAnchor(new Date()); setActiveSlice(null); }}
+          />
         </div>
 
-        {/* Income / Expense tab toggle */}
+        {/* Income / Expense tabs */}
         <div className="flex rounded-xl bg-secondary p-1 gap-1">
-          <button
-            type="button"
+          <button type="button"
             onClick={() => { setTab("income"); setActiveSlice(null); }}
-            className={cn(
-              "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
-              tab === "income" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
-            )}>
-            Income <span className="font-mono text-xs ml-1">{formatMoney(income)}</span>
+            className={cn("flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
+              tab === "income" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}>
+            Income <span className="font-mono text-xs ml-1">{formatMoney(incomeTotal)}</span>
           </button>
-          <button
-            type="button"
+          <button type="button"
             onClick={() => { setTab("expense"); setActiveSlice(null); }}
-            className={cn(
-              "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
-              tab === "expense" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
-            )}>
-            Expenses <span className="font-mono text-xs ml-1">{formatMoney(expense)}</span>
+            className={cn("flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
+              tab === "expense" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}>
+            Expenses <span className="font-mono text-xs ml-1">{formatMoney(expenseTotal)}</span>
           </button>
         </div>
       </div>
@@ -452,18 +760,21 @@ export default function ReportsPage() {
                     setActiveSlice(
                       activeSlice?.name === d.name
                         ? null
-                        : { name: d.name, value: d.value, color: COLORS[i % COLORS.length] }
+                        : { name: d.name, value: d.value, color: COLORS[i % COLORS.length] },
                     );
                   }}
                 >
-                  {chartData.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  {chartData.map((entry, i) => (
+                    <Cell
+                      key={entry.name}
+                      fill={COLORS[i % COLORS.length]}
+                      opacity={activeSlice && activeSlice.name !== entry.name ? 0.4 : 1}
+                    />
                   ))}
                 </Pie>
               </PieChart>
             </ResponsiveContainer>
 
-            {/* Popup on slice tap */}
             {activeSlice && (
               <div className="mx-auto w-fit bg-card border border-border rounded-xl px-5 py-3 text-center shadow-lg -mt-4 mb-2">
                 <p className="text-sm font-semibold text-foreground">{activeSlice.name}</p>
@@ -476,16 +787,21 @@ export default function ReportsPage() {
         )}
       </div>
 
-      {/* Category / Source list — tap to drill down */}
+      {/* Category / source list */}
       <div className="mx-4 mt-2 rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
         {chartData.map((item, i) => {
           const pct = chartTotal > 0 ? Math.round((item.value / chartTotal) * 100) : 0;
           return (
             <button key={item.name} type="button"
-              onClick={() => { setDrillItem({ name: item.name, colorIdx: i }); setActiveSlice(null); }}
-              className="w-full flex items-center gap-3 py-3.5 active:bg-secondary/40">
-              <div className="h-9 w-12 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
-                style={{ background: COLORS[i % COLORS.length] }}>
+              onClick={() => {
+                setDrillItem({ name: item.name, colorIdx: i, drillType: item.drillType });
+                setActiveSlice(null);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-3.5 active:bg-secondary/40">
+              <div
+                className="h-9 w-12 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
+                style={{ background: COLORS[i % COLORS.length] }}
+              >
                 {pct}%
               </div>
               <span className="flex-1 text-left text-sm font-medium">{item.name}</span>
