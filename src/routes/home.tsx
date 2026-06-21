@@ -104,7 +104,7 @@ export default function Home() {
     const splitItems = allSplitsForTab.map((s: any) => ({
       ...s,
       _itemType: "split" as const,
-      _sortKey: `${s.date}T${s.time ?? "00:00"}`,
+      _sortKey: s.created_at ?? `${s.date}T${s.time ?? "00:00"}`,
     }));
     const settlementItems = (homeSettlements as any[]).map((s) => ({
       ...s,

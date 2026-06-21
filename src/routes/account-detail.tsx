@@ -129,13 +129,29 @@ export default function AccountDetail() {
     queryKey: ["settlements", "account", accountId, dateFrom, dateTo],
     queryFn: async () => {
       if (!accountId) return [];
-      const { data, error } = await supabase
-        .from("settlements")
-        .select("*, split_shares:split_share_id(person_name, share_amount)")
+      // Fetch split IDs belonging to this account so we can include their settlements
+      const { data: acctSplits } = await supabase
+        .from("splits")
+        .select("id")
         .eq("account_id", accountId)
+        .gte("date", dateFrom)
+        .lte("date", dateTo);
+      const splitIds = (acctSplits ?? []).map((s: any) => s.id as string);
+
+      let q = supabase
+        .from("settlements")
+        .select("*, split_shares:split_share_id(person_name, share_amount), accounts:account_id(label, institution)")
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999")
         .order("created_at", { ascending: false });
+
+      if (splitIds.length > 0) {
+        q = q.or(`account_id.eq.${accountId},split_id.in.(${splitIds.join(",")})`);
+      } else {
+        q = q.eq("account_id", accountId);
+      }
+
+      const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
     },
@@ -147,7 +163,7 @@ export default function AccountDetail() {
       ...(splits as any[]).map((s) => ({
         ...s,
         _itemType: "split" as const,
-        _sortKey: `${s.date}T${s.time ?? "00:00"}`,
+        _sortKey: s.created_at ?? `${s.date}T${s.time ?? "00:00"}`,
       })),
       ...(settlements as any[]).map((s) => ({
         ...s,
@@ -547,15 +563,15 @@ function SettlementRow({ s }: { s: any }) {
       <div className="px-4 py-3">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium truncate flex-1">{payerName} → You</p>
-          <p className="text-sm font-mono text-[#10B981] shrink-0">{formatMoney(settled)}</p>
+          <p className="text-sm font-mono text-[#9CA3AF] shrink-0">{formatMoney(settled)}</p>
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
           {isFullySettled ? (
             <p className="text-[12px] font-medium text-[#10B981]">Fully settled</p>
           ) : (
             <>
-              <p className="text-[12px] text-[#F59E0B]">Still owes</p>
-              <p className="text-[12px] font-mono text-[#F59E0B] shrink-0">{formatMoney(remaining)} remaining</p>
+              <p className="text-[12px] text-[#9CA3AF]">Still owes</p>
+              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">{formatMoney(remaining)} remaining</p>
             </>
           )}
         </div>
