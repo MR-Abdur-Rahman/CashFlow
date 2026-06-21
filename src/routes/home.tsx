@@ -101,18 +101,56 @@ export default function Home() {
   }, [ownSplits, incomingSplits, dateFrom, dateTo]);
 
   const splitsTabItems = useMemo(() => {
+    // Build all-time person maps from every split owned by the user
+    const personTotalOwed = new Map<string, number>();
+    const personAllSettlements = new Map<string, { id: string; amount: number; created_at: string }[]>();
+    for (const split of ownSplits as any[]) {
+      const shares = (split.split_shares ?? []) as any[];
+      const shareIdToName = new Map<string, string>(
+        shares.map((sh: any) => [sh.id as string, (sh.person_name ?? "Unknown") as string])
+      );
+      for (const sh of shares) {
+        const nm = (sh.person_name ?? "Unknown") as string;
+        personTotalOwed.set(nm, (personTotalOwed.get(nm) ?? 0) + Number(sh.share_amount ?? 0));
+      }
+      for (const sett of (split.settlements ?? []) as any[]) {
+        const nm = shareIdToName.get(sett.split_share_id as string);
+        if (!nm) continue;
+        const arr = personAllSettlements.get(nm) ?? [];
+        arr.push({ id: sett.id as string, amount: Number(sett.amount ?? 0), created_at: (sett.created_at ?? "") as string });
+        personAllSettlements.set(nm, arr);
+      }
+    }
+    for (const arr of personAllSettlements.values()) {
+      arr.sort((a, b) => a.created_at.localeCompare(b.created_at));
+    }
+
     const splitItems = allSplitsForTab.map((s: any) => ({
       ...s,
       _itemType: "split" as const,
       _sortKey: s.created_at ?? `${s.date}T${s.time ?? "00:00"}`,
     }));
-    const settlementItems = (homeSettlements as any[]).map((s) => ({
-      ...s,
-      _itemType: "settlement" as const,
-      _sortKey: s.created_at ?? "",
-    }));
+
+    const settlementItems = (homeSettlements as any[]).map((s) => {
+      const personName = ((s.split_shares as any)?.person_name ?? "Unknown") as string;
+      const totalOwed = personTotalOwed.get(personName) ?? 0;
+      const sorted = personAllSettlements.get(personName) ?? [];
+      const idx = sorted.findIndex((x) => x.id === (s.id as string));
+      const cumulative = idx >= 0
+        ? sorted.slice(0, idx + 1).reduce((sum, x) => sum + x.amount, 0)
+        : Number(s.amount ?? 0);
+      const remaining = Math.max(0, totalOwed - cumulative);
+      return {
+        ...s,
+        _itemType: "settlement" as const,
+        _sortKey: (s.created_at ?? "") as string,
+        _remaining: remaining,
+        _isFullySettled: totalOwed > 0 && remaining <= 0,
+      };
+    });
+
     return [...splitItems, ...settlementItems].sort((a, b) => b._sortKey.localeCompare(a._sortKey));
-  }, [allSplitsForTab, homeSettlements]);
+  }, [allSplitsForTab, homeSettlements, ownSplits]);
 
   const [userId, setUserId] = useState<string | undefined>();
   useEffect(() => {
@@ -297,8 +335,8 @@ export default function Home() {
       <AlertDialog open={!!deleteTxn} onOpenChange={(o) => { if (!o) setDeleteTxn(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
-            <AlertDialogDescription>This will permanently delete this transaction and update your balance. This cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -325,8 +363,8 @@ export default function Home() {
       <AlertDialog open={!!deleteSplit} onOpenChange={(o) => { if (!o) setDeleteSplit(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete split?</AlertDialogTitle>
-            <AlertDialogDescription>Are you sure you want to delete this split?</AlertDialogDescription>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -357,8 +395,8 @@ export default function Home() {
       <AlertDialog open={!!deleteHomeSettlement} onOpenChange={(o) => { if (!o) setDeleteHomeSettlement(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete settlement?</AlertDialogTitle>
-            <AlertDialogDescription>Are you sure you want to delete this settlement?</AlertDialogDescription>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -653,10 +691,13 @@ function SplitDirectRow({ s }: { s: any }) {
 
 function HomeSettlementRow({ s }: { s: any }) {
   const share = s.split_shares as any;
-  const shareAmount = Number(share?.share_amount ?? 0);
   const settled = Number(s.amount);
-  const remaining = Math.max(0, shareAmount - settled);
-  const isFullySettled = shareAmount > 0 && remaining === 0;
+  const remaining: number = s._remaining !== undefined
+    ? s._remaining
+    : Math.max(0, Number(share?.share_amount ?? 0) - settled);
+  const isFullySettled: boolean = s._isFullySettled !== undefined
+    ? s._isFullySettled
+    : Number(share?.share_amount ?? 0) > 0 && remaining === 0;
   const payerName = share?.person_name ?? "Unknown";
   const dateStr = s.created_at
     ? format(new Date(s.created_at), "MMM dd, yyyy · hh:mm a")
@@ -1093,7 +1134,7 @@ export function EditSplitSheet({ split, open, onOpenChange }: { split: any; open
   );
 }
 
-function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onOpenChange: (o: boolean) => void }) {
+export function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient();
   const [amount, setAmount] = useState(String(txn.amount));
   const [note, setNote] = useState(txn.note ?? "");

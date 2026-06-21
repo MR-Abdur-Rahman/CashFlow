@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { accountQuery, transactionsQuery } from "@/lib/queries";
+import { accountQuery, transactionsQuery, splitsQuery } from "@/lib/queries";
 import { AccountIcon } from "@/components/AccountIcon";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { EditSplitSheet } from "@/routes/home";
+import { EditSplitSheet, EditTxSheet } from "@/routes/home";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import {
   format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
@@ -105,6 +105,7 @@ export default function AccountDetail() {
   const { dateFrom, dateTo } = useMemo(() => getPeriodRange(period, anchor), [period, anchor]);
 
   const { data: txns = [] } = useQuery(transactionsQuery({ accountId, dateFrom, dateTo }));
+  const { data: allSplits = [] } = useQuery(splitsQuery());
 
   const { data: splits = [] } = useQuery({
     queryKey: ["splits", "account", accountId, dateFrom, dateTo],
@@ -143,20 +144,56 @@ export default function AccountDetail() {
   });
 
   const splitsTabItems = useMemo(() => {
+    // Build all-time person maps from every split in the user's data
+    const personTotalOwed = new Map<string, number>();
+    const personAllSettlements = new Map<string, { id: string; amount: number; created_at: string }[]>();
+    for (const split of allSplits as any[]) {
+      const shares = (split.split_shares ?? []) as any[];
+      const shareIdToName = new Map<string, string>(
+        shares.map((sh: any) => [sh.id as string, (sh.person_name ?? "Unknown") as string])
+      );
+      for (const sh of shares) {
+        const nm = (sh.person_name ?? "Unknown") as string;
+        personTotalOwed.set(nm, (personTotalOwed.get(nm) ?? 0) + Number(sh.share_amount ?? 0));
+      }
+      for (const sett of (split.settlements ?? []) as any[]) {
+        const nm = shareIdToName.get(sett.split_share_id as string);
+        if (!nm) continue;
+        const arr = personAllSettlements.get(nm) ?? [];
+        arr.push({ id: sett.id as string, amount: Number(sett.amount ?? 0), created_at: (sett.created_at ?? "") as string });
+        personAllSettlements.set(nm, arr);
+      }
+    }
+    for (const arr of personAllSettlements.values()) {
+      arr.sort((a, b) => a.created_at.localeCompare(b.created_at));
+    }
+
     const items = [
       ...(splits as any[]).map((s) => ({
         ...s,
         _itemType: "split" as const,
         _sortKey: s.created_at ?? `${s.date}T${s.time ?? "00:00"}`,
       })),
-      ...(settlements as any[]).map((s) => ({
-        ...s,
-        _itemType: "settlement" as const,
-        _sortKey: s.created_at ?? "",
-      })),
+      ...(settlements as any[]).map((s) => {
+        const personName = ((s.split_shares as any)?.person_name ?? "Unknown") as string;
+        const totalOwed = personTotalOwed.get(personName) ?? 0;
+        const sorted = personAllSettlements.get(personName) ?? [];
+        const idx = sorted.findIndex((x) => x.id === (s.id as string));
+        const cumulative = idx >= 0
+          ? sorted.slice(0, idx + 1).reduce((sum, x) => sum + x.amount, 0)
+          : Number(s.amount ?? 0);
+        const remaining = Math.max(0, totalOwed - cumulative);
+        return {
+          ...s,
+          _itemType: "settlement" as const,
+          _sortKey: (s.created_at ?? "") as string,
+          _remaining: remaining,
+          _isFullySettled: totalOwed > 0 && remaining <= 0,
+        };
+      }),
     ];
     return items.sort((a, b) => b._sortKey.localeCompare(a._sortKey));
-  }, [splits, settlements]);
+  }, [splits, settlements, allSplits]);
 
   const delAccount = useMutation({
     mutationFn: async () => {
@@ -336,8 +373,8 @@ export default function AccountDetail() {
       <AlertDialog open={!!deleteSplitItem} onOpenChange={(o) => { if (!o) setDeleteSplitItem(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete split?</AlertDialogTitle>
-            <AlertDialogDescription>Are you sure you want to delete this split?</AlertDialogDescription>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -351,6 +388,7 @@ export default function AccountDetail() {
                 else {
                   toast.success("Split deleted");
                   qc.invalidateQueries({ queryKey: ["splits"] });
+                  qc.invalidateQueries({ queryKey: ["transactions"] });
                   qc.invalidateQueries({ queryKey: ["accounts"] });
                 }
                 setDeleteSplitItem(null);
@@ -365,8 +403,8 @@ export default function AccountDetail() {
       <AlertDialog open={!!deleteSettlement} onOpenChange={(o) => { if (!o) setDeleteSettlement(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete settlement?</AlertDialogTitle>
-            <AlertDialogDescription>Are you sure you want to delete this settlement?</AlertDialogDescription>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -398,10 +436,8 @@ export default function AccountDetail() {
       <AlertDialog open={!!deleteTxn} onOpenChange={(o) => { if (!o) setDeleteTxn(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this transaction and update your balance. This cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -535,10 +571,13 @@ function SplitRow({ s }: { s: any }) {
 // ─── Settlement Row ─────────────────────────────────────────────────────────
 function SettlementRow({ s }: { s: any }) {
   const share = s.split_shares as any;
-  const shareAmount = Number(share?.share_amount ?? 0);
   const settled = Number(s.amount);
-  const remaining = Math.max(0, shareAmount - settled);
-  const isFullySettled = shareAmount > 0 && remaining === 0;
+  const remaining: number = s._remaining !== undefined
+    ? s._remaining
+    : Math.max(0, Number(share?.share_amount ?? 0) - settled);
+  const isFullySettled: boolean = s._isFullySettled !== undefined
+    ? s._isFullySettled
+    : Number(share?.share_amount ?? 0) > 0 && remaining === 0;
   const payerName = share?.person_name ?? "Unknown";
   const dateStr = s.created_at
     ? format(new Date(s.created_at), "MMM dd, yyyy · hh:mm a")

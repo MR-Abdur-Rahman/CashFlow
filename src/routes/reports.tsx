@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { transactionsQuery, peopleQuery } from "@/lib/queries";
 import { formatMoney } from "@/lib/format";
 import { useState, useMemo } from "react";
@@ -17,6 +17,14 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { SwipeRow } from "@/components/SwipeRow";
+import { EditTxSheet, EditSplitSheet } from "@/routes/home";
+import { SettlementEditSheet } from "@/components/SettlementEditSheet";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const COLORS = [
@@ -302,6 +310,9 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
   const [drillPeriod, setDrillPeriod] = useState<Period>("monthly");
   const [drillAnchor, setDrillAnchor] = useState(new Date());
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
+  const [editItem, setEditItem] = useState<any>(null);
+  const [deleteItem, setDeleteItem] = useState<any>(null);
+  const qc = useQueryClient();
 
   const { dateFrom, dateTo } = useMemo(
     () => getPeriodRange(drillPeriod, drillAnchor),
@@ -577,17 +588,109 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
             <p className="text-sm text-muted-foreground text-center py-8">No data for this period</p>
           )}
           {allItems.map((item) => {
-            if (item._type === "exp") return <ExpenseRow key={item.id} t={item} />;
+            if (item._type === "exp") return (
+              <SwipeRow key={item.id} onEdit={() => setEditItem(item)} onDelete={() => setDeleteItem(item)}>
+                <ExpenseRow t={item} />
+              </SwipeRow>
+            );
             if (item._type === "split") {
               const highlight = isExpensePerson ? drillItem.name : undefined;
-              return <SplitItemRow key={item.id} s={item} highlightPerson={highlight} />;
+              return (
+                <SwipeRow key={item.id} onEdit={() => setEditItem(item)} onDelete={() => setDeleteItem(item)}>
+                  <SplitItemRow s={item} highlightPerson={highlight} />
+                </SwipeRow>
+              );
             }
-            if (item._type === "inc") return <IncomeRow key={item.id} t={item} />;
-            if (item._type === "set-inc") return <SettlementIncomeRow key={item.id} s={item} />;
+            if (item._type === "inc") return (
+              <SwipeRow key={item.id} onEdit={() => setEditItem(item)} onDelete={() => setDeleteItem(item)}>
+                <IncomeRow t={item} />
+              </SwipeRow>
+            );
+            if (item._type === "set-inc") return (
+              <SwipeRow key={item.id} onEdit={() => setEditItem(item)} onDelete={() => setDeleteItem(item)}>
+                <SettlementIncomeRow s={item} />
+              </SwipeRow>
+            );
             return null;
           })}
         </div>
       </div>
+
+      {/* Edit sheets */}
+      {editItem && (editItem._type === "exp" || editItem._type === "inc") && (
+        <EditTxSheet
+          txn={editItem}
+          open={!!editItem}
+          onOpenChange={(o) => {
+            if (!o) { setEditItem(null); qc.invalidateQueries({ queryKey: ["drill"] }); }
+          }}
+        />
+      )}
+      {editItem && editItem._type === "split" && (
+        <EditSplitSheet
+          split={editItem}
+          open={!!editItem}
+          onOpenChange={(o) => {
+            if (!o) { setEditItem(null); qc.invalidateQueries({ queryKey: ["drill"] }); }
+          }}
+        />
+      )}
+      {editItem && editItem._type === "set-inc" && (
+        <SettlementEditSheet
+          settlement={editItem}
+          open={!!editItem}
+          onOpenChange={(o) => {
+            if (!o) { setEditItem(null); qc.invalidateQueries({ queryKey: ["drill"] }); }
+          }}
+        />
+      )}
+
+      {/* Delete dialog */}
+      <AlertDialog open={!!deleteItem} onOpenChange={(o) => { if (!o) setDeleteItem(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
+              if (!deleteItem) return;
+              const item = deleteItem;
+              setDeleteItem(null);
+              let error: any = null;
+              if (item._type === "exp" || item._type === "inc") {
+                ({ error } = await supabase.from("transactions").delete().eq("id", item.id));
+                if (!error) {
+                  qc.invalidateQueries({ queryKey: ["transactions"] });
+                  qc.invalidateQueries({ queryKey: ["accounts"] });
+                  qc.invalidateQueries({ queryKey: ["splits"] });
+                  qc.invalidateQueries({ queryKey: ["drill"] });
+                }
+              } else if (item._type === "split") {
+                ({ error } = await supabase.from("splits").delete().eq("id", item.id));
+                if (!error) {
+                  qc.invalidateQueries({ queryKey: ["splits"] });
+                  qc.invalidateQueries({ queryKey: ["transactions"] });
+                  qc.invalidateQueries({ queryKey: ["accounts"] });
+                  qc.invalidateQueries({ queryKey: ["drill"] });
+                }
+              } else if (item._type === "set-inc") {
+                ({ error } = await supabase.from("settlements").delete().eq("id", item.id));
+                if (!error) {
+                  qc.invalidateQueries({ queryKey: ["settlements"] });
+                  qc.invalidateQueries({ queryKey: ["splits"] });
+                  qc.invalidateQueries({ queryKey: ["split_shares"] });
+                  qc.invalidateQueries({ queryKey: ["accounts"] });
+                  qc.invalidateQueries({ queryKey: ["drill"] });
+                }
+              }
+              if (error) toast.error(error.message);
+              else toast.success("Deleted");
+            }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
