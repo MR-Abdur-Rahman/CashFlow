@@ -424,123 +424,60 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
     enabled: isIncomePerson,
   });
 
-  // Trend chart: independent 8-month window ending at drillAnchor
-  const trendMonths = useMemo(() =>
-    eachMonthOfInterval({ start: subMonths(drillAnchor, 7), end: drillAnchor }),
-    [drillAnchor],
-  );
-
-  const { trendFrom, trendTo } = useMemo(() => ({
-    trendFrom: format(startOfMonth(subMonths(drillAnchor, 7)), "yyyy-MM-dd"),
-    trendTo: format(endOfMonth(drillAnchor), "yyyy-MM-dd"),
-  }), [drillAnchor]);
-
-  const { data: trendExpTxns = [] } = useQuery({
-    queryKey: ["drill", "trend-exp-txns", drillItem.name, trendFrom, trendTo],
-    queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return [];
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("date, amount, categories:category_id(name)")
-        .eq("user_id", u.user.id)
-        .eq("type", "expense")
-        .eq("is_split", false)
-        .gte("date", trendFrom)
-        .lte("date", trendTo);
-      if (error) throw error;
-      return (data ?? []).filter((t: any) => (t.categories?.name ?? "Other") === drillItem.name);
-    },
-    enabled: isExpenseCat,
-  });
-
-  const { data: trendSplits = [] } = useQuery({
-    queryKey: ["drill", "trend-splits", drillItem.name, drillItem.drillType, trendFrom, trendTo],
-    queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return [];
-      const { data, error } = await supabase
-        .from("splits")
-        .select("date, total_amount, categories:category_id(name), split_shares(person_name)")
-        .eq("paid_by", "me")
-        .eq("created_by", u.user.id)
-        .gte("date", trendFrom)
-        .lte("date", trendTo);
-      if (error) throw error;
-      return (data ?? []).filter((s: any) => {
-        if (isExpenseCat) return ((s.categories as any)?.name ?? "Uncategorized") === drillItem.name;
-        if (isExpensePerson) return (s.split_shares as any[]).some((sh: any) => sh.person_name === drillItem.name);
-        return false;
+  // ─── Chart buckets: X-axis structure driven by drillPeriod ─────────────────
+  const chartBuckets = useMemo((): { label: string; key: number | string }[] => {
+    if (drillPeriod === "today") {
+      return Array.from({ length: 24 }, (_, h) => ({
+        label: h === 0 ? "12AM" : h < 12 ? `${h}AM` : h === 12 ? "12PM" : `${h - 12}PM`,
+        key: h,
+      }));
+    }
+    if (drillPeriod === "weekly") {
+      const weekStart = startOfWeek(drillAnchor, { weekStartsOn: 1 });
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = addDays(weekStart, i);
+        return { label: format(d, "EEE"), key: format(d, "yyyy-MM-dd") };
       });
-    },
-    enabled: isExpense,
-  });
-
-  const { data: trendIncTxns = [] } = useQuery({
-    queryKey: ["drill", "trend-inc-txns", drillItem.name, drillItem.drillType, trendFrom, trendTo],
-    queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return [];
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("date, amount, income_source_type, income_source_text, people:income_person_id(name)")
-        .eq("user_id", u.user.id)
-        .eq("type", "income")
-        .gte("date", trendFrom)
-        .lte("date", trendTo);
-      if (error) throw error;
-      return (data ?? []).filter((t: any) => {
-        const label = t.income_source_type === "person"
-          ? ((t.people as any)?.name ?? "Unknown")
-          : (t.income_source_text ?? "Other");
-        return label === drillItem.name;
-      });
-    },
-    enabled: isIncome,
-  });
-
-  const { data: trendSettlements = [] } = useQuery({
-    queryKey: ["drill", "trend-settlements", drillItem.name, trendFrom, trendTo],
-    queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return [];
-      const { data, error } = await supabase
-        .from("settlements")
-        .select("created_at, amount, split_shares:split_share_id(person_name)")
-        .eq("created_by", u.user.id)
-        .gte("created_at", trendFrom)
-        .lte("created_at", trendTo + "T23:59:59.999");
-      if (error) throw error;
-      return (data ?? []).filter((s: any) => (s.split_shares as any)?.person_name === drillItem.name);
-    },
-    enabled: isIncomePerson,
-  });
+    }
+    if (drillPeriod === "monthly") {
+      return [1, 2, 3, 4, 5].map(w => ({ label: `W${w}`, key: w }));
+    }
+    // annually
+    const year = drillAnchor.getFullYear();
+    return Array.from({ length: 12 }, (_, i) => ({
+      label: format(new Date(year, i, 1), "MMM"),
+      key: i + 1,
+    }));
+  }, [drillPeriod, drillAnchor]);
 
   const trendData = useMemo(() => {
-    return trendMonths.map((m) => {
-      const mF = format(startOfMonth(m), "yyyy-MM-dd");
-      const mT = format(endOfMonth(m), "yyyy-MM-dd");
-      let val = 0;
-      if (isExpenseCat) {
-        val += (trendExpTxns as any[]).filter(t => t.date >= mF && t.date <= mT)
-          .reduce((s: number, t: any) => s + Number(t.amount), 0);
-        val += (trendSplits as any[]).filter(s => s.date >= mF && s.date <= mT)
-          .reduce((s: number, sp: any) => s + Number(sp.total_amount), 0);
-      } else if (isExpensePerson) {
-        val += (trendSplits as any[]).filter(s => s.date >= mF && s.date <= mT)
-          .reduce((s: number, sp: any) => s + Number(sp.total_amount), 0);
-      } else {
-        val += (trendIncTxns as any[]).filter(t => t.date >= mF && t.date <= mT)
-          .reduce((s: number, t: any) => s + Number(t.amount), 0);
-        if (isIncomePerson) {
-          val += (trendSettlements as any[])
-            .filter(s => s.created_at >= mF && s.created_at <= mT)
-            .reduce((s: number, st: any) => s + Number(st.amount), 0);
-        }
+    function txnKey(dateStr: string, timeStr?: string | null): number | string {
+      if (drillPeriod === "today") return parseInt((timeStr ?? "00:00").split(":")[0], 10);
+      if (drillPeriod === "weekly") return dateStr;
+      if (drillPeriod === "monthly") return Math.min(Math.ceil(parseInt(dateStr.split("-")[2], 10) / 7), 5);
+      return parseInt(dateStr.split("-")[1], 10);
+    }
+    function caKey(createdAt: string): number | string {
+      const d = new Date(createdAt);
+      if (drillPeriod === "today") return d.getHours();
+      if (drillPeriod === "weekly") return format(d, "yyyy-MM-dd");
+      if (drillPeriod === "monthly") return Math.min(Math.ceil(d.getDate() / 7), 5);
+      return d.getMonth() + 1;
+    }
+    const sums = new Map<number | string, number>(chartBuckets.map(b => [b.key, 0]));
+    if (isExpenseCat) {
+      for (const t of expTxns as any[]) { const k = txnKey(t.date, t.time); sums.set(k, (sums.get(k) ?? 0) + Number(t.amount)); }
+      for (const s of drillSplits as any[]) { const k = txnKey(s.date, s.time); sums.set(k, (sums.get(k) ?? 0) + Number(s.total_amount)); }
+    } else if (isExpensePerson) {
+      for (const s of drillSplits as any[]) { const k = txnKey(s.date, s.time); sums.set(k, (sums.get(k) ?? 0) + Number(s.total_amount)); }
+    } else {
+      for (const t of incTxns as any[]) { const k = txnKey(t.date, t.time); sums.set(k, (sums.get(k) ?? 0) + Number(t.amount)); }
+      if (isIncomePerson) {
+        for (const s of drillSettlements as any[]) { const k = caKey(s.created_at); sums.set(k, (sums.get(k) ?? 0) + Number(s.amount)); }
       }
-      return { label: format(m, "MMM"), value: val };
-    });
-  }, [trendMonths, trendExpTxns, trendSplits, trendIncTxns, trendSettlements, isExpenseCat, isExpensePerson, isIncomePerson]);
+    }
+    return chartBuckets.map(b => ({ label: b.label, value: sums.get(b.key) ?? 0 }));
+  }, [chartBuckets, expTxns, drillSplits, incTxns, drillSettlements, drillPeriod, isExpenseCat, isExpensePerson, isIncomePerson]);
 
   // Sub-categories for filter list (expense-category only, from expense txns)
   const subItems = useMemo(() => {
@@ -653,21 +590,29 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
         )}
 
         {/* Trend line chart */}
-        <div className="mx-4 mb-4 rounded-xl overflow-hidden bg-[#0A0A0A] p-3">
-          <ResponsiveContainer width="100%" height={160}>
-            <LineChart data={trendData} style={{ background: "#0A0A0A" }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: "#9CA3AF" }} width={40} axisLine={false} tickLine={false} />
-              <Tooltip
-                contentStyle={{ background: "#1A1A1A", border: "1px solid #2A2A2A", fontSize: 11, color: "#FFFFFF" }}
-                labelStyle={{ color: "#9CA3AF" }}
-                formatter={(v: any) => [formatMoney(v), ""]}
-              />
-              <Line type="monotone" dataKey="value" stroke="#FFFFFF" strokeWidth={2} dot={{ fill: "#FFFFFF", r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        {(() => {
+          const pointPx = 50;
+          const chartW = Math.max(chartBuckets.length * pointPx, 280);
+          return (
+            <div className="mx-4 mb-4 rounded-xl overflow-hidden bg-[#0A0A0A]">
+              <div style={{ overflowX: "auto", touchAction: "pan-x" }}>
+                <div style={{ width: chartW, padding: "12px 8px 4px 0" }}>
+                  <LineChart width={chartW} height={140} data={trendData} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#9CA3AF" }} width={44} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ background: "#1A1A1A", border: "1px solid #2A2A2A", fontSize: 11, color: "#FFFFFF" }}
+                      labelStyle={{ color: "#9CA3AF" }}
+                      formatter={(v: any) => [formatMoney(v), ""]}
+                    />
+                    <Line type="monotone" dataKey="value" stroke="#FFFFFF" strokeWidth={2} dot={{ fill: "#FFFFFF", r: 3 }} />
+                  </LineChart>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Transaction list */}
         <div className="mx-4 rounded-xl overflow-hidden border border-border divide-y divide-border">
