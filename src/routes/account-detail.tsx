@@ -278,12 +278,8 @@ export default function AccountDetail() {
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className="flex-1 py-2 text-sm font-medium rounded-lg capitalize transition-colors"
-            style={
-              tab === t
-                ? { background: "#1A1A1A", color: "white", border: "1px solid #7C3AED" }
-                : { background: "#2A2A2A", color: "#9CA3AF", border: "1px solid transparent" }
-            }
+            className={cn("flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
+              tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}
           >
             {t === "transactions" ? "Transactions" : "Splits"}
           </button>

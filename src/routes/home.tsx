@@ -229,12 +229,8 @@ export default function Home() {
               key={tab}
               type="button"
               onClick={() => setTxnTab(tab)}
-              className="flex-1 py-2 text-sm font-medium rounded-lg capitalize transition-colors"
-              style={
-                txnTab === tab
-                  ? { background: "#1A1A1A", color: "white", border: "1px solid #7C3AED" }
-                  : { background: "#2A2A2A", color: "#9CA3AF", border: "1px solid transparent" }
-              }
+              className={cn("flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
+                txnTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}
             >
               {tab === "transactions" ? "Transactions" : "Splits"}
             </button>
@@ -274,7 +270,7 @@ export default function Home() {
                 <div className="divide-y divide-border">
                   {visibleTxns.map((t) => (
                     <SwipeRow key={t.id} onEdit={() => setEditTxn(t)} onDelete={() => setDeleteTxn(t)}>
-                      <TxRowInner t={t} onClick={() => setEditTxn(t)} />
+                      <TxRowInner t={t} />
                     </SwipeRow>
                   ))}
                 </div>
@@ -384,8 +380,8 @@ export default function Home() {
   );
 }
 
-function TxRowInner({ t, onClick }: { t: any; onClick: () => void }) {
-  if (t.is_split) return <SplitRowContent t={t} onClick={onClick} />;
+function TxRowInner({ t }: { t: any }) {
+  if (t.is_split) return <SplitRowContent t={t} />;
 
   const isIncome = t.type === "income";
   const isExpense = t.type === "expense";
@@ -407,7 +403,7 @@ function TxRowInner({ t, onClick }: { t: any; onClick: () => void }) {
     : (t.accounts ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ") : "");
 
   return (
-    <div className="flex items-center gap-3 p-4 bg-card cursor-pointer active:bg-secondary/40" onClick={onClick}>
+    <div className="flex items-center gap-3 p-4 bg-card">
       <div className={`h-10 w-10 rounded-full flex items-center justify-center ${bgClass} ${colorClass}`}>
         <Icon className="h-5 w-5" />
       </div>
@@ -423,14 +419,14 @@ function TxRowInner({ t, onClick }: { t: any; onClick: () => void }) {
   );
 }
 
-function SplitRowContent({ t, onClick }: { t: any; onClick: () => void }) {
+function SplitRowContent({ t }: { t: any }) {
   const s = t.split;
 
   // Fallback if split data not joined
   if (!s) {
     return (
-      <div className="flex items-center gap-3 p-4 bg-card cursor-pointer active:bg-secondary/40"
-        style={{ borderLeft: "3px solid #F59E0B" }} onClick={onClick}>
+      <div className="flex items-center gap-3 p-4 bg-card"
+        style={{ borderLeft: "3px solid #F59E0B" }}>
         <div className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--color-split-bg)] text-split shrink-0">
           <Users className="h-5 w-5" />
         </div>
@@ -465,7 +461,7 @@ function SplitRowContent({ t, onClick }: { t: any; onClick: () => void }) {
   const perShare = shareCount > 0 ? total / shareCount : 0;
 
   return (
-    <div className="bg-card cursor-pointer active:bg-secondary/40" style={{ borderLeft: "3px solid #F59E0B" }} onClick={onClick}>
+    <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
       <div className="px-4 py-3">
         {/* Line 1: description + total */}
         <div className="flex items-start justify-between gap-2">
