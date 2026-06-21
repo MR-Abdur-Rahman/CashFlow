@@ -268,7 +268,7 @@ function PeriodNav({
     : "flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-3 py-1.5 rounded-xl";
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={compact ? "flex items-center gap-2" : "flex items-center gap-2 w-full"}>
       <button type="button" onClick={() => onNavigate(-1)} className={btnCls}>
         <ChevronLeft className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
       </button>
@@ -278,7 +278,7 @@ function PeriodNav({
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className={dropCls}>
+          <button className={compact ? dropCls : `${dropCls} ml-auto`}>
             {PERIOD_OPTIONS.find(p => p.key === period)?.label}
             <ChevronDown className={compact ? "h-3 w-3" : "h-4 w-4"} />
           </button>

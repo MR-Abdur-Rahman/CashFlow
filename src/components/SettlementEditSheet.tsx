@@ -65,6 +65,8 @@ export function SettlementEditSheet({
       toast.success("Settlement updated");
       qc.invalidateQueries({ queryKey: ["settlements"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
+      qc.invalidateQueries({ queryKey: ["splits"] });
+      qc.invalidateQueries({ queryKey: ["split_shares"] });
       onOpenChange(false);
     },
     onError: (e: any) => toast.error(e.message),

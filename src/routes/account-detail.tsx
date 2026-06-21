@@ -129,29 +129,13 @@ export default function AccountDetail() {
     queryKey: ["settlements", "account", accountId, dateFrom, dateTo],
     queryFn: async () => {
       if (!accountId) return [];
-      // Fetch split IDs belonging to this account so we can include their settlements
-      const { data: acctSplits } = await supabase
-        .from("splits")
-        .select("id")
-        .eq("account_id", accountId)
-        .gte("date", dateFrom)
-        .lte("date", dateTo);
-      const splitIds = (acctSplits ?? []).map((s: any) => s.id as string);
-
-      let q = supabase
+      const { data, error } = await supabase
         .from("settlements")
         .select("*, split_shares:split_share_id(person_name, share_amount), accounts:account_id(label, institution)")
+        .eq("account_id", accountId)
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999")
         .order("created_at", { ascending: false });
-
-      if (splitIds.length > 0) {
-        q = q.or(`account_id.eq.${accountId},split_id.in.(${splitIds.join(",")})`);
-      } else {
-        q = q.eq("account_id", accountId);
-      }
-
-      const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
     },
@@ -396,6 +380,8 @@ export default function AccountDetail() {
                 toast.success("Settlement deleted");
                 qc.invalidateQueries({ queryKey: ["settlements"] });
                 qc.invalidateQueries({ queryKey: ["accounts"] });
+                qc.invalidateQueries({ queryKey: ["splits"] });
+                qc.invalidateQueries({ queryKey: ["split_shares"] });
                 setDeleteSettlement(null);
               }}
             >

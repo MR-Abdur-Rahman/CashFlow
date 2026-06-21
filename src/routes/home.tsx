@@ -370,6 +370,8 @@ export default function Home() {
                 toast.success("Settlement deleted");
                 qc.invalidateQueries({ queryKey: ["settlements"] });
                 qc.invalidateQueries({ queryKey: ["accounts"] });
+                qc.invalidateQueries({ queryKey: ["splits"] });
+                qc.invalidateQueries({ queryKey: ["split_shares"] });
               }
               setDeleteHomeSettlement(null);
             }}>Delete</AlertDialogAction>
@@ -665,15 +667,15 @@ function HomeSettlementRow({ s }: { s: any }) {
       <div className="px-4 py-3">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium truncate flex-1">{payerName} → You</p>
-          <p className="text-sm font-mono text-[#10B981] shrink-0">{formatMoney(settled)}</p>
+          <p className="text-sm font-mono text-[#9CA3AF] shrink-0">{formatMoney(settled)}</p>
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
           {isFullySettled ? (
             <p className="text-[12px] font-medium text-[#10B981]">Fully settled</p>
           ) : (
             <>
-              <p className="text-[12px] text-[#F59E0B]">Still owes</p>
-              <p className="text-[12px] font-mono text-[#F59E0B] shrink-0">{formatMoney(remaining)} remaining</p>
+              <p className="text-[12px] text-[#9CA3AF]">Still owes</p>
+              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">{formatMoney(remaining)} remaining</p>
             </>
           )}
         </div>
