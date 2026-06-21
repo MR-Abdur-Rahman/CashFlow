@@ -381,14 +381,6 @@ export default function AccountDetail() {
                 const s = deleteSettlement;
                 const { error } = await supabase.from("settlements").delete().eq("id", s.id);
                 if (error) { toast.error(error.message); setDeleteSettlement(null); return; }
-                // Reverse the balance credit on the split's account
-                const { data: acct } = await supabase
-                  .from("accounts").select("current_balance").eq("id", accountId!).single();
-                if (acct) {
-                  await supabase.from("accounts")
-                    .update({ current_balance: Number(acct.current_balance) - Number(s.amount) })
-                    .eq("id", accountId!);
-                }
                 toast.success("Settlement deleted");
                 qc.invalidateQueries({ queryKey: ["settlements"] });
                 qc.invalidateQueries({ queryKey: ["accounts"] });
@@ -422,19 +414,6 @@ export default function AccountDetail() {
                 const txn = deleteTxn;
                 const { error } = await supabase.from("transactions").delete().eq("id", txn.id);
                 if (error) { toast.error(error.message); setDeleteTxn(null); return; }
-
-                // FIX 7: update account balance on delete
-                const isIncome = txn.type === "income";
-                const isTransferTo = txn.type === "transfer" && txn.to_account_id === accountId;
-                const { data: acct } = await supabase
-                  .from("accounts").select("current_balance").eq("id", accountId!).single();
-                if (acct) {
-                  const delta = (isIncome || isTransferTo) ? -Number(txn.amount) : Number(txn.amount);
-                  await supabase.from("accounts")
-                    .update({ current_balance: Number(acct.current_balance) + delta })
-                    .eq("id", accountId!);
-                }
-
                 toast.success("Transaction deleted");
                 qc.invalidateQueries({ queryKey: ["transactions"] });
                 qc.invalidateQueries({ queryKey: ["accounts"] });
@@ -645,22 +624,6 @@ function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onO
         time,
       }).eq("id", txn.id);
       if (error) throw error;
-
-      // FIX 7: update account balance for the amount diff
-      const oldAmt = Number(txn.amount);
-      const newAmt = Number(amount);
-      const diff = newAmt - oldAmt;
-      if (diff !== 0 && accountId) {
-        const isIncome = txn.type === "income";
-        const { data: acct } = await supabase
-          .from("accounts").select("current_balance").eq("id", accountId).single();
-        if (acct) {
-          const delta = isIncome ? diff : -diff;
-          await supabase.from("accounts")
-            .update({ current_balance: Number(acct.current_balance) + delta })
-            .eq("id", accountId);
-        }
-      }
     },
     onSuccess: () => {
       toast.success("Transaction updated");
