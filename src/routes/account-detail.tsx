@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { EditSplitSheet } from "@/routes/home";
+import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import {
   format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfYear, endOfYear, subDays, addDays, subWeeks, addWeeks,
@@ -99,6 +100,7 @@ export default function AccountDetail() {
   const [editSplit, setEditSplit] = useState<any | null>(null);
   const [deleteSplitItem, setDeleteSplitItem] = useState<any | null>(null);
   const [deleteSettlement, setDeleteSettlement] = useState<any | null>(null);
+  const [editSettlement, setEditSettlement] = useState<any | null>(null);
 
   const { dateFrom, dateTo } = useMemo(() => getPeriodRange(period, anchor), [period, anchor]);
 
@@ -308,7 +310,7 @@ export default function AccountDetail() {
           ) : (
             splitsTabItems.map((item: any) =>
               item._itemType === "settlement" ? (
-                <SwipeRow key={`set-${item.id}`} onDelete={() => setDeleteSettlement(item)}>
+                <SwipeRow key={`set-${item.id}`} onEdit={() => setEditSettlement(item)} onDelete={() => setDeleteSettlement(item)}>
                   <SettlementRow s={item} />
                 </SwipeRow>
               ) : (
@@ -325,6 +327,14 @@ export default function AccountDetail() {
 
       {editSplit && (
         <EditSplitSheet split={editSplit} open={!!editSplit} onOpenChange={(o) => { if (!o) setEditSplit(null); }} />
+      )}
+
+      {editSettlement && (
+        <SettlementEditSheet
+          settlement={editSettlement}
+          open={!!editSettlement}
+          onOpenChange={(o) => { if (!o) setEditSettlement(null); }}
+        />
       )}
 
       <AlertDialog open={!!deleteSplitItem} onOpenChange={(o) => { if (!o) setDeleteSplitItem(null); }}>
@@ -561,7 +571,7 @@ function SettlementRow({ s }: { s: any }) {
     <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
       <div className="px-4 py-3">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium">{payerName} → You</p>
+          <p className="text-sm font-medium truncate flex-1">{payerName} → You</p>
           <p className="text-sm font-mono text-[#9CA3AF] shrink-0">{formatMoney(settled)}</p>
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
@@ -574,7 +584,7 @@ function SettlementRow({ s }: { s: any }) {
             </>
           )}
         </div>
-        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{dateStr}</p>
+        <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5 text-right">{dateStr}</p>
       </div>
     </div>
   );

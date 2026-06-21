@@ -26,6 +26,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 
 type FilterPeriod = "today" | "week" | "month";
 
@@ -55,6 +56,8 @@ export default function Home() {
   const [deleteTxn, setDeleteTxn] = useState<any>(null);
   const [editSplit, setEditSplit] = useState<any>(null);
   const [deleteSplit, setDeleteSplit] = useState<any>(null);
+  const [editSettlement, setEditSettlement] = useState<any>(null);
+  const [deleteHomeSettlement, setDeleteHomeSettlement] = useState<any>(null);
   const [period, setPeriod] = useState<FilterPeriod>("today");
   const [notifOpen, setNotifOpen] = useState(false);
   const [txnTab, setTxnTab] = useState<"transactions" | "splits">("transactions");
@@ -248,7 +251,9 @@ export default function Home() {
                   <div className="divide-y divide-border">
                     {splitsTabItems.map((item: any) =>
                       item._itemType === "settlement" ? (
-                        <HomeSettlementRow key={`set-${item.id}`} s={item} />
+                        <SwipeRow key={`set-${item.id}`} onEdit={() => setEditSettlement(item)} onDelete={() => setDeleteHomeSettlement(item)}>
+                          <HomeSettlementRow s={item} />
+                        </SwipeRow>
                       ) : (
                         <SwipeRow key={item.id} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}>
                           <SplitDirectRow s={item} />
@@ -340,6 +345,37 @@ export default function Home() {
                 qc.invalidateQueries({ queryKey: ["accounts"] });
               }
               setDeleteSplit(null);
+            }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {editSettlement && (
+        <SettlementEditSheet
+          settlement={editSettlement}
+          open={!!editSettlement}
+          onOpenChange={(o) => { if (!o) setEditSettlement(null); }}
+        />
+      )}
+
+      <AlertDialog open={!!deleteHomeSettlement} onOpenChange={(o) => { if (!o) setDeleteHomeSettlement(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete settlement?</AlertDialogTitle>
+            <AlertDialogDescription>Are you sure you want to delete this settlement?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
+              if (!deleteHomeSettlement) return;
+              const { error } = await supabase.from("settlements").delete().eq("id", deleteHomeSettlement.id);
+              if (error) toast.error(error.message);
+              else {
+                toast.success("Settlement deleted");
+                qc.invalidateQueries({ queryKey: ["settlements"] });
+                qc.invalidateQueries({ queryKey: ["accounts"] });
+              }
+              setDeleteHomeSettlement(null);
             }}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -632,7 +668,7 @@ function HomeSettlementRow({ s }: { s: any }) {
     <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
       <div className="px-4 py-3">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium">{payerName} → You</p>
+          <p className="text-sm font-medium truncate flex-1">{payerName} → You</p>
           <p className="text-sm font-mono text-[#9CA3AF] shrink-0">{formatMoney(settled)}</p>
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
@@ -645,7 +681,7 @@ function HomeSettlementRow({ s }: { s: any }) {
             </>
           )}
         </div>
-        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{dateStr}</p>
+        <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5 text-right">{dateStr}</p>
       </div>
     </div>
   );
