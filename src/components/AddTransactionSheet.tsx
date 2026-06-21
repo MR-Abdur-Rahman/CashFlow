@@ -602,7 +602,10 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
         onSubmit={(e) => {
           e.preventDefault();
           const amt = Number(amount);
-          if (!amount || isNaN(amt) || amt <= 0) { toast.error("Please enter a valid amount greater than 0"); return; }
+          if (!amount || isNaN(amt) || amt <= 0) { toast.error("Amount must be greater than 0"); return; }
+          if (!accountId) { toast.error("Please select an account"); return; }
+          if (sourceType === "person" && !personId) { toast.error("Please select a person"); return; }
+          if (sourceType === "source" && !sourceText.trim()) { toast.error("Please enter or select a source"); return; }
           mutation.mutate();
         }}>
         <AmountInput value={amount} onChange={setAmount} accent="text-income" />
@@ -684,8 +687,9 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
         onSubmit={(e) => {
           e.preventDefault();
           const amt = Number(amount);
-          if (!amount || isNaN(amt) || amt <= 0) { toast.error("Please enter a valid amount greater than 0"); return; }
+          if (!amount || isNaN(amt) || amt <= 0) { toast.error("Amount must be greater than 0"); return; }
           if (!accountId) { toast.error("Please select an account"); return; }
+          if (!categoryId) { toast.error("Please select a category"); return; }
           mutation.mutate();
         }}>
         <AmountInput value={amount} onChange={setAmount} accent="text-expense" />
@@ -748,9 +752,10 @@ function TransferForm({ onClose }: { onClose: () => void }) {
       onSubmit={(e) => {
         e.preventDefault();
         const amt = Number(amount);
-        if (!amount || isNaN(amt) || amt <= 0) { toast.error("Please enter a valid amount greater than 0"); return; }
+        if (!amount || isNaN(amt) || amt <= 0) { toast.error("Amount must be greater than 0"); return; }
         if (!fromId) { toast.error("Please select a from account"); return; }
         if (!toId) { toast.error("Please select a to account"); return; }
+        if (fromId === toId) { toast.error("From and To accounts must be different"); return; }
         mutation.mutate();
       }}>
       <AmountInput value={amount} onChange={setAmount} accent="text-transfer" />
@@ -910,9 +915,13 @@ function SplitForm({ onClose }: { onClose: () => void }) {
         onSubmit={(e) => {
           e.preventDefault();
           const amt = Number(amount);
-          if (!amount || isNaN(amt) || amt <= 0) { toast.error("Please enter a valid amount greater than 0"); return; }
+          if (!amount || isNaN(amt) || amt <= 0) { toast.error("Amount must be greater than 0"); return; }
           if (!description.trim()) { toast.error("Please enter a description"); return; }
+          if (target === "person" && !personId) { toast.error("Please select a person"); return; }
+          if (target === "multi" && multiPeople.length === 0) { toast.error("Please select at least one person"); return; }
+          if (target === "group" && !groupId) { toast.error("Please select a group"); return; }
           if (!categoryId) { toast.error("Please select a category"); return; }
+          if (whoPaid === "me" && !accountId) { toast.error("Please select an account"); return; }
           mutation.mutate();
         }}>
         <AmountInput value={amount} onChange={setAmount} accent="text-split" />

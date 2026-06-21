@@ -32,7 +32,8 @@ export const transactionsQuery = (opts?: { dateFrom?: string; dateTo?: string; a
         .from("transactions")
         .select("*, accounts:account_id(label,institution,icon_name,icon_color,icon_url,icon_type), to_account:to_account_id(label,institution), categories:category_id(name,icon), sub_categories:sub_category_id(name), split:split_id(total_amount,paid_by,type,description,split_shares(share_amount,person_name,person_id),people:person_id(name),groups:group_id(name))")
         .order("date", { ascending: false })
-        .order("time", { ascending: false });
+        .order("time", { ascending: false })
+        .order("created_at", { ascending: false });
       if (opts?.dateFrom) q = q.gte("date", opts.dateFrom);
       if (opts?.dateTo) q = q.lte("date", opts.dateTo);
       if (opts?.accountId) q = q.or(`account_id.eq.${opts.accountId},to_account_id.eq.${opts.accountId}`);
@@ -144,7 +145,8 @@ export const splitsQuery = () =>
         .from("splits")
         .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name)")
         .order("date", { ascending: false })
-        .order("time", { ascending: false });
+        .order("time", { ascending: false })
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
