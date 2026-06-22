@@ -553,31 +553,31 @@ function SplitRowContent({ t }: { t: any }) {
 }
 
 function SplitDirectRow({ s }: { s: any }) {
-  console.log("SplitDirectRow debug:", {
-    id: s.id,
-    description: s.description,
-    paid_by: s.paid_by,
-    paid_by_person_id: s.paid_by_person_id,
-    _isIncoming: s._isIncoming,
-    _myPersonId: s._myPersonId,
-    isIncoming: !!s._isIncoming,
-    isMePaid_check: s._isIncoming
+  console.log("SplitDirectRow debug id:", String(s.id));
+  console.log("SplitDirectRow debug description:", String(s.description));
+  console.log("SplitDirectRow debug paid_by:", String(s.paid_by));
+  console.log("SplitDirectRow debug paid_by_person_id:", String(s.paid_by_person_id));
+  console.log("SplitDirectRow debug _isIncoming:", String(s._isIncoming));
+  console.log("SplitDirectRow debug _myPersonId:", String(s._myPersonId));
+  console.log("SplitDirectRow debug isIncoming:", String(!!s._isIncoming));
+  console.log("SplitDirectRow debug isMePaid_check:", String(
+    s._isIncoming
       ? (s.paid_by_person_id != null
           ? s.paid_by_person_id === s._myPersonId
           : s.paid_by !== "me")
       : s.paid_by === "me"
-  });
+  ));
   if (s._isIncoming === true) {
-    console.log("INCOMING SPLIT DEBUG:", {
-      id: s.id,
-      isIncoming: s._isIncoming,
-      paid_by: s.paid_by,
-      paid_by_person_id: s.paid_by_person_id,
-      _myPersonId: s._myPersonId,
-      isMePaid_check: s.paid_by_person_id != null && s._myPersonId != null
+    console.log("INCOMING DEBUG id:", String(s.id));
+    console.log("INCOMING DEBUG paid_by:", String(s.paid_by));
+    console.log("INCOMING DEBUG paid_by_person_id:", String(s.paid_by_person_id));
+    console.log("INCOMING DEBUG _myPersonId:", String(s._myPersonId));
+    console.log("INCOMING DEBUG _isIncoming:", String(s._isIncoming));
+    console.log("INCOMING DEBUG isMePaid_check:", String(
+      s.paid_by_person_id != null && s._myPersonId != null
         ? s.paid_by_person_id === s._myPersonId
         : s.paid_by !== "me"
-    });
+    ));
   }
   const shares = (s.split_shares ?? []) as any[];
   const total = Number(s.total_amount);
