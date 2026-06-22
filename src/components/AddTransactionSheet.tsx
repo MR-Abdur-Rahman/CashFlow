@@ -844,16 +844,22 @@ function SplitForm({ onClose }: { onClose: () => void }) {
   const total = Number(amount);
   const equalShare = participants.length > 0 ? total / (participants.length + 1) : 0;
 
-  // Resolve paid_by string for DB
+  // Resolve paid_by string and payer person_id for DB
   const paidByValue = useMemo(() => {
     if (whoPaid === "me") return "me";
-    if (target === "person") return personName; // the one person
+    if (target === "person") return personName;
     if (target === "multi" || target === "group") {
       const p = participants.find((x) => x.id === otherPayerId);
       return p?.name ?? "other";
     }
     return "other";
   }, [whoPaid, target, personName, participants, otherPayerId]);
+
+  const paidByPersonId = useMemo((): string | null => {
+    if (whoPaid === "me") return null;
+    if (target === "person") return personId || null;
+    return otherPayerId || null;
+  }, [whoPaid, target, personId, otherPayerId]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -870,6 +876,7 @@ function SplitForm({ onClose }: { onClose: () => void }) {
         description: description.trim() || null,
         total_amount: total,
         paid_by: paidByValue,
+        paid_by_person_id: paidByPersonId,
         split_type: splitType,
         category_id: categoryId || null,
         sub_category_id: subCatId || null,

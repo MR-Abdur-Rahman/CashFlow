@@ -324,12 +324,16 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
       const paidByName = whoPaid === "me" ? "me"
         : target === "person" ? personName
         : participants.find((p) => p.id === otherPayerId)?.name ?? "other";
+      const paidByPersonId: string | null = whoPaid === "me" ? null
+        : target === "person" ? personId || null
+        : otherPayerId || null;
       const { error } = await supabase.from("splits").update({
         total_amount: total,
         type: target === "group" ? "group" : "individual",
         person_id: target === "person" && personId ? personId : null,
         group_id: target === "group" && groupId ? groupId : null,
         paid_by: paidByName,
+        paid_by_person_id: paidByPersonId,
         split_type: splitType,
         category_id: categoryId || null,
         sub_category_id: subCatId || null,

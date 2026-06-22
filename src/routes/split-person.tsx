@@ -67,13 +67,32 @@ export default function PersonDetail() {
   const totals = (splits as any[]).reduce((acc, s) => {
     const targetPersonId = s._isIncoming ? s._myPersonId : personId;
     if (!targetPersonId) return acc;
-    for (const sh of (s.split_shares ?? [])) {
-      if (sh.person_id !== targetPersonId) continue;
-      const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
+
+    if (s._isIncoming) {
+      const myShareRecord = (s.split_shares ?? []).find((sh: any) => sh.person_id === targetPersonId);
+      if (!myShareRecord) return acc;
+      const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === myShareRecord.id)
         .reduce((a: number, x: any) => a + Number(x.amount), 0);
-      if (s._isIncoming) {
-        acc.iOwe += Number(sh.share_amount) - settled;
+
+      // For incoming: paid_by="me" = creator paid → I owe; paid_by_person_id===mine → I paid → they owe me
+      const isCreatorPaid = s.paid_by === "me";
+      const iMePaid = s.paid_by_person_id != null
+        ? s.paid_by_person_id === targetPersonId
+        : !isCreatorPaid;
+
+      if (iMePaid) {
+        // I paid → creator owes me their implicit share
+        const totalSharesSum = (s.split_shares ?? []).reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
+        acc.owed += Number(s.total_amount) - totalSharesSum;
       } else {
+        // Creator paid → I owe my share
+        acc.iOwe += Number(myShareRecord.share_amount) - settled;
+      }
+    } else {
+      for (const sh of (s.split_shares ?? [])) {
+        if (sh.person_id !== targetPersonId) continue;
+        const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
+          .reduce((a: number, x: any) => a + Number(x.amount), 0);
         acc.owed += Number(sh.share_amount);
         acc.paid += settled;
       }
@@ -456,12 +475,16 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
       const paidByName = whoPaid === "me" ? "me"
         : target === "person" ? personName
         : participants.find((p) => p.id === otherPayerId)?.name ?? "other";
+      const paidByPersonId: string | null = whoPaid === "me" ? null
+        : target === "person" ? personId || null
+        : otherPayerId || null;
       const { error } = await supabase.from("splits").update({
         total_amount: total,
         type: target === "group" ? "group" : "individual",
         person_id: target === "person" && personId ? personId : null,
         group_id: target === "group" && groupId ? groupId : null,
         paid_by: paidByName,
+        paid_by_person_id: paidByPersonId,
         split_type: splitType,
         category_id: categoryId || null,
         sub_category_id: subCatId || null,

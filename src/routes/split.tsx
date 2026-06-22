@@ -49,11 +49,25 @@ export default function SplitPage() {
         if (s._createdByUserId !== person.linked_user_id) continue;
         const myPersonId = s._myPersonId;
         if (!myPersonId) continue;
-        for (const sh of (s.split_shares ?? [])) {
-          if (sh.person_id !== myPersonId) continue;
-          const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
-            .reduce((a: number, x: any) => a + Number(x.amount), 0);
-          owed -= Number(sh.share_amount) - settled;
+        const myShareRecord = (s.split_shares ?? []).find((sh: any) => sh.person_id === myPersonId);
+        if (!myShareRecord) continue;
+        const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === myShareRecord.id)
+          .reduce((a: number, x: any) => a + Number(x.amount), 0);
+
+        // For incoming: paid_by="me" means creator paid → I owe them.
+        // paid_by_person_id===myPersonId (or fallback: paid_by!="me") → I paid → they owe me.
+        const isCreatorPaid = s.paid_by === "me";
+        const iMePaid = s.paid_by_person_id != null
+          ? s.paid_by_person_id === myPersonId
+          : !isCreatorPaid;
+
+        if (iMePaid) {
+          // Current user paid → creator (person) owes current user their implicit share
+          const totalSharesSum = (s.split_shares ?? []).reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
+          owed += Number(s.total_amount) - totalSharesSum;
+        } else {
+          // Creator (or 3rd party) paid → current user owes their share
+          owed -= Number(myShareRecord.share_amount) - settled;
         }
       }
     }

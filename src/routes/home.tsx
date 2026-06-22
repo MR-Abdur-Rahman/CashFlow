@@ -557,12 +557,20 @@ function SplitDirectRow({ s }: { s: any }) {
   const total = Number(s.total_amount);
   const totalShares = shares.reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
   const myShare = total - totalShares;
-  const isMePaid = s.paid_by === "me";
   const isGroup = s.type === "group";
   const isMulti = !isGroup && shares.length > 1;
   const isPerson = !isGroup && shares.length <= 1;
   const isIncoming = !!s._isIncoming;
-  const isOtherPaid = !isMePaid || isIncoming;
+
+  // For incoming splits: paid_by="me" means the CREATOR paid (not the current user).
+  // paid_by_person_id set → check if it matches _myPersonId (current user's person record in creator's list)
+  // paid_by_person_id null → old split: paid_by==="me" means creator paid → owe; paid_by!=="me" → I paid → lent
+  const isMePaid = isIncoming
+    ? (s.paid_by_person_id != null
+        ? s.paid_by_person_id === s._myPersonId
+        : s.paid_by !== "me")
+    : s.paid_by === "me";
+  const isOtherPaid = !isMePaid;
 
   const description = s.description || (
     isGroup ? (s.groups?.name ?? "Group split")
@@ -644,26 +652,37 @@ function SplitDirectRow({ s }: { s: any }) {
   }
 
   // Me paid
-  const personName = s.people?.name ?? shares[0]?.person_name ?? "";
-  const peopleName = shares.length > 2
-    ? `${shares[0]?.person_name}, ${shares[1]?.person_name} +${shares.length - 2} more`
-    : shares.map((sh: any) => sh.person_name).filter(Boolean).join(", ");
+  // For incoming, the counterpart label is the creator; for own splits it's the person field.
+  const personName = isIncoming
+    ? (s.creator?.full_name ?? shares.find((sh: any) => sh.person_id !== s._myPersonId)?.person_name ?? "")
+    : (s.people?.name ?? shares[0]?.person_name ?? "");
+  const peopleName = isIncoming
+    ? (s.creator?.full_name ?? "")
+    : (shares.length > 2
+        ? `${shares[0]?.person_name}, ${shares[1]?.person_name} +${shares.length - 2} more`
+        : shares.map((sh: any) => sh.person_name).filter(Boolean).join(", "));
   const groupName = s.groups?.name ?? "Group";
   const shareCount = shares.length + 1;
   const perShare = shareCount > 0 ? total / shareCount : 0;
 
+  // Amount current user lent: own split = sum of others' shares; incoming = total minus own portion
+  const myPersonShareAmt = isIncoming
+    ? Number(shares.find((sh: any) => sh.person_id === s._myPersonId)?.share_amount ?? 0)
+    : 0;
+  const youLent = isIncoming ? total - myPersonShareAmt : totalShares;
+
   return (
-    <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
+    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
       <div className="px-4 py-3">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium truncate flex-1">{description}</p>
-          <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">{formatMoney(total)}</p>
+          <p className="text-sm font-mono font-semibold text-[#10B981] shrink-0">{formatMoney(total)}</p>
         </div>
         {isPerson && (
           <div className="flex items-center justify-between gap-2 mt-0.5">
             <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{personName}</p>
             <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
-              You lent {formatMoney(totalShares)}
+              You lent {formatMoney(youLent)}
             </p>
           </div>
         )}
@@ -672,13 +691,13 @@ function SplitDirectRow({ s }: { s: any }) {
             <div className="flex items-center justify-between gap-2 mt-0.5">
               <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{isGroup ? groupName : peopleName}</p>
               <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
-                {shares.length} × {formatMoney(perShare)}
+                {formatMoney(youLent)}
               </p>
             </div>
             <div className="flex items-center justify-between gap-2 mt-0.5">
               <p className="text-[12px] text-[#9CA3AF]">Paid by You</p>
               <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
-                You lent {formatMoney(totalShares)}
+                You lent {formatMoney(youLent)}
               </p>
             </div>
           </>
@@ -886,6 +905,12 @@ export function EditSplitSheet({ split, open, onOpenChange }: { split: any; open
     return "other";
   }, [whoPaid, target, personId, people, otherPayerId, participants, split.paid_by]);
 
+  const paidByPersonId = useMemo((): string | null => {
+    if (whoPaid === "me") return null;
+    if (target === "person") return personId || null;
+    return otherPayerId || null;
+  }, [whoPaid, target, personId, otherPayerId]);
+
   const mutation = useMutation({
     mutationFn: async () => {
       if (!total || total <= 0) throw new Error("Enter a valid amount");
@@ -900,6 +925,7 @@ export function EditSplitSheet({ split, open, onOpenChange }: { split: any; open
         description: description.trim(),
         total_amount: total,
         paid_by: paidByValue,
+        paid_by_person_id: paidByPersonId,
         split_type: splitType,
         category_id: categoryId || null,
         sub_category_id: subCatId || null,

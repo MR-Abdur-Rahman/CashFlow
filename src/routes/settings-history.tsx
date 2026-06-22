@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { transactionsQuery } from "@/lib/queries";
+import { transactionsQuery, incomingSplitsQuery } from "@/lib/queries";
 import { formatMoney } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { useState, useMemo } from "react";
@@ -39,9 +39,16 @@ function formatAnchorLabel(period: Period, anchor: Date) {
   return format(anchor, "yyyy");
 }
 
+function formatDateTime(date?: string, time?: string): string {
+  if (!date) return "";
+  const t = time?.slice(0, 5) ?? "00:00";
+  return `${date} ${t}`;
+}
+
 export default function HistoryPage() {
   const [searchParams] = useSearchParams();
   const { data: txns = [] } = useQuery(transactionsQuery());
+  const { data: incomingSplits = [] } = useQuery(incomingSplitsQuery());
   const [q, setQ] = useState("");
   const [type, setType] = useState<string>(searchParams.get("filter") ?? "all");
   const [period, setPeriod] = useState<Period>("monthly");
@@ -57,7 +64,7 @@ export default function HistoryPage() {
   const fromStr = useMemo(() => format(periodFrom, "yyyy-MM-dd"), [periodFrom]);
   const toStr = useMemo(() => format(periodTo, "yyyy-MM-dd"), [periodTo]);
 
-  const filtered = useMemo(() => {
+  const filteredTxns = useMemo(() => {
     return (txns as any[]).filter((t) => {
       if (t.date < fromStr || t.date > toStr) return false;
       if (type === "split") { if (!t.is_split) return false; }
@@ -81,14 +88,32 @@ export default function HistoryPage() {
     });
   }, [txns, q, type, fromStr, toStr]);
 
+  const filteredIncoming = useMemo(() => {
+    if (type !== "all" && type !== "split") return [];
+    return (incomingSplits as any[]).filter((s) => {
+      if (s.date < fromStr || s.date > toStr) return false;
+      if (!q) return true;
+      const hay = [
+        s.description,
+        s.creator?.full_name,
+        ...(s.split_shares ?? []).map((sh: any) => sh.person_name),
+      ].filter(Boolean).join(" ").toLowerCase();
+      return hay.includes(q.toLowerCase());
+    });
+  }, [incomingSplits, q, type, fromStr, toStr]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, any[]>();
-    for (const t of filtered) {
+    for (const t of filteredTxns) {
       if (!map.has(t.date)) map.set(t.date, []);
-      map.get(t.date)!.push(t);
+      map.get(t.date)!.push({ ...t, _kind: "txn" });
     }
-    return Array.from(map.entries());
-  }, [filtered]);
+    for (const s of filteredIncoming) {
+      if (!map.has(s.date)) map.set(s.date, []);
+      map.get(s.date)!.push({ ...s, _kind: "incoming-split" });
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a));
+  }, [filteredTxns, filteredIncoming]);
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-4">
@@ -141,11 +166,15 @@ export default function HistoryPage() {
         <div key={date}>
           <p className="text-xs uppercase text-muted-foreground mb-2 px-1 font-mono">{date}</p>
           <div className="rounded-xl overflow-hidden divide-y divide-border border border-border">
-            {items.map((t) => (
-              <SwipeRow key={t.id} onEdit={() => setEditTxn(t)} onDelete={() => setDeleteTxn(t)}>
-                <Row t={t} />
-              </SwipeRow>
-            ))}
+            {items.map((item) =>
+              item._kind === "incoming-split" ? (
+                <IncomingSplitRow key={`inc-${item.id}`} s={item} />
+              ) : (
+                <SwipeRow key={item.id} onEdit={() => setEditTxn(item)} onDelete={() => setDeleteTxn(item)}>
+                  <Row t={item} />
+                </SwipeRow>
+              )
+            )}
           </div>
         </div>
       ))}
@@ -250,6 +279,56 @@ function Row({ t }: { t: any }) {
       <div className="text-right">
         <p className={`text-sm font-mono font-semibold ${color}`}>{sign}{formatMoney(t.amount)}</p>
         <p className="text-[10px] text-muted-foreground font-mono">{t.time?.slice(0, 5)}</p>
+      </div>
+    </div>
+  );
+}
+
+function IncomingSplitRow({ s }: { s: any }) {
+  const shares = (s.split_shares ?? []) as any[];
+  const total = Number(s.total_amount);
+  const description = s.description || s.creator?.full_name || "Split";
+  const creatorName = s.creator?.full_name ?? (s.paid_by !== "me" ? s.paid_by : "Other");
+
+  // paid_by_person_id set → check if current user paid; null → paid_by!=="me" means current user paid
+  const isMePaid = s.paid_by_person_id != null
+    ? s.paid_by_person_id === s._myPersonId
+    : s.paid_by !== "me";
+
+  if (!isMePaid) {
+    const myShareRecord = shares.find((sh: any) => sh.person_id === s._myPersonId);
+    const youOwe = myShareRecord ? Number(myShareRecord.share_amount) : total;
+    return (
+      <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
+        <div className="px-4 py-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-medium truncate flex-1">{description}</p>
+            <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">{formatMoney(total)}</p>
+          </div>
+          <div className="flex items-center justify-between gap-2 mt-0.5">
+            <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{creatorName}</p>
+            <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">You owe {formatMoney(youOwe)}</p>
+          </div>
+          <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{formatDateTime(s.date, s.time)}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const myPersonShareAmt = Number(shares.find((sh: any) => sh.person_id === s._myPersonId)?.share_amount ?? 0);
+  const youLent = total - myPersonShareAmt;
+  return (
+    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
+      <div className="px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium truncate flex-1">{description}</p>
+          <p className="text-sm font-mono font-semibold text-[#10B981] shrink-0">{formatMoney(total)}</p>
+        </div>
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{creatorName}</p>
+          <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">You lent {formatMoney(youLent)}</p>
+        </div>
+        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{formatDateTime(s.date, s.time)}</p>
       </div>
     </div>
   );

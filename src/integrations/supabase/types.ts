@@ -445,6 +445,7 @@ export type Database = {
           group_id: string | null
           id: string
           paid_by: string
+          paid_by_person_id: string | null
           person_id: string | null
           split_type: string
           sub_category_id: string | null
@@ -462,6 +463,7 @@ export type Database = {
           group_id?: string | null
           id?: string
           paid_by: string
+          paid_by_person_id?: string | null
           person_id?: string | null
           split_type: string
           sub_category_id?: string | null
@@ -479,6 +481,7 @@ export type Database = {
           group_id?: string | null
           id?: string
           paid_by?: string
+          paid_by_person_id?: string | null
           person_id?: string | null
           split_type?: string
           sub_category_id?: string | null
