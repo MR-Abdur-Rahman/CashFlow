@@ -88,22 +88,23 @@ export default function Home() {
   const allSplitsForTab = useMemo(() => {
     console.log("OWN SPLITS IDs:", (ownSplits as any[]).map(s => s.id));
     console.log("INCOMING SPLITS IDs:", (incomingSplits as any[]).map(s => s.id));
-    const seen = new Set<string>();
-    const combined = [
-      ...(incomingSplits as any[]).map(s => ({
+    // Build a map keyed by split ID. Incoming version always wins over own version
+    // (with the explicit splitsQuery created_by filter, overlap should never occur).
+    const byId = new Map<string, any>();
+    for (const s of ownSplits as any[]) {
+      byId.set(s.id, { ...s, _isIncoming: false });
+    }
+    for (const s of incomingSplits as any[]) {
+      // Incoming always overwrites — a split cannot be both own and incoming
+      byId.set(s.id, {
         ...s,
         _isIncoming: true,
         _myPersonId: s._myPersonId ?? null,
         _createdByUserId: s._createdByUserId ?? null,
-      })),
-      ...(ownSplits as any[]).map(s => ({ ...s, _isIncoming: false })),
-    ];
-    return combined
-      .filter(s => {
-        if (seen.has(s.id)) return false;
-        seen.add(s.id);
-        return s.date >= dateFrom && s.date <= dateTo;
-      })
+      });
+    }
+    return Array.from(byId.values())
+      .filter(s => s.date >= dateFrom && s.date <= dateTo)
       .sort((a, b) =>
         a.date !== b.date
           ? b.date.localeCompare(a.date)
