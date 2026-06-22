@@ -574,19 +574,20 @@ function SplitDirectRow({ s }: { s: any }) {
   const isGroup = s.type === "group";
   const isMulti = !isGroup && shares.length > 1;
   const isPerson = !isGroup && shares.length <= 1;
-  const isIncoming = !!s._isIncoming;
+  const isIncoming = s._isIncoming === true; // must be explicitly true, not just truthy
 
   const isMePaid = (() => {
     if (!isIncoming) {
-      // Own split: "me" means current user paid
+      // User A's own split — "me" means User A paid
       return s.paid_by === "me";
     } else {
-      // Incoming split: "me" means the CREATOR paid, not current user
-      // So if paid_by === "me" → creator paid → current user OWES → isMePaid = false
-      // If paid_by !== "me" → current user paid → isMePaid = true
-      if (s.paid_by_person_id != null) {
+      // Incoming split seen by User B
+      // paid_by === "me" means the CREATOR (User A) paid → User B owes → isMePaid = false for User B
+      // paid_by !== "me" means User B paid → User B lent → isMePaid = true for User B
+      if (s.paid_by_person_id != null && s._myPersonId != null) {
         return s.paid_by_person_id === s._myPersonId;
       }
+      // fallback for old splits without paid_by_person_id
       return s.paid_by !== "me";
     }
   })();
