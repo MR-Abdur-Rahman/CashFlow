@@ -86,15 +86,17 @@ export default function Home() {
   });
 
   const allSplitsForTab = useMemo(() => {
+    console.log("OWN SPLITS IDs:", (ownSplits as any[]).map(s => s.id));
+    console.log("INCOMING SPLITS IDs:", (incomingSplits as any[]).map(s => s.id));
     const seen = new Set<string>();
     const combined = [
-      ...(ownSplits as any[]).map(s => ({ ...s, _isIncoming: false })),
       ...(incomingSplits as any[]).map(s => ({
         ...s,
         _isIncoming: true,
         _myPersonId: s._myPersonId ?? null,
         _createdByUserId: s._createdByUserId ?? null,
-      }))
+      })),
+      ...(ownSplits as any[]).map(s => ({ ...s, _isIncoming: false })),
     ];
     return combined
       .filter(s => {
