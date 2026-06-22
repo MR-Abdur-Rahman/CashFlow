@@ -87,8 +87,17 @@ export default function Home() {
 
   const allSplitsForTab = useMemo(() => {
     const seen = new Set<string>();
-    return [...(ownSplits as any[]), ...(incomingSplits as any[])]
-      .filter((s) => {
+    const combined = [
+      ...(ownSplits as any[]).map(s => ({ ...s, _isIncoming: false })),
+      ...(incomingSplits as any[]).map(s => ({
+        ...s,
+        _isIncoming: true,
+        _myPersonId: s._myPersonId ?? null,
+        _createdByUserId: s._createdByUserId ?? null,
+      }))
+    ];
+    return combined
+      .filter(s => {
         if (seen.has(s.id)) return false;
         seen.add(s.id);
         return s.date >= dateFrom && s.date <= dateTo;
