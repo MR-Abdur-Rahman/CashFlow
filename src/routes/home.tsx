@@ -567,6 +567,18 @@ function SplitDirectRow({ s }: { s: any }) {
           : s.paid_by !== "me")
       : s.paid_by === "me"
   });
+  if (s._isIncoming === true) {
+    console.log("INCOMING SPLIT DEBUG:", {
+      id: s.id,
+      isIncoming: s._isIncoming,
+      paid_by: s.paid_by,
+      paid_by_person_id: s.paid_by_person_id,
+      _myPersonId: s._myPersonId,
+      isMePaid_check: s.paid_by_person_id != null && s._myPersonId != null
+        ? s.paid_by_person_id === s._myPersonId
+        : s.paid_by !== "me"
+    });
+  }
   const shares = (s.split_shares ?? []) as any[];
   const total = Number(s.total_amount);
   const totalShares = shares.reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
