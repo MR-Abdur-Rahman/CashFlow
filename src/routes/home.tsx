@@ -616,6 +616,12 @@ function SplitDirectRow({ s }: { s: any }) {
   })();
   const isOtherPaid = !isMePaid;
 
+  console.log("ALL SPLIT DEBUG id:", String(s.id));
+  console.log("ALL SPLIT DEBUG isIncoming:", String(isIncoming));
+  console.log("ALL SPLIT DEBUG paid_by:", String(s.paid_by));
+  console.log("ALL SPLIT DEBUG isMePaid:", String(isMePaid));
+  console.log("ALL SPLIT DEBUG isOtherPaid:", String(isOtherPaid));
+
   const description = s.description || (
     isGroup ? (s.groups?.name ?? "Group split")
     : isPerson ? `Split w/ ${shares[0]?.person_name ?? s.people?.name ?? ""}`
@@ -623,6 +629,7 @@ function SplitDirectRow({ s }: { s: any }) {
   );
 
   if (isOtherPaid) {
+    console.log("ALL SPLIT DEBUG branch: You owe (isOtherPaid=true), id:", String(s.id));
     // Resolve payer name
     let paidByName: string;
     if (isIncoming) {
@@ -696,6 +703,7 @@ function SplitDirectRow({ s }: { s: any }) {
   }
 
   // Me paid
+  console.log("ALL SPLIT DEBUG branch: You lent (isOtherPaid=false), id:", String(s.id));
   // For incoming, the counterpart label is the creator; for own splits it's the person field.
   const personName = isIncoming
     ? (s.creator?.full_name ?? shares.find((sh: any) => sh.person_id !== s._myPersonId)?.person_name ?? "")
