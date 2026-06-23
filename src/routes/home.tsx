@@ -585,9 +585,13 @@ export function SplitDirectRow({ s }: { s: any }) {
   const personLabel = isIncoming
     ? (s.creator?.full_name ?? "")
     : (s.people?.name ?? shares[0]?.person_name ?? "");
-  // People split — always show participant names from split_shares (never the creator), max 2 then "+N more"
-  const shareNames = shares.map((sh: any) => sh.person_name).filter(Boolean) as string[];
-  const nameList = shareNames.slice(0, 2).join(", ") + (shares.length > 2 ? ` +${shares.length - 2} more` : "");
+  // People split names. Own split: all share names (creator = viewer, excluded already).
+  // Incoming split: creator's name + other participants, EXCLUDING the viewer's own share
+  // (share person_name is from the creator's contact list, so it's the viewer's own name — skip it).
+  const peopleNames: string[] = isIncoming
+    ? [s.creator?.full_name, ...shares.filter((sh: any) => sh.person_id !== s._myPersonId).map((sh: any) => sh.person_name)].filter(Boolean)
+    : shares.map((sh: any) => sh.person_name).filter(Boolean);
+  const nameList = peopleNames.slice(0, 2).join(", ") + (peopleNames.length > 2 ? ` +${peopleNames.length - 2} more` : "");
   // Group → group name; People → participant names; Person → other party (creator for incoming)
   const line2Name = isGroup ? groupName : isPerson ? personLabel : nameList;
 

@@ -116,9 +116,14 @@ export default function HistoryPage() {
       if (!map.has(date)) map.set(date, []);
       map.get(date)!.push(item);
     };
-    for (const t of filteredTxns) push(t.date, { ...t, _kind: "txn", _sortKey: `${t.date}T${t.time ?? "00:00"}` });
-    for (const s of filteredSplits) push(s.date, { ...s, _kind: "split", _sortKey: `${s.date}T${s.time ?? "00:00"}` });
-    for (const arr of map.values()) arr.sort((a, b) => b._sortKey.localeCompare(a._sortKey));
+    for (const t of filteredTxns) push(t.date, { ...t, _kind: "txn" });
+    for (const s of filteredSplits) push(s.date, { ...s, _kind: "split" });
+    // Sort within each date: time DESC, then created_at DESC (most recently created first).
+    for (const arr of map.values()) arr.sort((a, b) => {
+      const at = (a.time ?? "00:00").slice(0, 8), bt = (b.time ?? "00:00").slice(0, 8);
+      if (at !== bt) return bt.localeCompare(at);
+      return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+    });
     return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a));
   }, [filteredTxns, filteredSplits]);
 
