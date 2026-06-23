@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { transactionsQuery, incomingSplitsQuery } from "@/lib/queries";
+import { transactionsQuery, incomingSplitsQuery, splitsQuery } from "@/lib/queries";
+import { SplitDirectRow, EditSplitSheet } from "./home";
 import { formatMoney } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { useState, useMemo } from "react";
@@ -39,15 +40,10 @@ function formatAnchorLabel(period: Period, anchor: Date) {
   return format(anchor, "yyyy");
 }
 
-function formatDateTime(date?: string, time?: string): string {
-  if (!date) return "";
-  const t = time?.slice(0, 5) ?? "00:00";
-  return format(new Date(`${date}T${t}`), "MMM dd, yyyy · hh:mm a");
-}
-
 export default function HistoryPage() {
   const [searchParams] = useSearchParams();
   const { data: txns = [] } = useQuery(transactionsQuery());
+  const { data: ownSplits = [] } = useQuery(splitsQuery());
   const { data: incomingSplits = [] } = useQuery(incomingSplitsQuery());
   const [q, setQ] = useState("");
   const [type, setType] = useState<string>(searchParams.get("filter") ?? "all");
@@ -55,6 +51,8 @@ export default function HistoryPage() {
   const [anchor, setAnchor] = useState(new Date());
   const [editTxn, setEditTxn] = useState<any | null>(null);
   const [deleteTxn, setDeleteTxn] = useState<any | null>(null);
+  const [editSplit, setEditSplit] = useState<any | null>(null);
+  const [deleteSplit, setDeleteSplit] = useState<any | null>(null);
   const qc = useQueryClient();
 
   const { from: periodFrom, to: periodTo } = useMemo(
@@ -64,11 +62,13 @@ export default function HistoryPage() {
   const fromStr = useMemo(() => format(periodFrom, "yyyy-MM-dd"), [periodFrom]);
   const toStr = useMemo(() => format(periodTo, "yyyy-MM-dd"), [periodTo]);
 
+  // Non-split transactions only — own splits are rendered via SplitDirectRow (same as Home).
   const filteredTxns = useMemo(() => {
     return (txns as any[]).filter((t) => {
+      if (t.is_split) return false;
       if (t.date < fromStr || t.date > toStr) return false;
-      if (type === "split") { if (!t.is_split) return false; }
-      else if (type !== "all" && t.type !== type) return false;
+      if (type === "split") return false;
+      if (type !== "all" && t.type !== type) return false;
       if (!q) return true;
       const hay = [
         t.note,
@@ -78,42 +78,49 @@ export default function HistoryPage() {
         t.accounts?.institution,
         t.income_source_text,
         t.to_account?.label,
-        t.split?.description,
-        t.split?.people?.name,
-        t.split?.groups?.name,
-        t.split?.paid_by,
-        ...(t.split?.split_shares ?? []).map((sh: any) => sh.person_name),
       ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(q.toLowerCase());
     });
   }, [txns, q, type, fromStr, toStr]);
 
-  const filteredIncoming = useMemo(() => {
+  // Own + incoming splits, deduped (incoming version wins) — same as Home page.
+  const allSplits = useMemo(() => {
+    const byId = new Map<string, any>();
+    for (const s of ownSplits as any[]) byId.set(s.id, { ...s, _isIncoming: false });
+    for (const s of incomingSplits as any[]) {
+      byId.set(s.id, { ...s, _isIncoming: true, _myPersonId: s._myPersonId ?? null, _createdByUserId: s._createdByUserId ?? null });
+    }
+    return [...byId.values()];
+  }, [ownSplits, incomingSplits]);
+
+  const filteredSplits = useMemo(() => {
     if (type !== "all" && type !== "split") return [];
-    return (incomingSplits as any[]).filter((s) => {
+    return allSplits.filter((s) => {
       if (s.date < fromStr || s.date > toStr) return false;
       if (!q) return true;
       const hay = [
         s.description,
         s.creator?.full_name,
+        s.people?.name,
+        s.groups?.name,
+        s.paid_by,
         ...(s.split_shares ?? []).map((sh: any) => sh.person_name),
       ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(q.toLowerCase());
     });
-  }, [incomingSplits, q, type, fromStr, toStr]);
+  }, [allSplits, q, type, fromStr, toStr]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, any[]>();
-    for (const t of filteredTxns) {
-      if (!map.has(t.date)) map.set(t.date, []);
-      map.get(t.date)!.push({ ...t, _kind: "txn" });
-    }
-    for (const s of filteredIncoming) {
-      if (!map.has(s.date)) map.set(s.date, []);
-      map.get(s.date)!.push({ ...s, _kind: "incoming-split" });
-    }
+    const push = (date: string, item: any) => {
+      if (!map.has(date)) map.set(date, []);
+      map.get(date)!.push(item);
+    };
+    for (const t of filteredTxns) push(t.date, { ...t, _kind: "txn", _sortKey: `${t.date}T${t.time ?? "00:00"}` });
+    for (const s of filteredSplits) push(s.date, { ...s, _kind: "split", _sortKey: `${s.date}T${s.time ?? "00:00"}` });
+    for (const arr of map.values()) arr.sort((a, b) => b._sortKey.localeCompare(a._sortKey));
     return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a));
-  }, [filteredTxns, filteredIncoming]);
+  }, [filteredTxns, filteredSplits]);
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-4">
@@ -164,11 +171,13 @@ export default function HistoryPage() {
       )}
       {grouped.map(([date, items]) => (
         <div key={date}>
-          <p className="text-xs uppercase text-muted-foreground mb-2 px-1 font-mono">{date}</p>
+          <p className="text-xs uppercase text-muted-foreground mb-2 px-1 font-mono">{format(new Date(`${date}T00:00`), "MMM dd, yyyy")}</p>
           <div className="rounded-xl overflow-hidden divide-y divide-border border border-border">
             {items.map((item) =>
-              item._kind === "incoming-split" ? (
-                <IncomingSplitRow key={`inc-${item.id}`} s={item} />
+              item._kind === "split" ? (
+                <SwipeRow key={`split-${item.id}`} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}>
+                  <SplitDirectRow s={item} />
+                </SwipeRow>
               ) : (
                 <SwipeRow key={item.id} onEdit={() => setEditTxn(item)} onDelete={() => setDeleteTxn(item)}>
                   <Row t={item} />
@@ -182,6 +191,39 @@ export default function HistoryPage() {
       {editTxn && (
         <EditTransactionSheet txn={editTxn} open={!!editTxn} onOpenChange={(o) => { if (!o) setEditTxn(null); }} />
       )}
+
+      {editSplit && (
+        <EditSplitSheet split={editSplit} open={!!editSplit} onOpenChange={(o) => { if (!o) setEditSplit(null); }} />
+      )}
+
+      <AlertDialog open={!!deleteSplit} onOpenChange={(o) => { if (!o) setDeleteSplit(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={async () => {
+                if (!deleteSplit) return;
+                const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
+                if (error) toast.error(error.message);
+                else {
+                  toast.success("Split deleted");
+                  qc.invalidateQueries({ queryKey: ["splits"] });
+                  qc.invalidateQueries({ queryKey: ["transactions"] });
+                  qc.invalidateQueries({ queryKey: ["accounts"] });
+                }
+                setDeleteSplit(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!deleteTxn} onOpenChange={(o) => { if (!o) setDeleteTxn(null); }}>
         <AlertDialogContent>
@@ -279,56 +321,6 @@ function Row({ t }: { t: any }) {
       <div className="text-right">
         <p className={`text-sm font-mono font-semibold ${color}`}>{sign}{formatMoney(t.amount)}</p>
         <p className="text-[10px] text-muted-foreground font-mono">{t.time?.slice(0, 5)}</p>
-      </div>
-    </div>
-  );
-}
-
-function IncomingSplitRow({ s }: { s: any }) {
-  const shares = (s.split_shares ?? []) as any[];
-  const total = Number(s.total_amount);
-  const description = s.description || s.creator?.full_name || "Split";
-  const creatorName = s.creator?.full_name ?? (s.paid_by !== "me" ? s.paid_by : "Other");
-
-  // paid_by_person_id set → check if current user paid; null → paid_by!=="me" means current user paid
-  const isMePaid = s.paid_by_person_id != null
-    ? s.paid_by_person_id === s._myPersonId
-    : s.paid_by !== "me";
-
-  if (!isMePaid) {
-    const myShareRecord = shares.find((sh: any) => sh.person_id === s._myPersonId);
-    const youOwe = myShareRecord ? Number(myShareRecord.share_amount) : total;
-    return (
-      <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
-        <div className="px-4 py-3">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-medium truncate flex-1">{description}</p>
-            <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">{formatMoney(total)}</p>
-          </div>
-          <div className="flex items-center justify-between gap-2 mt-0.5">
-            <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{creatorName}</p>
-            <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">You owe {formatMoney(youOwe)}</p>
-          </div>
-          <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{formatDateTime(s.date, s.time)}</p>
-        </div>
-      </div>
-    );
-  }
-
-  const myPersonShareAmt = Number(shares.find((sh: any) => sh.person_id === s._myPersonId)?.share_amount ?? 0);
-  const youLent = total - myPersonShareAmt;
-  return (
-    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
-      <div className="px-4 py-3">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium truncate flex-1">{description}</p>
-          <p className="text-sm font-mono font-semibold text-[#10B981] shrink-0">{formatMoney(total)}</p>
-        </div>
-        <div className="flex items-center justify-between gap-2 mt-0.5">
-          <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{creatorName}</p>
-          <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">You lent {formatMoney(youLent)}</p>
-        </div>
-        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{formatDateTime(s.date, s.time)}</p>
       </div>
     </div>
   );

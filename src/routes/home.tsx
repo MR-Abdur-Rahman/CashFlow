@@ -562,7 +562,7 @@ function SplitRowContent({ t }: { t: any }) {
   );
 }
 
-function SplitDirectRow({ s }: { s: any }) {
+export function SplitDirectRow({ s }: { s: any }) {
   const shares = (s.split_shares ?? []) as any[];
   const total = Number(s.total_amount);
   const totalShares = shares.reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
