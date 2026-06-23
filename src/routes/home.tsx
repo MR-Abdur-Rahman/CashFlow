@@ -581,17 +581,21 @@ function SplitDirectRow({ s }: { s: any }) {
   })();
 
   // Counterpart label on line 2
-  const groupName = s.groups?.name ?? "Group";
+  const groupName = s.groups?.name ?? s.group?.name ?? s.group_name ?? "Unknown Group";
   const personLabel = isIncoming
     ? (s.creator?.full_name ?? "")
     : (s.people?.name ?? shares[0]?.person_name ?? "");
-  // Names for people split — exclude the viewer's own share; max 2 then "+N more"
-  const otherShares = isIncoming ? shares.filter((sh: any) => sh.person_id !== s._myPersonId) : shares;
-  const otherNames = otherShares.map((sh: any) => sh.person_name).filter(Boolean) as string[];
-  const nameList = otherNames.length > 2
-    ? `${otherNames[0]}, ${otherNames[1]} +${otherNames.length - 2} more`
-    : otherNames.join(", ");
-  const line2Name = isPerson ? personLabel : isGroup ? groupName : (nameList || personLabel);
+  // People split — always show participant names from split_shares (never the creator), max 2 then "+N more"
+  const shareNames = shares.map((sh: any) => sh.person_name).filter(Boolean) as string[];
+  const nameList = shareNames.slice(0, 2).join(", ") + (shares.length > 2 ? ` +${shares.length - 2} more` : "");
+  const line2Name = isPerson ? personLabel : isGroup ? groupName : nameList;
+
+  if (isMulti || isGroup) {
+    console.log("SHARES DEBUG:", JSON.stringify(shares));
+    console.log("TOTAL:", total);
+    console.log("SHARES LENGTH:", shares.length);
+    console.log("GROUP DEBUG:", JSON.stringify({ groups: s.groups, group: s.group, type: s.type }));
+  }
 
   const description = s.description || (
     isGroup ? (s.groups?.name ?? "Group split")
@@ -653,7 +657,7 @@ function SplitDirectRow({ s }: { s: any }) {
             <div className="flex items-center justify-between gap-2 mt-0.5">
               <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{line2Name}</p>
               <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
-                {isMePaid ? `${owersCount} × ${formatMoney(perShare)}` : formatMoney(perShare)}
+                {isMePaid ? `${owersCount} × ${formatMoney(perShare)}` : `${formatMoney(perShare)} per share`}
               </p>
             </div>
             {isMePaid ? (
