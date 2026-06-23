@@ -42,7 +42,7 @@ function formatAnchorLabel(period: Period, anchor: Date) {
 function formatDateTime(date?: string, time?: string): string {
   if (!date) return "";
   const t = time?.slice(0, 5) ?? "00:00";
-  return `${date} ${t}`;
+  return format(new Date(`${date}T${t}`), "MMM dd, yyyy · hh:mm a");
 }
 
 export default function HistoryPage() {
