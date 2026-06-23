@@ -566,28 +566,32 @@ function SplitDirectRow({ s }: { s: any }) {
   const shares = (s.split_shares ?? []) as any[];
   const total = Number(s.total_amount);
   const totalShares = shares.reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
-  const myShare = total - totalShares;
   const isGroup = s.type === "group";
   const isMulti = !isGroup && shares.length > 1;
   const isPerson = !isGroup && shares.length <= 1;
   const isIncoming = s._isIncoming === true; // must be explicitly true, not just truthy
 
+  // Did the CURRENT VIEWER pay? For incoming, paid_by="me" means the CREATOR paid (not the viewer).
   const isMePaid = (() => {
-    if (!isIncoming) {
-      // User A's own split — "me" means User A paid
-      return s.paid_by === "me";
-    } else {
-      // Incoming split seen by User B
-      // paid_by === "me" means the CREATOR (User A) paid → User B owes → isMePaid = false for User B
-      // paid_by !== "me" means User B paid → User B lent → isMePaid = true for User B
-      if (s.paid_by_person_id != null && s._myPersonId != null) {
-        return s.paid_by_person_id === s._myPersonId;
-      }
-      // fallback for old splits without paid_by_person_id
-      return s.paid_by !== "me";
+    if (!isIncoming) return s.paid_by === "me";
+    if (s.paid_by_person_id != null && s._myPersonId != null) {
+      return s.paid_by_person_id === s._myPersonId;
     }
+    return s.paid_by !== "me"; // fallback for old splits without paid_by_person_id
   })();
-  const isOtherPaid = !isMePaid;
+
+  // Counterpart label on line 2
+  const groupName = s.groups?.name ?? "Group";
+  const personLabel = isIncoming
+    ? (s.creator?.full_name ?? "")
+    : (s.people?.name ?? shares[0]?.person_name ?? "");
+  // Names for people split — exclude the viewer's own share; max 2 then "+N more"
+  const otherShares = isIncoming ? shares.filter((sh: any) => sh.person_id !== s._myPersonId) : shares;
+  const otherNames = otherShares.map((sh: any) => sh.person_name).filter(Boolean) as string[];
+  const nameList = otherNames.length > 2
+    ? `${otherNames[0]}, ${otherNames[1]} +${otherNames.length - 2} more`
+    : otherNames.join(", ");
+  const line2Name = isPerson ? personLabel : isGroup ? groupName : (nameList || personLabel);
 
   const description = s.description || (
     isGroup ? (s.groups?.name ?? "Group split")
@@ -595,131 +599,76 @@ function SplitDirectRow({ s }: { s: any }) {
     : "Split"
   );
 
-  if (isOtherPaid) {
-    // Resolve payer name
-    let paidByName: string;
-    if (isIncoming) {
-      paidByName = s.creator?.full_name ?? (s.paid_by !== "me" ? s.paid_by : "Other");
-    } else if (s.paid_by === "other" || !s.paid_by) {
-      paidByName = shares.find((sh: any) => sh.person_name)?.person_name ?? "Other";
-    } else {
-      paidByName = s.paid_by;
-    }
-
-    // Resolve how much the current user owes
-    let youOwe: number;
-    if (isIncoming && s._myPersonId) {
-      const myShareRecord = shares.find((sh: any) => sh.person_id === s._myPersonId);
-      youOwe = myShareRecord ? Number(myShareRecord.share_amount) : myShare;
-    } else {
-      youOwe = myShare;
-    }
-
-    // Participant names for multi/group line 2 — exclude current user's own share record
-    const otherShares = shares.filter((sh: any) => sh.person_id !== s._myPersonId);
-    const participantNames = otherShares.map((sh: any) => sh.person_name).filter(Boolean) as string[];
-    const participantsDisplay = participantNames.length > 2
-      ? `${participantNames[0]}, ${participantNames[1]} +${participantNames.length - 2} more`
-      : participantNames.join(", ") || paidByName;
-    const groupName = s.groups?.name ?? "Group";
-
-    return (
-      <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
-        <div className="px-4 py-3">
-          {/* Line 1: description + total */}
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-medium truncate flex-1">{description}</p>
-            <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">{formatMoney(total)}</p>
-          </div>
-
-          {/* Person split — 2 lines */}
-          {isPerson && (
-            <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{paidByName}</p>
-              <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">
-                You owe {formatMoney(youOwe)}
-              </p>
-            </div>
-          )}
-
-          {/* People / Group split — 3 lines */}
-          {(isMulti || isGroup) && (
-            <>
-              <div className="flex items-center justify-between gap-2 mt-0.5">
-                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
-                  {isGroup ? groupName : participantsDisplay}
-                </p>
-                <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
-                  {formatMoney(youOwe)}
-                </p>
-              </div>
-              <div className="flex items-center justify-between gap-2 mt-0.5">
-                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">Paid by {paidByName}</p>
-                <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">
-                  You owe {formatMoney(youOwe)}
-                </p>
-              </div>
-            </>
-          )}
-
-          <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{formatDateTime(s.date, s.time)}</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Me paid
-  // For incoming, the counterpart label is the creator; for own splits it's the person field.
-  const personName = isIncoming
-    ? (s.creator?.full_name ?? shares.find((sh: any) => sh.person_id !== s._myPersonId)?.person_name ?? "")
-    : (s.people?.name ?? shares[0]?.person_name ?? "");
-  const peopleName = isIncoming
-    ? (s.creator?.full_name ?? "")
-    : (shares.length > 2
-        ? `${shares[0]?.person_name}, ${shares[1]?.person_name} +${shares.length - 2} more`
-        : shares.map((sh: any) => sh.person_name).filter(Boolean).join(", "));
-  const groupName = s.groups?.name ?? "Group";
-  const shareCount = shares.length + 1;
-  const perShare = shareCount > 0 ? total / shareCount : 0;
-
-  // Amount current user lent: own split = sum of others' shares; incoming = total minus own portion
-  const myPersonShareAmt = isIncoming
+  // Amounts
+  const myShareAmt = isIncoming
     ? Number(shares.find((sh: any) => sh.person_id === s._myPersonId)?.share_amount ?? 0)
     : 0;
-  const youLent = isIncoming ? total - myPersonShareAmt : totalShares;
+  const creatorImplicit = total - totalShares; // creator's own (unrecorded) portion
+  const youLent = isIncoming ? total - myShareAmt : totalShares; // what others owe the viewer
+  const youOwe = isIncoming ? myShareAmt : creatorImplicit;       // what the viewer owes
+  const perShare = shares.length > 0 ? total / (shares.length + 1) : total;
+  const owersCount = shares.length; // people who owe the viewer when the viewer paid
+
+  // Account line — shown only when the viewer paid. Own split → account label; incoming → not recorded.
+  const accountLabel = isMePaid
+    ? (isIncoming ? "No account selected" : (s.accounts?.label ?? "No account selected"))
+    : null;
+
+  const dateNode = (
+    <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5 text-right">{formatDateTime(s.date, s.time)}</p>
+  );
 
   return (
-    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
+    <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
       <div className="px-4 py-3">
+        {/* Line 1: description + total */}
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium truncate flex-1">{description}</p>
-          <p className="text-sm font-mono font-semibold text-[#10B981] shrink-0">{formatMoney(total)}</p>
+          <p className="text-sm font-medium text-foreground truncate flex-1">{description}</p>
+          <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">{formatMoney(total)}</p>
         </div>
+
+        {/* Person split */}
         {isPerson && (
-          <div className="flex items-center justify-between gap-2 mt-0.5">
-            <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{personName}</p>
-            <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
-              You lent {formatMoney(youLent)}
-            </p>
-          </div>
+          <>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{line2Name}</p>
+              {isMePaid ? (
+                <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">You lent {formatMoney(youLent)}</p>
+              ) : (
+                <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">You owe {formatMoney(youOwe)}</p>
+              )}
+            </div>
+            {isMePaid ? (
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{accountLabel}</p>
+                {dateNode}
+              </div>
+            ) : dateNode}
+          </>
         )}
+
+        {/* People / Group split */}
         {(isMulti || isGroup) && (
           <>
             <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{isGroup ? groupName : peopleName}</p>
+              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{line2Name}</p>
               <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
-                {formatMoney(youLent)}
+                {isMePaid ? `${owersCount} × ${formatMoney(perShare)}` : formatMoney(perShare)}
               </p>
             </div>
-            <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF]">Paid by You</p>
-              <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
-                You lent {formatMoney(youLent)}
-              </p>
-            </div>
+            {isMePaid ? (
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{accountLabel}</p>
+                <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">You lent {formatMoney(youLent)}</p>
+              </div>
+            ) : (
+              <div className="flex items-center justify-end gap-2 mt-0.5">
+                <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">You owe {formatMoney(youOwe)}</p>
+              </div>
+            )}
+            {dateNode}
           </>
         )}
-        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{formatDateTime(s.date, s.time)}</p>
       </div>
     </div>
   );

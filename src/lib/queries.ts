@@ -145,7 +145,7 @@ export const splitsQuery = () =>
       if (!u.user) return [];
       const { data, error } = await supabase
         .from("splits")
-        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name)")
+        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name), accounts:account_id(label)")
         .eq("created_by", u.user.id)
         .order("date", { ascending: false })
         .order("time", { ascending: false })
