@@ -110,6 +110,12 @@ export default function GroupDetail() {
 
   if (!group) return <div className="p-6">Group not found</div>;
 
+  // Detect legacy mixed groups (both local and linked members) — splits misbehave for these.
+  const memberPeople = ((group as any).group_members ?? []).map((m: any) => m.people).filter(Boolean);
+  const hasLinkedMember = memberPeople.some((p: any) => !!p.linked_user_id);
+  const hasLocalMember = memberPeople.some((p: any) => !p.linked_user_id);
+  const isMixedGroup = hasLinkedMember && hasLocalMember;
+
   return (
     <div className="px-4 pt-4 pb-24 space-y-5">
       <Link to="/split" className="inline-flex items-center text-sm text-muted-foreground">
@@ -134,8 +140,14 @@ export default function GroupDetail() {
         </div>
       )}
 
+      {isMixedGroup && (
+        <div className="rounded-xl border border-[#F59E0B]/40 bg-[#F59E0B]/10 px-3 py-2.5 text-xs text-[#F59E0B]">
+          This group has both local and linked members. Splits may not work correctly.
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="outline" onClick={() => setAddSplitOpen(true)}><Plus className="h-4 w-4 mr-2" /> Add Split</Button>
+        <Button variant="outline" disabled={isMixedGroup} onClick={() => setAddSplitOpen(true)}><Plus className="h-4 w-4 mr-2" /> Add Split</Button>
         <Button variant="outline" onClick={() => setEdit(true)}><Pencil className="h-4 w-4 mr-2" /> Edit</Button>
       </div>
       <div className="grid grid-cols-2 gap-2">

@@ -22,6 +22,15 @@ export function AddGroupDialog({ open, onOpenChange, edit }: { open: boolean; on
     }
   }, [open, edit]);
 
+  // Lock member list to one type (linked vs local) once a member is chosen, to prevent mixing.
+  const selectedPeople = (people as any[]).filter((p) => members.includes(p.id));
+  const lockMode: "linked" | "local" | null = selectedPeople.length > 0
+    ? (selectedPeople[0].linked_user_id ? "linked" : "local")
+    : null;
+  const visiblePeople = lockMode === null
+    ? (people as any[])
+    : (people as any[]).filter((p) => members.includes(p.id) || (lockMode === "linked" ? !!p.linked_user_id : !p.linked_user_id));
+
   const mutation = useMutation({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
@@ -53,7 +62,19 @@ export function AddGroupDialog({ open, onOpenChange, edit }: { open: boolean; on
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogTitle>{edit ? "Edit group" : "Create group"}</DialogTitle>
-        <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const hasLinked = selectedPeople.some((p) => !!p.linked_user_id);
+            const hasLocal = selectedPeople.some((p) => !p.linked_user_id);
+            if (hasLinked && hasLocal) {
+              toast.error("Groups cannot have both local and linked members");
+              return;
+            }
+            mutation.mutate();
+          }}
+          className="space-y-4"
+        >
           <div className="space-y-1.5">
             <Label>Name</Label>
             <Input required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Roomies" />
@@ -62,7 +83,7 @@ export function AddGroupDialog({ open, onOpenChange, edit }: { open: boolean; on
             <Label>Members</Label>
             <div className="max-h-60 overflow-y-auto rounded-lg border border-border divide-y divide-border">
               {people.length === 0 && <p className="p-3 text-sm text-muted-foreground">Add people first</p>}
-              {people.map((p) => (
+              {visiblePeople.map((p) => (
                 <label key={p.id} className="flex items-center gap-3 p-3 cursor-pointer">
                   <Checkbox
                     checked={members.includes(p.id)}
@@ -72,6 +93,11 @@ export function AddGroupDialog({ open, onOpenChange, edit }: { open: boolean; on
                 </label>
               ))}
             </div>
+            {lockMode !== null && (
+              <p className="text-xs text-muted-foreground">
+                {lockMode === "linked" ? "Only linked CashFlow users can be added" : "Only local contacts can be added"}
+              </p>
+            )}
           </div>
           <Button type="submit" className="w-full" disabled={mutation.isPending}>Save</Button>
         </form>

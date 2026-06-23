@@ -591,22 +591,6 @@ function SplitDirectRow({ s }: { s: any }) {
   // Group → group name; People → participant names; Person → other party (creator for incoming)
   const line2Name = isGroup ? groupName : isPerson ? personLabel : nameList;
 
-  console.log("RAW SPLIT:", JSON.stringify({
-    id: s.id,
-    type: s.type,
-    description: s.description,
-    group_id: s.group_id,
-    groups: s.groups,
-    isIncoming: s._isIncoming,
-    shares: (s.split_shares ?? []).map((sh: any) => ({
-      name: sh.person_name,
-      id: sh.person_id,
-      amount: sh.share_amount,
-    })),
-    creator: s.creator,
-    created_by: s.created_by,
-  }));
-
   const description = s.description || (
     isGroup ? (s.groups?.name ?? "Group split")
     : isPerson ? `Split w/ ${shares[0]?.person_name ?? s.people?.name ?? ""}`

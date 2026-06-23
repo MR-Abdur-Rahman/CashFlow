@@ -318,6 +318,16 @@ function MultiPersonPickerSheet({
     onOpenChange(false);
   }
 
+  // Once a person is selected, lock the list to matching type (linked vs local) to prevent mixing.
+  const peopleArr = people as any[];
+  const checkedPeople = peopleArr.filter((p) => checked.has(p.id));
+  const lockMode: "linked" | "local" | null = checkedPeople.length > 0
+    ? (checkedPeople[0].linked_user_id ? "linked" : "local")
+    : null;
+  const visiblePeople = lockMode === null
+    ? peopleArr
+    : peopleArr.filter((p) => checked.has(p.id) || (lockMode === "linked" ? !!p.linked_user_id : !p.linked_user_id));
+
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
@@ -331,9 +341,14 @@ function MultiPersonPickerSheet({
               <button type="button" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
           </div>
+          {lockMode !== null && (
+            <p className="px-5 py-2 text-xs text-muted-foreground bg-secondary/30 border-b border-border">
+              {lockMode === "linked" ? "Only linked CashFlow users can be added" : "Only local contacts can be added"}
+            </p>
+          )}
           <div className="flex-1 overflow-y-auto divide-y divide-border">
-            {(people as any[]).length === 0 && <p className="text-sm text-muted-foreground text-center py-10">No people yet. Tap + to add.</p>}
-            {(people as any[]).map((p) => (
+            {visiblePeople.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">No people yet. Tap + to add.</p>}
+            {visiblePeople.map((p) => (
               <div key={p.id} onClick={() => toggle(p.id)}
                 className="flex items-center gap-3 px-5 py-4 bg-card active:bg-secondary/40 cursor-pointer">
                 <div className={cn("h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
