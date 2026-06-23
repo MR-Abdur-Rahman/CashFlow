@@ -581,20 +581,23 @@ function SplitDirectRow({ s }: { s: any }) {
   })();
 
   // Counterpart label on line 2
-  const groupName = s.groups?.name ?? s.group?.name ?? s.group_name ?? "Unknown Group";
+  const groupName = s.groups?.name ?? "Unknown Group";
   const personLabel = isIncoming
     ? (s.creator?.full_name ?? "")
     : (s.people?.name ?? shares[0]?.person_name ?? "");
   // People split — always show participant names from split_shares (never the creator), max 2 then "+N more"
   const shareNames = shares.map((sh: any) => sh.person_name).filter(Boolean) as string[];
   const nameList = shareNames.slice(0, 2).join(", ") + (shares.length > 2 ? ` +${shares.length - 2} more` : "");
-  const line2Name = isPerson ? personLabel : isGroup ? groupName : nameList;
+  // Group → group name; People → participant names; Person → other party (creator for incoming)
+  const line2Name = isGroup ? groupName : isPerson ? personLabel : nameList;
 
   if (isMulti || isGroup) {
-    console.log("SHARES DEBUG:", JSON.stringify(shares));
-    console.log("TOTAL:", total);
-    console.log("SHARES LENGTH:", shares.length);
-    console.log("GROUP DEBUG:", JSON.stringify({ groups: s.groups, group: s.group, type: s.type }));
+    console.log("GROUP NAME DEBUG:", JSON.stringify({ groups: s.groups, group_id: s.group_id, type: s.type }));
+    console.log("GROUP SHARE DEBUG:", JSON.stringify({
+      total: s.total_amount,
+      shares_count: shares.length,
+      shares: shares.map((sh: any) => ({ name: sh.person_name, amount: sh.share_amount })),
+    }));
   }
 
   const description = s.description || (
@@ -610,7 +613,9 @@ function SplitDirectRow({ s }: { s: any }) {
   const creatorImplicit = total - totalShares; // creator's own (unrecorded) portion
   const youLent = isIncoming ? total - myShareAmt : totalShares; // what others owe the viewer
   const youOwe = isIncoming ? myShareAmt : creatorImplicit;       // what the viewer owes
-  const perShare = shares.length > 0 ? total / (shares.length + 1) : total;
+  // Per-share = the actual recorded amount per participant (avoids guessing creator inclusion).
+  // For a LKR 3,000 split among 3 (creator + 2 members), shares hold 2 × 1,000 → perShare = 1,000.
+  const perShare = shares.length > 0 ? totalShares / shares.length : total;
   const owersCount = shares.length; // people who owe the viewer when the viewer paid
 
   // Account line — shown only when the viewer paid. Own split → account label; incoming → not recorded.
