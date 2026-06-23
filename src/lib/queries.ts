@@ -162,16 +162,14 @@ export const incomingSplitsQuery = () =>
     queryKey: ["splits", "incoming"],
     queryFn: async () => {
       const { data: u } = await supabase.auth.getUser();
-      if (!u.user) { console.log("[incomingSplits] no auth user"); return []; }
-      console.log("[incomingSplits] auth uid:", u.user.id);
+      if (!u.user) return [];
 
       // Step 1: people records in OTHER users' lists that represent the current user
       const { data: linkedPeople, error: e1 } = await supabase
         .from("people")
         .select("id, user_id, name")
         .eq("linked_user_id", u.user.id);
-      if (e1) { console.error("[incomingSplits] step1 error:", e1); throw e1; }
-      console.log("[incomingSplits] step1 linkedPeople:", linkedPeople);
+      if (e1) throw e1;
       if (!linkedPeople || linkedPeople.length === 0) return [];
 
       const linkedPersonIds = linkedPeople.map((p: any) => p.id);
@@ -181,12 +179,10 @@ export const incomingSplitsQuery = () =>
         .from("split_shares")
         .select("split_id, person_id")
         .in("person_id", linkedPersonIds);
-      if (e2) { console.error("[incomingSplits] step2 error:", e2); throw e2; }
-      console.log("[incomingSplits] step2 shares:", shares);
+      if (e2) throw e2;
       if (!shares || shares.length === 0) return [];
 
       const splitIds = [...new Set(shares.map((s: any) => s.split_id))];
-      console.log("[incomingSplits] step3 splitIds:", splitIds);
 
       // Step 3: fetch those splits, excluding ones the current user created
       const { data, error: e3 } = await supabase
@@ -195,8 +191,7 @@ export const incomingSplitsQuery = () =>
         .in("id", splitIds)
         .neq("created_by", u.user.id)
         .order("date", { ascending: false });
-      if (e3) { console.error("[incomingSplits] step3 error:", e3); throw e3; }
-      console.log("[incomingSplits] step3 splits:", data);
+      if (e3) throw e3;
 
       // Step 4: tag each split with incoming flag and current user's person_id
       return (data ?? []).map((s: any) => ({

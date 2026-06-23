@@ -86,8 +86,6 @@ export default function Home() {
   });
 
   const allSplitsForTab = useMemo(() => {
-    console.log("OWN SPLITS IDs:", (ownSplits as any[]).map(s => s.id));
-    console.log("INCOMING SPLITS IDs:", (incomingSplits as any[]).map(s => s.id));
     // Build a map keyed by split ID. Incoming version always wins over own version
     // (with the explicit splitsQuery created_by filter, overlap should never occur).
     const byId = new Map<string, any>();
@@ -565,32 +563,6 @@ function SplitRowContent({ t }: { t: any }) {
 }
 
 function SplitDirectRow({ s }: { s: any }) {
-  console.log("SplitDirectRow debug id:", String(s.id));
-  console.log("SplitDirectRow debug description:", String(s.description));
-  console.log("SplitDirectRow debug paid_by:", String(s.paid_by));
-  console.log("SplitDirectRow debug paid_by_person_id:", String(s.paid_by_person_id));
-  console.log("SplitDirectRow debug _isIncoming:", String(s._isIncoming));
-  console.log("SplitDirectRow debug _myPersonId:", String(s._myPersonId));
-  console.log("SplitDirectRow debug isIncoming:", String(!!s._isIncoming));
-  console.log("SplitDirectRow debug isMePaid_check:", String(
-    s._isIncoming
-      ? (s.paid_by_person_id != null
-          ? s.paid_by_person_id === s._myPersonId
-          : s.paid_by !== "me")
-      : s.paid_by === "me"
-  ));
-  if (s._isIncoming === true) {
-    console.log("INCOMING DEBUG id:", String(s.id));
-    console.log("INCOMING DEBUG paid_by:", String(s.paid_by));
-    console.log("INCOMING DEBUG paid_by_person_id:", String(s.paid_by_person_id));
-    console.log("INCOMING DEBUG _myPersonId:", String(s._myPersonId));
-    console.log("INCOMING DEBUG _isIncoming:", String(s._isIncoming));
-    console.log("INCOMING DEBUG isMePaid_check:", String(
-      s.paid_by_person_id != null && s._myPersonId != null
-        ? s.paid_by_person_id === s._myPersonId
-        : s.paid_by !== "me"
-    ));
-  }
   const shares = (s.split_shares ?? []) as any[];
   const total = Number(s.total_amount);
   const totalShares = shares.reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
@@ -617,12 +589,6 @@ function SplitDirectRow({ s }: { s: any }) {
   })();
   const isOtherPaid = !isMePaid;
 
-  console.log("ALL SPLIT DEBUG id:", String(s.id));
-  console.log("ALL SPLIT DEBUG isIncoming:", String(isIncoming));
-  console.log("ALL SPLIT DEBUG paid_by:", String(s.paid_by));
-  console.log("ALL SPLIT DEBUG isMePaid:", String(isMePaid));
-  console.log("ALL SPLIT DEBUG isOtherPaid:", String(isOtherPaid));
-
   const description = s.description || (
     isGroup ? (s.groups?.name ?? "Group split")
     : isPerson ? `Split w/ ${shares[0]?.person_name ?? s.people?.name ?? ""}`
@@ -630,7 +596,6 @@ function SplitDirectRow({ s }: { s: any }) {
   );
 
   if (isOtherPaid) {
-    console.log("ALL SPLIT DEBUG branch: You owe (isOtherPaid=true), id:", String(s.id));
     // Resolve payer name
     let paidByName: string;
     if (isIncoming) {
@@ -704,7 +669,6 @@ function SplitDirectRow({ s }: { s: any }) {
   }
 
   // Me paid
-  console.log("ALL SPLIT DEBUG branch: You lent (isOtherPaid=false), id:", String(s.id));
   // For incoming, the counterpart label is the creator; for own splits it's the person field.
   const personName = isIncoming
     ? (s.creator?.full_name ?? shares.find((sh: any) => sh.person_id !== s._myPersonId)?.person_name ?? "")
