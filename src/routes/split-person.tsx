@@ -66,35 +66,41 @@ export default function PersonDetail() {
     for (const s of splits as any[]) {
       const shares = (s.split_shares ?? []) as any[];
       const settlements = (s.settlements ?? []) as any[];
+      const myPersonIds: string[] = s._myPersonIds ?? [];
+      const currentUserId: string | null = s._currentUserId ?? null;
+      const targetLui: string | null = s._targetLinkedUserId ?? null;
+      const targetPid: string = s._targetPersonId ?? personId!;
       const total = Number(s.total_amount);
       const sumShares = shares.reduce((a: number, sh: any) => a + Number(sh.share_amount), 0);
-      const shareOf = (pid: string | null) => {
-        const sh = shares.find((x: any) => x.person_id === pid);
-        return sh ? Number(sh.share_amount) : 0;
-      };
-      const settledOf = (pid: string | null) => {
-        const sh = shares.find((x: any) => x.person_id === pid);
-        if (!sh) return 0;
-        return settlements.filter((x: any) => x.split_share_id === sh.id).reduce((a: number, x: any) => a + Number(x.amount), 0);
-      };
+      const settledOf = (ss: any) => !ss ? 0 :
+        settlements.filter((x: any) => x.split_share_id === ss.id).reduce((a: number, x: any) => a + Number(x.amount), 0);
+      const payerAuthId: string | null = (() => {
+        if (s.paid_by_person_id) {
+          const ps = shares.find((ss: any) => ss.person_id === s.paid_by_person_id);
+          if (ps?.person?.linked_user_id) return ps.person.linked_user_id;
+        }
+        if (s.paid_by === "me") return s.created_by;
+        if (s.paid_by) {
+          const m = shares.find((ss: any) => ss.person?.name === s.paid_by || ss.person_name === s.paid_by);
+          if (m?.person?.linked_user_id) return m.person.linked_user_id;
+        }
+        return null;
+      })();
+      const myShareEntry = shares.find((ss: any) =>
+        myPersonIds.includes(ss.person_id) || ss.person?.linked_user_id === currentUserId);
+      const targetShareEntry = shares.find((ss: any) =>
+        (targetLui && ss.person?.linked_user_id === targetLui) || ss.person_id === targetPid);
 
-      if (!s._isIncoming) {
-        // Own split — I'm the creator (implicit share = total - sumShares); target = personId.
-        const iPaid = s.paid_by_person_id == null ? s.paid_by === "me" : false;
-        const targetPaid = s.paid_by_person_id != null
-          ? s.paid_by_person_id === personId
-          : (s.paid_by !== "me" && s.paid_by === person?.name);
-        if (iPaid) net += shareOf(personId!) - settledOf(personId!);          // target owes me their share
-        else if (targetPaid) net -= total - sumShares;                         // I owe target my implicit share
-        // else third-party paid → skip
-      } else if (person?.linked_user_id && s.created_by === person.linked_user_id) {
-        // Incoming split where the TARGET is the creator → bilateral me ↔ target.
-        const myPid = s._myPersonId;
-        const iPaid = s.paid_by_person_id != null ? s.paid_by_person_id === myPid : s.paid_by !== "me";
-        if (iPaid) net += total - sumShares;                                   // target (creator) owes me the implicit share
-        else net -= shareOf(myPid) - settledOf(myPid);                         // creator paid → I owe my share
+      if (payerAuthId && payerAuthId === currentUserId) {
+        // I paid → target owes me their share (or their implicit creator share)
+        if (targetShareEntry) net += Number(targetShareEntry.share_amount) - settledOf(targetShareEntry);
+        else if (targetLui && s.created_by === targetLui) net += total - sumShares;
+      } else if (payerAuthId && targetLui && payerAuthId === targetLui) {
+        // Target paid → I owe my share (or my implicit creator share)
+        if (myShareEntry) net -= Number(myShareEntry.share_amount) - settledOf(myShareEntry);
+        else if (s.created_by === currentUserId) net -= total - sumShares;
       }
-      // incoming where target is a co-participant (not creator) → skip; handled on the creator's page
+      // Third party paid → skip (no direct bilateral debt)
     }
     return net;
   }, [splits, personId, person]);
@@ -163,7 +169,7 @@ export default function PersonDetail() {
         <Button variant="outline" className="flex-1" onClick={() => setAddSplitOpen(true)}>
           <Plus className="h-4 w-4 mr-2" /> Add Split
         </Button>
-        {unsettledItems.length > 0 && (
+        {Math.abs(balance) > 0 && unsettledItems.length > 0 && (
           <Button variant="outline" className="flex-1 text-income" onClick={() => setSettleOpen(true)}>
             Settle Up
           </Button>

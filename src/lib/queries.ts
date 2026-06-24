@@ -212,63 +212,103 @@ export const personSplitsQuery = (personId: string) =>
     queryFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return [];
+      const currentUserId = u.user.id;
 
-
-
-      const { data: personData } = await supabase
+      // Target person record
+      const { data: target } = await supabase
         .from("people")
-        .select("id, linked_user_id, user_id")
+        .select("id, linked_user_id, user_id, name")
         .eq("id", personId)
         .maybeSingle();
+      if (!target) return [];
 
+      // Every people record that represents the current user (across all contact lists)
+      const { data: myPeople } = await supabase
+        .from("people").select("id").eq("linked_user_id", currentUserId);
+      const myPersonIds = (myPeople ?? []).map((p: any) => p.id);
 
+      // Current user's own contacts — for resolving participant names to how *I* know them
+      const { data: myContacts } = await supabase
+        .from("people").select("id, name, linked_user_id").eq("user_id", currentUserId);
 
-      const personIds = new Set<string>([personId]);
+      const SEL = "*, split_shares(*, person:people(id, linked_user_id, name)), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name), accounts:account_id(label)";
 
-      if (personData?.linked_user_id) {
-        const { data: mirrorPeople } = await supabase
-          .from("people")
-          .select("id")
-          .eq("user_id", personData.linked_user_id)
-          .eq("linked_user_id", u.user.id);
-        
-
-        if (mirrorPeople) mirrorPeople.forEach((p: any) => personIds.add(p.id));
+      // Category A — own splits (I'm the creator) where the target participates
+      const { data: targetShares } = await supabase
+        .from("split_shares").select("split_id").eq("person_id", target.id);
+      const targetSplitIds = [...new Set((targetShares ?? []).map((s: any) => s.split_id))];
+      let ownSplits: any[] = [];
+      {
+        let qy = supabase.from("splits").select(SEL).eq("created_by", currentUserId);
+        qy = targetSplitIds.length > 0
+          ? qy.or(`person_id.eq.${target.id},id.in.(${targetSplitIds.join(",")})`)
+          : qy.eq("person_id", target.id);
+        const { data } = await qy;
+        ownSplits = (data ?? []).map((s: any) => ({ ...s, _isIncoming: false }));
       }
 
-      const uniquePersonIds = [...personIds];
+      // Category B — incoming splits (created by others) where I participate AND the target is involved.
+      // Compare by linked_user_id because share person_ids belong to the CREATOR's contact list.
+      let incomingSplits: any[] = [];
+      if (myPersonIds.length > 0) {
+        const { data: myShares } = await supabase
+          .from("split_shares").select("split_id").in("person_id", myPersonIds);
+        const incomingIds = [...new Set((myShares ?? []).map((s: any) => s.split_id))];
+        if (incomingIds.length > 0) {
+          const { data: candidates } = await supabase
+            .from("splits").select(SEL).neq("created_by", currentUserId).in("id", incomingIds);
+          incomingSplits = (candidates ?? []).filter((split: any) => {
+            const creatorIsTarget = !!target.linked_user_id && split.created_by === target.linked_user_id;
+            const targetInShares = (split.split_shares ?? []).some((ss: any) =>
+              (target.linked_user_id && ss.person?.linked_user_id === target.linked_user_id) ||
+              ss.person_id === target.id
+            );
+            return creatorIsTarget || targetInShares;
+          }).map((s: any) => ({ ...s, _isIncoming: true }));
+        }
+      }
 
+      // Merge (incoming first so _isIncoming survives) + dedupe by id
+      const seen = new Set<string>();
+      const deduped = [...incomingSplits, ...ownSplits].filter((s) => {
+        if (seen.has(s.id)) return false;
+        seen.add(s.id);
+        return true;
+      });
 
-      const { data: shareData, error: shareError } = await supabase
-        .from("split_shares")
-        .select("split_id")
-        .in("person_id", uniquePersonIds);
-      
+      // Sort: date DESC, time DESC, created_at DESC
+      deduped.sort((a, b) => {
+        if (a.date !== b.date) return String(b.date).localeCompare(String(a.date));
+        const at = String(a.time ?? "").slice(0, 8), bt = String(b.time ?? "").slice(0, 8);
+        if (at !== bt) return bt.localeCompare(at);
+        return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+      });
 
-
-      const splitIds = [...new Set((shareData ?? []).map((s: any) => s.split_id))];
-
-
-      if (splitIds.length === 0) return [];
-
-      const { data, error } = await supabase
-        .from("splits")
-        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name), accounts:account_id(label)")
-        .in("id", splitIds)
-        .order("date", { ascending: false })
-        .order("time", { ascending: false })
-        .order("created_at", { ascending: false });
-
-
-      if (error) throw error;
-
-      return (data ?? []).map((s: any) => ({
-        ...s,
-        _isIncoming: s.created_by !== u.user!.id,
-        _myPersonId: uniquePersonIds.find(pid =>
-          (s.split_shares ?? []).some((sh: any) => sh.person_id === pid)
-        ) ?? null,
-      }));
+      // Resolve participant names to the viewer's contacts + attach balance context
+      return deduped.map((s: any) => {
+        const shares = (s.split_shares ?? []).map((ss: any) => {
+          let person_name = ss.person_name;
+          const lui = ss.person?.linked_user_id;
+          if (lui) {
+            const myContact = (myContacts ?? []).find((c: any) => c.linked_user_id === lui);
+            if (myContact) person_name = myContact.name;
+          }
+          return { ...ss, person_name };
+        });
+        const myShare = shares.find((ss: any) =>
+          myPersonIds.includes(ss.person_id) || ss.person?.linked_user_id === currentUserId
+        );
+        return {
+          ...s,
+          split_shares: shares,
+          _isIncoming: s._isIncoming,
+          _myPersonId: myShare?.person_id ?? null,
+          _myPersonIds: myPersonIds,
+          _currentUserId: currentUserId,
+          _targetLinkedUserId: target.linked_user_id ?? null,
+          _targetPersonId: target.id,
+        };
+      });
     },
   });
 
