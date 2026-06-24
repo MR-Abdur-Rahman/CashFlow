@@ -16,7 +16,7 @@ createRoot(document.getElementById('root')!).render(
       <SwipeProvider>
         <PrefsApplier />
         <App />
-        <Toaster position="top-center" richColors theme="dark" />
+        <Toaster position="top-center" theme="dark" />
       </SwipeProvider>
     </QueryClientProvider>
   </StrictMode>,
