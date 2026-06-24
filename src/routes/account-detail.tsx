@@ -347,7 +347,10 @@ export default function AccountDetail() {
                   <SettlementRow s={item} />
                 </SwipeRow>
               ) : (
-                <SwipeRow key={`sp-${item.id}`} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplitItem(item)}>
+                <SwipeRow key={`sp-${item.id}`} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplitItem(item)}
+                  canEdit={!item._isIncoming} canDelete={!item._isIncoming}
+                  editDeniedMessage="Only the creator can edit this split"
+                  deleteDeniedMessage="Only the creator can delete this split">
                   <SplitRow s={item} />
                 </SwipeRow>
               )

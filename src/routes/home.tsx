@@ -299,7 +299,10 @@ export default function Home() {
                           <HomeSettlementRow s={item} />
                         </SwipeRow>
                       ) : (
-                        <SwipeRow key={item.id} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}>
+                        <SwipeRow key={item.id} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}
+                          canEdit={!item._isIncoming} canDelete={!item._isIncoming}
+                          editDeniedMessage="Only the creator can edit this split"
+                          deleteDeniedMessage="Only the creator can delete this split">
                           <SplitDirectRow s={item} />
                         </SwipeRow>
                       )

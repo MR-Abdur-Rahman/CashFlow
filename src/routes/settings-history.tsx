@@ -180,7 +180,10 @@ export default function HistoryPage() {
           <div className="rounded-xl overflow-hidden divide-y divide-border border border-border">
             {items.map((item) =>
               item._kind === "split" ? (
-                <SwipeRow key={`split-${item.id}`} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}>
+                <SwipeRow key={`split-${item.id}`} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}
+                  canEdit={!item._isIncoming} canDelete={!item._isIncoming}
+                  editDeniedMessage="Only the creator can edit this split"
+                  deleteDeniedMessage="Only the creator can delete this split">
                   <SplitDirectRow s={item} />
                 </SwipeRow>
               ) : (

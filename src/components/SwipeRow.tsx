@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useContext, createContext, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 // ─── Global swipe context ──────────────────────────────────────────────────
 // Tracks which row is currently open so others can close themselves
@@ -17,11 +18,19 @@ export function SwipeRow({
   onEdit,
   onDelete,
   className,
+  canEdit = true,
+  canDelete = true,
+  editDeniedMessage = "Not allowed",
+  deleteDeniedMessage = "Not allowed",
 }: {
   children: ReactNode;
   onEdit?: () => void;
   onDelete?: () => void;
   className?: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  editDeniedMessage?: string;
+  deleteDeniedMessage?: string;
 }) {
   const ACTION_WIDTH = onEdit && onDelete ? 144 : 72;
   const [x, setX] = useState(0);
@@ -66,15 +75,17 @@ export function SwipeRow({
       <div className="absolute inset-y-0 right-0 flex">
         {onEdit && (
           <button type="button"
-            onClick={() => { setX(0); setOpenId(null); onEdit(); }}
-            className="w-[72px] flex flex-col items-center justify-center bg-transfer text-white text-xs">
+            onClick={() => { setX(0); setOpenId(null); if (canEdit) onEdit(); else toast.error(editDeniedMessage); }}
+            className={cn("w-[72px] flex flex-col items-center justify-center text-xs", canEdit && "bg-transfer text-white")}
+            style={canEdit ? undefined : { background: "#374151", color: "#6B7280" }}>
             <Pencil className="h-4 w-4 mb-0.5" /> Edit
           </button>
         )}
         {onDelete && (
           <button type="button"
-            onClick={() => { setX(0); setOpenId(null); onDelete(); }}
-            className="w-[72px] flex flex-col items-center justify-center bg-expense text-white text-xs">
+            onClick={() => { setX(0); setOpenId(null); if (canDelete) onDelete(); else toast.error(deleteDeniedMessage); }}
+            className={cn("w-[72px] flex flex-col items-center justify-center text-xs", canDelete && "bg-expense text-white")}
+            style={canDelete ? undefined : { background: "#374151", color: "#6B7280" }}>
             <Trash2 className="h-4 w-4 mb-0.5" /> Delete
           </button>
         )}

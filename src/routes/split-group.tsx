@@ -203,7 +203,10 @@ export default function GroupDetail() {
               const unsettledShare = (s.split_shares ?? []).find((sh: any) => !sh.is_settled);
               const label = getSplitLabel(s);
               return (
-                <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
+                <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}
+                  canEdit={!s._isIncoming} canDelete={!s._isIncoming}
+                  editDeniedMessage="Only the creator can edit this split"
+                  deleteDeniedMessage="Only the creator can delete this split">
                   <div className="flex items-center gap-3 px-4 py-3 bg-card">
                     <div className="h-9 w-9 rounded-full bg-split/20 flex items-center justify-center text-split shrink-0">
                       <Users className="h-4 w-4" />

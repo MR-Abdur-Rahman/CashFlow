@@ -233,7 +233,10 @@ export default function PersonDetail() {
         ) : (
           <div className="rounded-2xl overflow-hidden border border-border divide-y divide-border">
             {filteredSplits.map((s: any) => (
-              <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
+              <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}
+                canEdit={!s._isIncoming} canDelete={!s._isIncoming}
+                editDeniedMessage="Only the creator can edit this split"
+                deleteDeniedMessage="Only the creator can delete this split">
                 <SplitDirectRow s={s} lentOweOverride={bilateralRowAmount(s)} />
               </SwipeRow>
             ))}
