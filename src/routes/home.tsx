@@ -66,7 +66,7 @@ function showToastIfEnabled(n: any, prefs: any) {
     }
     case "delete_attempt": shouldShow = !!prefs.toast_delete_attempt; break;
   }
-  if (shouldShow) notifyToast(n.type, n.message);
+  if (shouldShow) notifyToast(n.type, n.title, n.message);
 }
 
 // Colored circle icon per notification type

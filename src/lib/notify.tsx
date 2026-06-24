@@ -20,18 +20,21 @@ export function getToastIcon(type: string) {
   }
 }
 
-// Compact single-line toast (sonner default size) with a type-colored background + white icon.
-export function notifyToast(type: string, message: string) {
+// Compact toast with a type-colored background + white icon.
+// Pass `description` to render a two-line title + description toast (capped at 400px).
+export function notifyToast(type: string, message: string, description?: string) {
   const style = toastStyles[type] ?? { background: "#1A1A1A", border: "1px solid #2A2A2A" };
   toast(message, {
     icon: getToastIcon(type),
     duration: 4000,
+    description,
     style: {
       ...style,
       color: "#FFFFFF",
       borderRadius: "12px",
       fontSize: "14px",
       padding: "12px 16px",
+      ...(description ? { maxWidth: "400px" } : {}),
     },
   });
 }
