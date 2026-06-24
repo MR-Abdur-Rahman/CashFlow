@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { peopleQuery, groupsQuery, splitBalancesQuery } from "@/lib/queries";
 import { Users, Plus, ChevronRight, Archive, QrCode, History } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { QrScannerDialog } from "@/components/QrScannerDialog";
@@ -21,6 +20,7 @@ export default function SplitPage() {
   const [addGroup, setAddGroup] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanned, setScanned] = useState<{ name?: string; phone?: string } | undefined>();
+  const [tab, setTab] = useState<"people" | "groups" | "pending">("people");
 
   function handleScan(text: string) {
     let obj: any;
@@ -40,71 +40,103 @@ export default function SplitPage() {
   }
 
   return (
-    <div className="px-4 pt-6 space-y-5 pb-24">
+    <div className="px-4 pt-6 space-y-4 pb-24">
+      {/* Header: title + context actions + history */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Split</h1>
-        <Link
-          to="/settings/history?filter=split"
-          className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground"
-        >
-          <History className="h-5 w-5" />
-        </Link>
+        <div className="flex items-center gap-2">
+          {tab === "people" && (
+            <>
+              <button onClick={() => setScanOpen(true)} className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground">
+                <QrCode className="h-5 w-5" />
+              </button>
+              <button onClick={() => { setScanned(undefined); setAddPerson(true); }} className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground">
+                <Plus className="h-5 w-5" />
+              </button>
+            </>
+          )}
+          {tab === "groups" && (
+            <button onClick={() => setAddGroup(true)} className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground">
+              <Plus className="h-5 w-5" />
+            </button>
+          )}
+          <Link to="/settings/history?filter=split" className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground">
+            <History className="h-5 w-5" />
+          </Link>
+        </div>
       </div>
 
-      {/* People */}
-      <Section title="People" action={
-        <div className="flex gap-1">
-          <Button size="sm" variant="ghost" onClick={() => setScanOpen(true)}><QrCode className="h-4 w-4" /></Button>
-          <Button size="sm" variant="ghost" onClick={() => { setScanned(undefined); setAddPerson(true); }}><Plus className="h-4 w-4" /></Button>
+      {/* Segmented tab bar */}
+      <div className="flex gap-1 rounded-full p-1" style={{ background: "#2A2A2A" }}>
+        {(["people", "groups", "pending"] as const).map((t) => (
+          <button key={t} type="button" onClick={() => setTab(t)}
+            className="flex-1 rounded-full py-1.5 text-sm font-medium capitalize transition-colors"
+            style={tab === t
+              ? { background: "#1A1A1A", color: "#FFFFFF", border: "1px solid #7C3AED" }
+              : { background: "transparent", color: "#9CA3AF", border: "1px solid transparent" }}>
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {/* People tab */}
+      {tab === "people" && (
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+          {people.length === 0 ? <Empty text="No people yet" /> : (
+            <div className="divide-y divide-border">
+              {(people as any[]).map((p) => {
+                const bal = personBalance(p);
+                return (
+                  <Link key={p.id} to={`/split/person/${p.id}`} className="flex items-center gap-3 p-4 active:bg-secondary/40">
+                    <Avatar name={p.name} />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{p.name}{p.linked_user_id && " 🔗"}</p>
+                      <p className="text-xs text-muted-foreground">{p.phone_number ?? "no phone"}</p>
+                    </div>
+                    {Math.abs(bal) >= 0.005 && (
+                      <span className="text-sm font-mono font-semibold" style={{ color: bal > 0 ? "#22C55E" : "#EF4444" }}>
+                        {bal > 0 ? "+" : "-"}{formatMoney(Math.abs(bal))}
+                      </span>
+                    )}
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
-      }>
-        {people.length === 0 ? <Empty text="No people yet" /> : (
-          <div className="divide-y divide-border">
-            {(people as any[]).map((p) => {
-              const bal = personBalance(p);
-              return (
-                <Link key={p.id} to={`/split/person/${p.id}`} className="flex items-center gap-3 p-4 active:bg-secondary/40">
-                  <Avatar name={p.name} />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{p.name}{p.linked_user_id && " 🔗"}</p>
-                    <p className="text-xs text-muted-foreground">{p.phone_number ?? "no phone"}</p>
+      )}
+
+      {/* Groups tab */}
+      {tab === "groups" && (
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+          {groups.length === 0 ? <Empty text="No groups yet" /> : (
+            <div className="divide-y divide-border">
+              {(groups as any[]).map((g) => (
+                <Link key={g.id} to={`/split/group/${g.id}`} className="flex items-center gap-3 p-4 active:bg-secondary/40">
+                  <div className="h-10 w-10 rounded-full bg-split/20 flex items-center justify-center text-split">
+                    <Users className="h-5 w-5" />
                   </div>
-                  {Math.abs(bal) >= 0.005 && (
-                    <span className="text-sm font-mono font-semibold" style={{ color: bal > 0 ? "#22C55E" : "#EF4444" }}>
-                      {bal > 0 ? "+" : "-"}{formatMoney(Math.abs(bal))}
-                    </span>
-                  )}
+                  <div className="flex-1">
+                    <p className="text-sm font-medium flex items-center gap-2">
+                      {g.name} {g.is_archived && <Archive className="h-3 w-3 text-muted-foreground" />}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{g.group_members?.length ?? 0} members</p>
+                  </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </Link>
-              );
-            })}
-          </div>
-        )}
-      </Section>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Groups */}
-      <Section title="Groups" action={
-        <Button size="sm" variant="ghost" onClick={() => setAddGroup(true)}><Plus className="h-4 w-4" /></Button>
-      }>
-        {groups.length === 0 ? <Empty text="No groups yet" /> : (
-          <div className="divide-y divide-border">
-            {(groups as any[]).map((g) => (
-              <Link key={g.id} to={`/split/group/${g.id}`} className="flex items-center gap-3 p-4 active:bg-secondary/40">
-                <div className="h-10 w-10 rounded-full bg-split/20 flex items-center justify-center text-split">
-                  <Users className="h-5 w-5" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium flex items-center gap-2">
-                    {g.name} {g.is_archived && <Archive className="h-3 w-3 text-muted-foreground" />}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{g.group_members?.length ?? 0} members</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </Link>
-            ))}
-          </div>
-        )}
-      </Section>
+      {/* Pending tab — placeholder until the account-selection system is built */}
+      {tab === "pending" && (
+        <div className="rounded-2xl p-10 text-center" style={{ background: "#1A1A1A" }}>
+          <p className="text-sm" style={{ color: "#9CA3AF" }}>No pending payments</p>
+        </div>
+      )}
 
       <AddPersonDialog open={addPerson} onOpenChange={setAddPerson} initial={scanned} />
       <AddGroupDialog open={addGroup} onOpenChange={setAddGroup} />
@@ -176,14 +208,3 @@ function Empty({ text }: { text: string }) {
   return <p className="text-sm text-muted-foreground text-center py-8">{text}</p>;
 }
 
-function Section({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2 px-1">
-        <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{title}</p>
-        {action}
-      </div>
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">{children}</div>
-    </div>
-  );
-}
