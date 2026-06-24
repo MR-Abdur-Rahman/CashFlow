@@ -1,8 +1,6 @@
 import { toast } from "sonner";
-import type { CSSProperties } from "react";
 import { Users, Trash2, Check, ShieldAlert, Bell } from "lucide-react";
 
-// Type-based background + border for each toast.
 const toastStyles: Record<string, { background: string; border: string }> = {
   split_added: { background: "#78350F", border: "1px solid #F59E0B" },
   split_deleted: { background: "#7F1D1D", border: "1px solid #EF4444" },
@@ -10,33 +8,55 @@ const toastStyles: Record<string, { background: string; border: string }> = {
   delete_attempt: { background: "#374151", border: "1px solid #6B7280" },
 };
 
-// White icon per toast type (background is colored).
-export function getToastIcon(type: string) {
+function getToastIcon(type: string) {
+  const props = { size: 18, color: "#FFFFFF" };
   switch (type) {
-    case "split_added": return <Users size={16} color="#FFFFFF" />;
-    case "split_deleted": return <Trash2 size={16} color="#FFFFFF" />;
-    case "settlement_created": return <Check size={16} color="#FFFFFF" />;
-    case "delete_attempt": return <ShieldAlert size={16} color="#FFFFFF" />;
-    default: return <Bell size={16} color="#FFFFFF" />;
+    case "split_added": return <Users {...props} />;
+    case "split_deleted": return <Trash2 {...props} />;
+    case "settlement_created": return <Check {...props} />;
+    case "delete_attempt": return <ShieldAlert {...props} />;
+    default: return <Bell {...props} />;
   }
 }
 
-// Compact toast with a type-colored background + white icon.
-// Pass `description` to render a two-line title + description toast (capped at 400px).
 export function notifyToast(type: string, message: string, description?: string) {
-  const { background, border } = toastStyles[type] ?? { background: "#1A1A1A", border: "1px solid #2A2A2A" };
-  const style = {
-    background,
-    border,
-    color: "#FFFFFF",
-    borderRadius: "12px",
-    fontSize: "14px",
-    padding: "12px 16px",
-    // Override sonner's CSS variables too, so the colored background wins even with richColors.
-    "--normal-bg": background,
-    "--normal-border": border,
-    "--normal-text": "#FFFFFF",
-    ...(description ? { maxWidth: "400px", margin: "0 auto" } : {}),
-  } as CSSProperties;
-  toast(message, { icon: getToastIcon(type), duration: 4000, description, style });
+  const { background, border } = toastStyles[type] ?? {
+    background: "#1A1A1A",
+    border: "1px solid #2A2A2A",
+  };
+
+  toast.custom(
+    () => (
+      <div
+        style={{
+          background,
+          border,
+          borderRadius: "12px",
+          padding: "12px 16px",
+          display: "flex",
+          alignItems: "flex-start",
+          gap: "10px",
+          color: "#FFFFFF",
+          width: "100%",
+          maxWidth: "400px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+        }}
+      >
+        <div style={{ flexShrink: 0, marginTop: "2px" }}>
+          {getToastIcon(type)}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: "14px", lineHeight: "20px" }}>
+            {message}
+          </div>
+          {description && (
+            <div style={{ fontSize: "13px", lineHeight: "18px", opacity: 0.9, marginTop: "2px", wordBreak: "break-word" }}>
+              {description}
+            </div>
+          )}
+        </div>
+      </div>
+    ),
+    { duration: 4000 }
+  );
 }
