@@ -134,9 +134,21 @@ export default function PersonDetail() {
   const fromStr = useMemo(() => format(periodFrom, "yyyy-MM-dd"), [periodFrom]);
   const toStr = useMemo(() => format(periodTo, "yyyy-MM-dd"), [periodTo]);
 
+  // Only show rows where the PAYER is one of the two people being viewed (current user or target).
+  // Third-party-paid splits are hidden from the list (balance already skips them internally).
+  const visibleSplits = useMemo(() =>
+    (splits as any[]).filter((s) => {
+      const payerAuthId = getPayerAuthId(s);
+      if (!payerAuthId) return true; // can't determine payer → show
+      const targetLui = s._targetLinkedUserId;
+      return payerAuthId === s._currentUserId || (!!targetLui && payerAuthId === targetLui);
+    }),
+    [splits]
+  );
+
   const filteredSplits = useMemo(() =>
-    (splits as any[]).filter((s) => s.date >= fromStr && s.date <= toStr),
-    [splits, fromStr, toStr]
+    visibleSplits.filter((s) => s.date >= fromStr && s.date <= toStr),
+    [visibleSplits, fromStr, toStr]
   );
 
   if (!person) return <div className="p-6">Person not found</div>;
@@ -328,6 +340,20 @@ export default function PersonDetail() {
       )}
     </div>
   );
+}
+
+// ─── Helper: resolve a split's payer to an auth user id ───────────────────
+function getPayerAuthId(split: any): string | null {
+  if (split.paid_by_person_id) {
+    const ps = (split.split_shares ?? []).find((ss: any) => ss.person_id === split.paid_by_person_id);
+    if (ps?.person?.linked_user_id) return ps.person.linked_user_id;
+  }
+  if (split.paid_by === "me") return split.created_by; // "me" always means the creator
+  if (split.paid_by) {
+    const m = (split.split_shares ?? []).find((ss: any) => ss.person?.name === split.paid_by || ss.person_name === split.paid_by);
+    if (m?.person?.linked_user_id) return m.person.linked_user_id;
+  }
+  return null;
 }
 
 // ─── Helper: get display label for a split ────────────────────────────────
