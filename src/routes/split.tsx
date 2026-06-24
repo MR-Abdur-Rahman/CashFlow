@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { peopleQuery, groupsQuery, splitsQuery, incomingSplitsQuery } from "@/lib/queries";
+import { peopleQuery, groupsQuery, splitBalancesQuery } from "@/lib/queries";
 import { Users, Plus, ChevronRight, Archive, QrCode, History } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,10 @@ import { Link } from "react-router-dom";
 export default function SplitPage() {
   const { data: people = [] } = useQuery(peopleQuery());
   const { data: groups = [] } = useQuery(groupsQuery());
-  const { data: splits = [] } = useQuery(splitsQuery());
-  const { data: incomingSplits = [] } = useQuery(incomingSplitsQuery());
+  const { data: balanceData } = useQuery(splitBalancesQuery());
+  const allSplits = balanceData?.splits ?? [];
+  const myPersonIds = balanceData?.myPersonIds ?? [];
+  const currentUserId = balanceData?.currentUserId ?? null;
   const [addPerson, setAddPerson] = useState(false);
   const [addGroup, setAddGroup] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
@@ -33,45 +35,8 @@ export default function SplitPage() {
     toast.success("QR scanned — review and save");
   }
 
-  function personBalance(personId: string) {
-    let owed = 0;
-    for (const s of splits as any[]) {
-      for (const sh of (s.split_shares ?? [])) {
-        if (sh.person_id !== personId) continue;
-        const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
-          .reduce((a: number, x: any) => a + Number(x.amount), 0);
-        owed += Number(sh.share_amount) - settled;
-      }
-    }
-    const person = (people as any[]).find((p) => p.id === personId);
-    if (person?.linked_user_id) {
-      for (const s of incomingSplits as any[]) {
-        if (s._createdByUserId !== person.linked_user_id) continue;
-        const myPersonId = s._myPersonId;
-        if (!myPersonId) continue;
-        const myShareRecord = (s.split_shares ?? []).find((sh: any) => sh.person_id === myPersonId);
-        if (!myShareRecord) continue;
-        const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === myShareRecord.id)
-          .reduce((a: number, x: any) => a + Number(x.amount), 0);
-
-        // For incoming: paid_by="me" means creator paid → I owe them.
-        // paid_by_person_id===myPersonId (or fallback: paid_by!="me") → I paid → they owe me.
-        const isCreatorPaid = s.paid_by === "me";
-        const iMePaid = s.paid_by_person_id != null
-          ? s.paid_by_person_id === myPersonId
-          : !isCreatorPaid;
-
-        if (iMePaid) {
-          // Current user paid → creator (person) owes current user their implicit share
-          const totalSharesSum = (s.split_shares ?? []).reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
-          owed += Number(s.total_amount) - totalSharesSum;
-        } else {
-          // Creator (or 3rd party) paid → current user owes their share
-          owed -= Number(myShareRecord.share_amount) - settled;
-        }
-      }
-    }
-    return owed;
+  function personBalance(person: any): number {
+    return bilateralBalance(allSplits, person, currentUserId, myPersonIds);
   }
 
   return (
@@ -96,7 +61,7 @@ export default function SplitPage() {
         {people.length === 0 ? <Empty text="No people yet" /> : (
           <div className="divide-y divide-border">
             {(people as any[]).map((p) => {
-              const bal = personBalance(p.id);
+              const bal = personBalance(p);
               return (
                 <Link key={p.id} to={`/split/person/${p.id}`} className="flex items-center gap-3 p-4 active:bg-secondary/40">
                   <Avatar name={p.name} />
@@ -104,9 +69,9 @@ export default function SplitPage() {
                     <p className="text-sm font-medium">{p.name}{p.linked_user_id && " 🔗"}</p>
                     <p className="text-xs text-muted-foreground">{p.phone_number ?? "no phone"}</p>
                   </div>
-                  {bal !== 0 && (
-                    <span className={`text-sm font-mono font-semibold ${bal > 0 ? "text-income" : "text-expense"}`}>
-                      {bal > 0 ? "+" : ""}{formatMoney(bal)}
+                  {Math.abs(bal) >= 0.005 && (
+                    <span className="text-sm font-mono font-semibold" style={{ color: bal > 0 ? "#22C55E" : "#EF4444" }}>
+                      {bal > 0 ? "+" : "-"}{formatMoney(Math.abs(bal))}
                     </span>
                   )}
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -146,6 +111,57 @@ export default function SplitPage() {
       <QrScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScan} />
     </div>
   );
+}
+
+// Resolve a split's payer to an auth user id (creator paid / a participant paid / a third party).
+function getPayerAuthId(split: any): string | null {
+  if (split.paid_by_person_id) {
+    const ps = (split.split_shares ?? []).find((ss: any) => ss.person_id === split.paid_by_person_id);
+    if (ps?.person?.linked_user_id) return ps.person.linked_user_id;
+  }
+  if (split.paid_by === "me") return split.created_by; // "me" always means the creator
+  if (split.paid_by) {
+    const m = (split.split_shares ?? []).find((ss: any) => ss.person?.name === split.paid_by || ss.person_name === split.paid_by);
+    if (m?.person?.linked_user_id) return m.person.linked_user_id;
+  }
+  return null;
+}
+
+// Bilateral net balance between current user and a target contact.
+// Positive = target owes me; negative = I owe target. Third-party-paid splits are skipped.
+function bilateralBalance(splits: any[], target: any, currentUserId: string | null, myPersonIds: string[]): number {
+  let net = 0;
+  const targetLui = target.linked_user_id;
+  for (const s of splits) {
+    const shares = (s.split_shares ?? []) as any[];
+    const settlements = (s.settlements ?? []) as any[];
+    const total = Number(s.total_amount);
+    const sumShares = shares.reduce((a: number, sh: any) => a + Number(sh.share_amount), 0);
+    const settledOf = (ss: any) => !ss ? 0 :
+      settlements.filter((x: any) => x.split_share_id === ss.id).reduce((a: number, x: any) => a + Number(x.amount), 0);
+
+    // Only count splits where the target is actually involved.
+    const creatorIsTarget = !!targetLui && s.created_by === targetLui;
+    const targetShareEntry = shares.find((ss: any) =>
+      (targetLui && ss.person?.linked_user_id === targetLui) || ss.person_id === target.id);
+    if (!creatorIsTarget && !targetShareEntry) continue;
+
+    const payerAuthId = getPayerAuthId(s);
+    const myShareEntry = shares.find((ss: any) =>
+      myPersonIds.includes(ss.person_id) || ss.person?.linked_user_id === currentUserId);
+
+    if (payerAuthId && payerAuthId === currentUserId) {
+      // I paid → target owes me their share (or their implicit creator share)
+      if (targetShareEntry) net += Number(targetShareEntry.share_amount) - settledOf(targetShareEntry);
+      else if (creatorIsTarget) net += total - sumShares;
+    } else if (payerAuthId && targetLui && payerAuthId === targetLui) {
+      // Target paid → I owe my share (or my implicit creator share)
+      if (myShareEntry) net -= Number(myShareEntry.share_amount) - settledOf(myShareEntry);
+      else if (s.created_by === currentUserId) net -= total - sumShares;
+    }
+    // Third party paid → skip
+  }
+  return net;
 }
 
 function Avatar({ name }: { name: string }) {

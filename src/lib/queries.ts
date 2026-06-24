@@ -312,6 +312,49 @@ export const personSplitsQuery = (personId: string) =>
     },
   });
 
+// Single fetch of all splits involving the current user (own + incoming) with the people join,
+// for computing bilateral balances against every contact on the Split page (avoids N+1 per person).
+// Keyed under ["splits", ...] so existing invalidateQueries(["splits"]) calls refresh it.
+export const splitBalancesQuery = () =>
+  queryOptions({
+    queryKey: ["splits", "balances"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return { splits: [] as any[], myPersonIds: [] as string[], currentUserId: null as string | null };
+      const currentUserId = u.user.id;
+
+      const { data: myPeople } = await supabase
+        .from("people").select("id").eq("linked_user_id", currentUserId);
+      const myPersonIds = (myPeople ?? []).map((p: any) => p.id);
+
+      const SEL = "*, split_shares(*, person:people(id, linked_user_id, name)), settlements(*)";
+
+      // Own splits
+      const { data: own } = await supabase.from("splits").select(SEL).eq("created_by", currentUserId);
+
+      // Incoming splits where the current user participates
+      let incoming: any[] = [];
+      if (myPersonIds.length > 0) {
+        const { data: myShares } = await supabase
+          .from("split_shares").select("split_id").in("person_id", myPersonIds);
+        const ids = [...new Set((myShares ?? []).map((s: any) => s.split_id))];
+        if (ids.length > 0) {
+          const { data } = await supabase.from("splits").select(SEL).neq("created_by", currentUserId).in("id", ids);
+          incoming = data ?? [];
+        }
+      }
+
+      // Incoming first so _isIncoming survives dedupe
+      const seen = new Set<string>();
+      const splits = [
+        ...incoming.map((s: any) => ({ ...s, _isIncoming: true })),
+        ...(own ?? []).map((s: any) => ({ ...s, _isIncoming: false })),
+      ].filter((s) => { if (seen.has(s.id)) return false; seen.add(s.id); return true; });
+
+      return { splits, myPersonIds, currentUserId };
+    },
+  });
+
 export const groupSplitsQuery = (groupId: string) =>
   queryOptions({
     queryKey: ["splits", "group", groupId],
