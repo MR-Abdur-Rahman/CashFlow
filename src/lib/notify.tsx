@@ -34,7 +34,7 @@ export function notifyToast(type: string, message: string, description?: string)
       borderRadius: "12px",
       fontSize: "14px",
       padding: "12px 16px",
-      ...(description ? { maxWidth: "400px" } : {}),
+      ...(description ? { maxWidth: "400px", margin: "0 auto" } : {}),
     },
   });
 }
