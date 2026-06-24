@@ -297,29 +297,8 @@ export default function PersonDetail() {
                 return;
               }
 
-              // Notify linked participants BEFORE deleting (so FK is valid)
-              const personIds = (deleteSplit.split_shares ?? []).map((sh: any) => sh.person_id).filter(Boolean);
-              if (personIds.length > 0) {
-                const { data: linked } = await supabase
-                  .from("people").select("linked_user_id")
-                  .in("id", personIds).not("linked_user_id", "is", null);
-                if (linked && linked.length > 0) {
-                  const { data: creatorProfile } = await supabase
-                    .from("profiles").select("full_name").eq("id", u.user.id).maybeSingle();
-                  const creatorName = creatorProfile?.full_name ?? "Someone";
-                  await supabase.from("notifications").insert(
-                    linked.map((p: any) => ({
-                      user_id: p.linked_user_id,
-                      type: "split_deleted",
-                      title: "Split deleted",
-                      message: `${creatorName} deleted the split: ${deleteSplit.description || "Split"}`,
-                      related_split_id: deleteSplit.id,
-                      is_read: false,
-                    }))
-                  );
-                }
-              }
-
+              // split_deleted notifications are now sent by the DB trigger
+              // (trigger_notify_split_deleted, gated by each recipient's split_notifications pref).
               const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
               if (error) toast.error(error.message);
               else {

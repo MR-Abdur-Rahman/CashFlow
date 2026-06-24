@@ -53,18 +53,6 @@ export default function SettingsPage() {
   const currencyCode = (profile as any)?.currency_code ?? "LKR";
   const thousand = (profile as any)?.thousand_separator ?? ",";
   const decimals = (profile as any)?.decimal_places ?? 2;
-  const notifySplits = (profile as any)?.notify_splits ?? true;
-  const notifySettle = (profile as any)?.notify_settlement ?? true;
-  const notifyDaily = (profile as any)?.notify_daily ?? false;
-  const dailyTime = (profile as any)?.daily_reminder_time ?? "20:00";
-
-  const defaultPrefs = {
-    split_added: true, split_deleted: true,
-    settlement_cash: false, settlement_bank: true, settlement_ewallet: true,
-    delete_attempt: true, account_needed: true, reminder: true,
-  };
-  const notifPrefs: Record<string, boolean> = { ...defaultPrefs, ...((profile as any)?.notification_prefs ?? {}) };
-
   const [pendingToggle, setPendingToggle] = useState<{
     key: string; newValue: boolean; label: string; description: string;
   } | null>(null);
@@ -77,6 +65,37 @@ export default function SettingsPage() {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["profile"] }),
     onError: (e) => toast.error(e.message),
+  });
+
+  // Notification preferences (separate table). Create a default row on first access.
+  const { data: prefs } = useQuery({
+    queryKey: ["notification_preferences", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      if (!userId) return null;
+      const { data: existing } = await (supabase as any)
+        .from("notification_preferences").select("*").eq("user_id", userId).maybeSingle();
+      if (existing) return existing;
+      const { data: created, error } = await (supabase as any)
+        .from("notification_preferences").insert({ user_id: userId }).select("*").single();
+      if (error) {
+        const { data: refetched } = await (supabase as any)
+          .from("notification_preferences").select("*").eq("user_id", userId).maybeSingle();
+        return refetched;
+      }
+      return created;
+    },
+  });
+
+  const updatePrefs = useMutation({
+    mutationFn: async (patch: Record<string, any>) => {
+      if (!userId) throw new Error("Not signed in");
+      const { error } = await (supabase as any).from("notification_preferences")
+        .update({ ...patch, updated_at: new Date().toISOString() }).eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notification_preferences"] }),
+    onError: (e: any) => toast.error(e.message),
   });
 
   async function signOut() {
@@ -253,14 +272,14 @@ export default function SettingsPage() {
         <Link to="/settings/notifications">
           <Row icon={<Bell className="h-4 w-4" />} label="Notification history" />
         </Link>
-        <ToggleRow label="Split notifications" checked={notifySplits} onChange={(v) => updateProfile.mutate({ notify_splits: v })} />
-        <ToggleRow label="Settlement reminders" checked={notifySettle} onChange={(v) => updateProfile.mutate({ notify_settlement: v })} />
-        <ToggleRow label="Daily expense reminder" checked={notifyDaily} onChange={(v) => updateProfile.mutate({ notify_daily: v })} />
-        {notifyDaily && (
+        <ToggleRow label="Split notifications" checked={prefs?.split_notifications ?? false} onChange={(v) => updatePrefs.mutate({ split_notifications: v })} />
+        <ToggleRow label="Settlement reminders" checked={prefs?.settlement_reminders ?? false} onChange={(v) => updatePrefs.mutate({ settlement_reminders: v })} />
+        <ToggleRow label="Daily expense reminder" checked={prefs?.daily_expense_reminder ?? true} onChange={(v) => updatePrefs.mutate({ daily_expense_reminder: v })} />
+        {prefs?.daily_expense_reminder && (
           <div className="p-4 flex items-center justify-between border-t border-border">
             <Label htmlFor="daily-time" className="text-sm">Reminder time</Label>
-            <input id="daily-time" type="time" value={String(dailyTime).slice(0, 5)}
-              onChange={(e) => updateProfile.mutate({ daily_reminder_time: e.target.value })}
+            <input id="daily-time" type="time" value={String(prefs?.daily_expense_reminder_time ?? "08:00").slice(0, 5)}
+              onChange={(e) => updatePrefs.mutate({ daily_expense_reminder_time: e.target.value })}
               className="bg-secondary text-foreground rounded-md px-3 py-1.5 text-sm font-mono" />
           </div>
         )}
@@ -268,20 +287,20 @@ export default function SettingsPage() {
 
       <Section label="Toast preferences">
         {([
-          { key: "split_added",       label: "Split added",              description: "someone adds a split with you" },
-          { key: "split_deleted",     label: "Split deleted",            description: "a split you're part of is deleted" },
-          { key: "settlement_cash",   label: "Settlement — Cash",        description: "someone settles with cash" },
-          { key: "settlement_bank",   label: "Settlement — Bank Transfer", description: "someone settles via bank transfer" },
-          { key: "settlement_ewallet",label: "Settlement — E-wallet",    description: "someone settles via e-wallet" },
-          { key: "delete_attempt",    label: "Delete attempt",           description: "someone tries to delete your split" },
-          { key: "account_needed",    label: "Account selection needed", description: "you need to select an account for a received settlement" },
-          { key: "reminder",          label: "Payment reminder received",description: "someone sends you a payment reminder" },
-        ] as const).map(({ key, label, description }) => (
-          <div key={key} className="flex items-center justify-between p-4">
+          { col: "toast_split_added",        label: "Split added",              description: "someone adds a split with you" },
+          { col: "toast_split_deleted",      label: "Split deleted",            description: "a split you're part of is deleted" },
+          { col: "toast_settlement_cash",    label: "Settlement — Cash",        description: "someone settles with cash" },
+          { col: "toast_settlement_bank",    label: "Settlement — Bank Transfer", description: "someone settles via bank transfer" },
+          { col: "toast_settlement_ewallet", label: "Settlement — E-wallet",    description: "someone settles via e-wallet" },
+          { col: "toast_delete_attempt",     label: "Delete attempt",           description: "someone tries to delete your split" },
+          { col: "toast_account_selection",  label: "Account selection needed", description: "you need to select an account for a received settlement" },
+          { col: "toast_payment_reminder",   label: "Payment reminder received",description: "someone sends you a payment reminder" },
+        ] as const).map(({ col, label, description }) => (
+          <div key={col} className="flex items-center justify-between p-4">
             <span className="text-sm">{label}</span>
             <Switch
-              checked={!!notifPrefs[key]}
-              onCheckedChange={(newValue) => setPendingToggle({ key, newValue, label, description })}
+              checked={!!prefs?.[col]}
+              onCheckedChange={(newValue) => setPendingToggle({ key: col, newValue, label, description })}
             />
           </div>
         ))}
@@ -319,8 +338,7 @@ export default function SettingsPage() {
           <div className="flex justify-end mt-2">
             <Button onClick={() => {
               if (!pendingToggle || !userId) return;
-              const newPrefs = { ...notifPrefs, [pendingToggle.key]: pendingToggle.newValue };
-              updateProfile.mutate({ notification_prefs: newPrefs });
+              updatePrefs.mutate({ [pendingToggle.key]: pendingToggle.newValue });
               setPendingToggle(null);
             }}>
               OK
