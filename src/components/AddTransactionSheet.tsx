@@ -799,6 +799,7 @@ function TransferForm({ onClose }: { onClose: () => void }) {
 function SplitForm({ onClose }: { onClose: () => void }) {
   const { data: accounts = [] } = useQuery(accountsQuery());
   const { data: groups = [] } = useQuery(groupsQuery());
+  const { data: people = [] } = useQuery(peopleQuery());
   const qc = useQueryClient();
 
   const [amount, setAmount] = useState("");
