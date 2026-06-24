@@ -6,6 +6,7 @@ import { SettleUpDialog } from "@/components/SettleUpDialog";
 import { SwipeRow } from "@/components/SwipeRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { notifyToast } from "@/lib/notify";
 import { useState, useMemo, useEffect } from "react";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
@@ -258,7 +259,7 @@ export default function GroupDetail() {
               if (!deleteSplit) return;
               const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
               if (error) toast.error(error.message);
-              else { toast.success("Split deleted"); qc.invalidateQueries({ queryKey: ["splits"] }); }
+              else { notifyToast("split_deleted", "Split deleted"); qc.invalidateQueries({ queryKey: ["splits"] }); }
               setDeleteSplit(null);
             }}>Delete</AlertDialogAction>
           </AlertDialogFooter>
@@ -358,7 +359,7 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Split updated");
+      notifyToast("split_added", "Split updated");
       qc.invalidateQueries({ queryKey: ["splits"] });
       onOpenChange(false);
     },

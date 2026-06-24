@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SwipeRow } from "@/components/SwipeRow";
 import { toast } from "sonner";
+import { notifyToast } from "@/lib/notify";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,31 +66,7 @@ function showToastIfEnabled(n: any, prefs: any) {
     }
     case "delete_attempt": shouldShow = !!prefs.toast_delete_attempt; break;
   }
-  if (!shouldShow) return;
-
-  const colorMap: Record<string, string> = {
-    split_added: "#F59E0B",
-    split_deleted: "#EF4444",
-    settlement_created: "#10B981",
-    delete_attempt: "#9CA3AF",
-  };
-  const titleColor = colorMap[n.type] ?? "#FFFFFF";
-
-  toast.custom(() => (
-    <div style={{
-      background: "#1A1A1A",
-      border: "1px solid #2A2A2A",
-      borderRadius: "12px",
-      padding: "12px 16px",
-      display: "flex",
-      flexDirection: "column",
-      gap: "4px",
-      minWidth: "300px",
-    }}>
-      <span style={{ color: titleColor, fontWeight: 600, fontSize: "14px" }}>{n.title}</span>
-      <span style={{ color: "#FFFFFF", fontSize: "13px" }}>{n.message}</span>
-    </div>
-  ), { duration: 4000, unstyled: true });
+  if (shouldShow) notifyToast(n.type, n.message);
 }
 
 // Colored circle icon per notification type
@@ -484,7 +461,7 @@ export default function Home() {
               const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
               if (error) toast.error(error.message);
               else {
-                toast.success("Split deleted");
+                notifyToast("split_deleted", "Split deleted");
                 qc.invalidateQueries({ queryKey: ["splits"] });
                 qc.invalidateQueries({ queryKey: ["transactions"] });
                 qc.invalidateQueries({ queryKey: ["accounts"] });
@@ -516,7 +493,7 @@ export default function Home() {
               const { error } = await supabase.from("settlements").delete().eq("id", deleteHomeSettlement.id);
               if (error) toast.error(error.message);
               else {
-                toast.success("Settlement deleted");
+                notifyToast("settlement_created", "Settlement deleted");
                 qc.invalidateQueries({ queryKey: ["settlements"] });
                 qc.invalidateQueries({ queryKey: ["accounts"] });
                 qc.invalidateQueries({ queryKey: ["splits"] });
@@ -1023,7 +1000,7 @@ export function EditSplitSheet({ split, open, onOpenChange }: { split: any; open
         .eq("split_id", split.id);
     },
     onSuccess: () => {
-      toast.success("Split updated");
+      notifyToast("split_added", "Split updated");
       qc.invalidateQueries({ queryKey: ["splits"] });
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });

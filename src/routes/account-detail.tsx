@@ -5,6 +5,7 @@ import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { notifyToast } from "@/lib/notify";
 import { useState, useMemo } from "react";
 import { AddAccountSheet } from "@/components/AddAccountSheet";
 import { SwipeRow } from "@/components/SwipeRow";
@@ -389,7 +390,7 @@ export default function AccountDetail() {
                 const { error } = await supabase.from("splits").delete().eq("id", deleteSplitItem.id);
                 if (error) toast.error(error.message);
                 else {
-                  toast.success("Split deleted");
+                  notifyToast("split_deleted", "Split deleted");
                   qc.invalidateQueries({ queryKey: ["splits"] });
                   qc.invalidateQueries({ queryKey: ["transactions"] });
                   qc.invalidateQueries({ queryKey: ["accounts"] });
@@ -418,7 +419,7 @@ export default function AccountDetail() {
                 const s = deleteSettlement;
                 const { error } = await supabase.from("settlements").delete().eq("id", s.id);
                 if (error) { toast.error(error.message); setDeleteSettlement(null); return; }
-                toast.success("Settlement deleted");
+                notifyToast("settlement_created", "Settlement deleted");
                 qc.invalidateQueries({ queryKey: ["settlements"] });
                 qc.invalidateQueries({ queryKey: ["accounts"] });
                 qc.invalidateQueries({ queryKey: ["splits"] });

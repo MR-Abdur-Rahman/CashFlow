@@ -12,6 +12,7 @@ import {
 import { SwipeRow } from "@/components/SwipeRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { notifyToast } from "@/lib/notify";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -219,7 +220,7 @@ export default function HistoryPage() {
                 const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
                 if (error) toast.error(error.message);
                 else {
-                  toast.success("Split deleted");
+                  notifyToast("split_deleted", "Split deleted");
                   qc.invalidateQueries({ queryKey: ["splits"] });
                   qc.invalidateQueries({ queryKey: ["transactions"] });
                   qc.invalidateQueries({ queryKey: ["accounts"] });

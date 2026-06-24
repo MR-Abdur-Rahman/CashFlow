@@ -8,6 +8,7 @@ import { AddTransactionSheet } from "@/components/AddTransactionSheet";
 import { SettleUpDialog } from "@/components/SettleUpDialog";
 import { SwipeRow } from "@/components/SwipeRow";
 import { SplitDirectRow } from "./home";
+import { notifyToast } from "@/lib/notify";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState, useMemo, useEffect } from "react";
@@ -302,7 +303,7 @@ export default function PersonDetail() {
               const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
               if (error) toast.error(error.message);
               else {
-                toast.success("Split deleted");
+                notifyToast("split_deleted", "Split deleted");
                 qc.invalidateQueries({ queryKey: ["splits"] });
                 qc.invalidateQueries({ queryKey: ["transactions"] });
                 qc.invalidateQueries({ queryKey: ["accounts"] });
@@ -467,7 +468,7 @@ function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boole
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Split updated");
+      notifyToast("split_added", "Split updated");
       qc.invalidateQueries({ queryKey: ["splits"] });
       qc.invalidateQueries({ queryKey: ["transactions"] });
       onOpenChange(false);

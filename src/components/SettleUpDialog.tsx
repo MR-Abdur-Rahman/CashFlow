@@ -8,6 +8,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { accountsQuery } from "@/lib/queries";
 import { toast } from "sonner";
+import { notifyToast } from "@/lib/notify";
 import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
@@ -182,7 +183,7 @@ export function SettleUpDialog({
       }
     },
     onSuccess: () => {
-      toast.success("Settled successfully");
+      notifyToast("settlement_created", "Settled successfully");
       qc.invalidateQueries({ queryKey: ["splits"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
       qc.invalidateQueries({ queryKey: ["transactions"] });

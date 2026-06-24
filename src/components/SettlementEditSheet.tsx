@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { accountsQuery } from "@/lib/queries";
 import { toast } from "sonner";
+import { notifyToast } from "@/lib/notify";
 import { format } from "date-fns";
 
 export function SettlementEditSheet({
@@ -62,7 +63,7 @@ export function SettlementEditSheet({
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Settlement updated");
+      notifyToast("settlement_created", "Settlement updated");
       qc.invalidateQueries({ queryKey: ["settlements"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
       qc.invalidateQueries({ queryKey: ["splits"] });

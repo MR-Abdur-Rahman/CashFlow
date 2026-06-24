@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { accountsQuery, categoriesQuery, subCategoriesQuery, peopleQuery, groupsQuery } from "@/lib/queries";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { notifyToast } from "@/lib/notify";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
@@ -922,7 +923,7 @@ function SplitForm({ onClose }: { onClose: () => void }) {
       }
     },
     onSuccess: () => {
-      toast.success("Split added");
+      notifyToast("split_added", "Split added");
       qc.invalidateQueries({ queryKey: ["splits"] });
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
