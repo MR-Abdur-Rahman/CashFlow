@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { accountsQuery, transactionsQuery, profileQuery, notificationsQuery, peopleQuery, splitsQuery, incomingSplitsQuery, groupsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
 import { formatMoney, greeting } from "@/lib/format";
@@ -48,6 +48,25 @@ const PERIOD_LABELS: { key: FilterPeriod; label: string }[] = [
   { key: "week", label: "Weekly" },
   { key: "month", label: "Monthly" },
 ];
+
+// Show a toast for a freshly-arrived notification only if the user's toast pref for that type is on.
+function showToastIfEnabled(n: any, prefs: any) {
+  if (!n || !prefs) return;
+  let shouldShow = false;
+  switch (n.type) {
+    case "split_added": shouldShow = !!prefs.toast_split_added; break;
+    case "split_deleted": shouldShow = !!prefs.toast_split_deleted; break;
+    case "settlement_created": {
+      const m = String(n.message ?? "").toLowerCase();
+      if (m.includes("bank")) shouldShow = !!prefs.toast_settlement_bank;
+      else if (m.includes("wallet")) shouldShow = !!prefs.toast_settlement_ewallet;
+      else shouldShow = !!prefs.toast_settlement_cash;
+      break;
+    }
+    case "delete_attempt": shouldShow = !!prefs.toast_delete_attempt; break;
+  }
+  if (shouldShow) toast(n.title, { description: n.message, duration: 4000 });
+}
 
 export default function Home() {
   const navigate = useNavigate();
@@ -182,6 +201,47 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notifOpen]);
 
+  // Per-user toast preferences (which notification types pop a toast)
+  const { data: toastPrefs } = useQuery({
+    queryKey: ["toast-preferences", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      if (!userId) return null;
+      const { data } = await (supabase as any)
+        .from("notification_preferences").select("*").eq("user_id", userId).maybeSingle();
+      return data;
+    },
+  });
+  const toastPrefsRef = useRef<any>(null);
+  useEffect(() => { toastPrefsRef.current = toastPrefs; }, [toastPrefs]);
+
+  // Real-time: refresh badge/list + relevant data, and toast on new notifications.
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel("notifications-realtime")
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "notifications",
+        filter: `user_id=eq.${userId}`,
+      }, (payload: any) => {
+        const n = payload.new;
+        qc.invalidateQueries({ queryKey: ["notifications"] });
+        if (n?.type === "split_added" || n?.type === "split_deleted") {
+          qc.invalidateQueries({ queryKey: ["splits"] }); // covers split-balances & person-splits (["splits", ...])
+          qc.invalidateQueries({ queryKey: ["transactions"] });
+          qc.invalidateQueries({ queryKey: ["accounts"] });
+        }
+        if (n?.type === "settlement_created") {
+          qc.invalidateQueries({ queryKey: ["settlements"] });
+          qc.invalidateQueries({ queryKey: ["splits"] });
+          qc.invalidateQueries({ queryKey: ["accounts"] });
+        }
+        showToastIfEnabled(n, toastPrefsRef.current);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, qc]);
+
   const total = accounts.reduce((s, a) => s + Number(a.current_balance), 0);
   const displayName = profile?.full_name
     ? profile.full_name.split(/\s+/).slice(0, 2).join(" ")
@@ -211,8 +271,8 @@ export default function Home() {
           >
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
-              <span className="absolute top-0.5 right-0.5 h-4 min-w-4 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center px-0.5 leading-none">
-                {unreadCount > 9 ? "9+" : unreadCount}
+              <span className="absolute top-0.5 right-0.5 h-[18px] min-w-[18px] rounded-full text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none" style={{ background: "#EF4444" }}>
+                {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
           </button>
