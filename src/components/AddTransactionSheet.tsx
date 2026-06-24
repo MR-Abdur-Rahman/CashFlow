@@ -885,6 +885,11 @@ function SplitForm({ onClose }: { onClose: () => void }) {
       if (!total) throw new Error("Enter an amount");
       if (target !== "group" && participants.length === 0) throw new Error("Select at least one person");
       if (target === "group" && !groupId) throw new Error("Select a group");
+      // For People/Group splits, "Other paid" needs an explicit payer — otherwise the split saves
+      // as paid_by="other" with no person_id, silently skipping the account-pending flow.
+      if (whoPaid !== "me" && (target === "multi" || target === "group") && !otherPayerId) {
+        throw new Error("Select who paid");
+      }
 
       // Account-pending: if someone OTHER than me paid and that payer is a linked CashFlow user,
       // we don't yet know which of THEIR accounts the money came from — they must confirm it later.
