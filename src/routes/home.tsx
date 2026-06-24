@@ -6,7 +6,7 @@ import { formatMoney, greeting } from "@/lib/format";
 import { AccountIcon } from "@/components/AccountIcon";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
 import { Fab } from "@/components/Fab";
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users, ChevronDown, ChevronRight, Check, Bell, History, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users, ChevronDown, ChevronRight, Check, Bell, X, Trash2, ShieldAlert } from "lucide-react";
 import { format, startOfWeek, startOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -65,7 +65,56 @@ function showToastIfEnabled(n: any, prefs: any) {
     }
     case "delete_attempt": shouldShow = !!prefs.toast_delete_attempt; break;
   }
-  if (shouldShow) toast(n.title, { description: n.message, duration: 4000 });
+  if (!shouldShow) return;
+
+  const colorMap: Record<string, string> = {
+    split_added: "#F59E0B",
+    split_deleted: "#EF4444",
+    settlement_created: "#10B981",
+    delete_attempt: "#9CA3AF",
+  };
+  const titleColor = colorMap[n.type] ?? "#FFFFFF";
+
+  toast.custom(() => (
+    <div style={{
+      background: "#1A1A1A",
+      border: "1px solid #2A2A2A",
+      borderRadius: "12px",
+      padding: "12px 16px",
+      display: "flex",
+      flexDirection: "column",
+      gap: "4px",
+      minWidth: "300px",
+    }}>
+      <span style={{ color: titleColor, fontWeight: 600, fontSize: "14px" }}>{n.title}</span>
+      <span style={{ color: "#FFFFFF", fontSize: "13px" }}>{n.message}</span>
+    </div>
+  ), { duration: 4000, unstyled: true });
+}
+
+// Colored circle icon per notification type
+function getNotificationIcon(type: string) {
+  switch (type) {
+    case "split_added": return { bg: "#78350F", color: "#F59E0B", Icon: Users };
+    case "split_deleted": return { bg: "#7F1D1D", color: "#EF4444", Icon: Trash2 };
+    case "settlement_created": return { bg: "#064E3B", color: "#10B981", Icon: Check };
+    case "delete_attempt": return { bg: "#374151", color: "#6B7280", Icon: ShieldAlert };
+    default: return { bg: "#374151", color: "#9CA3AF", Icon: Bell };
+  }
+}
+
+// Relative "time ago" label
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "Just now";
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} hour${hr > 1 ? "s" : ""} ago`;
+  const day = Math.floor(hr / 24);
+  if (day === 1) return "Yesterday";
+  if (day < 7) return `${day} days ago`;
+  return format(new Date(dateStr), "MMM d, yyyy");
 }
 
 export default function Home() {
@@ -188,18 +237,6 @@ export default function Home() {
   const { data: profile } = useQuery(profileQuery(userId));
   const { data: notifications = [] } = useQuery(notificationsQuery());
   const unreadCount = (notifications as any[]).filter((n: any) => !n.is_read).length;
-
-  // Auto-mark non-settlement notifications as read when bell opens
-  useEffect(() => {
-    if (!notifOpen) return;
-    const ids = (notifications as any[])
-      .filter((n: any) => !n.is_read && n.type !== "settlement_account_needed")
-      .map((n: any) => n.id);
-    if (ids.length === 0) return;
-    supabase.from("notifications").update({ is_read: true }).in("id", ids)
-      .then(() => qc.invalidateQueries({ queryKey: ["notifications"] }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notifOpen]);
 
   // Per-user toast preferences (which notification types pop a toast)
   const { data: toastPrefs } = useQuery({
@@ -398,6 +435,7 @@ export default function Home() {
         open={notifOpen}
         onOpenChange={setNotifOpen}
         notifications={notifications as any[]}
+        userId={userId}
         onNavigate={(path) => { setNotifOpen(false); navigate(path); }}
       />
 
@@ -1386,75 +1424,91 @@ export function EditTxSheet({ txn, open, onOpenChange }: { txn: any; open: boole
   );
 }
 
-function NotificationSheet({ open, onOpenChange, notifications, onNavigate }: {
+function NotificationSheet({ open, onOpenChange, notifications, onNavigate, userId }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   notifications: any[];
   onNavigate: (path: string) => void;
+  userId?: string;
 }) {
-  const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
+  const qc = useQueryClient();
+  const recent = notifications.slice(0, 10);
 
-  const visible = notifications.filter((n: any) => {
-    if (filter === "unread") return !n.is_read;
-    if (filter === "read") return n.is_read;
-    return true;
-  });
+  async function markAllRead() {
+    if (!userId) return;
+    await supabase.from("notifications").update({ is_read: true }).eq("user_id", userId).eq("is_read", false);
+    qc.invalidateQueries({ queryKey: ["notifications"] });
+  }
+
+  async function handleTap(n: any) {
+    await supabase.from("notifications").update({ is_read: true }).eq("id", n.id);
+    qc.invalidateQueries({ queryKey: ["notifications"] });
+    onOpenChange(false);
+
+    if (n.type === "settlement_account_needed") { onNavigate("/accounts"); return; }
+
+    // split_added / settlement_created → navigate to the counterpart person's detail page.
+    // notifications has related_split_id (not from_user_id), so resolve via the split's creator.
+    if ((n.type === "split_added" || n.type === "settlement_created") && n.related_split_id && userId) {
+      const { data: split } = await supabase
+        .from("splits").select("created_by").eq("id", n.related_split_id).maybeSingle();
+      if (split?.created_by) {
+        const { data: person } = await supabase
+          .from("people").select("id")
+          .eq("user_id", userId).eq("linked_user_id", split.created_by).maybeSingle();
+        if (person) onNavigate(`/split/person/${person.id}`);
+      }
+    }
+    // split_deleted, delete_attempt → just mark as read, no navigation
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[75dvh] flex flex-col">
+      <SheetContent side="bottom" className="border-0 p-0 max-h-[75dvh] flex flex-col"
+        style={{ background: "#1A1A1A", border: "1px solid #2A2A2A", borderRadius: "12px 12px 0 0" }}>
         <SheetTitle className="sr-only">Notifications</SheetTitle>
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
-          <div className="flex items-center gap-3">
-            <button type="button" onClick={() => onNavigate("/settings/notifications")}
-              className="h-8 w-8 flex items-center justify-center rounded-full bg-secondary">
-              <History className="h-4 w-4" />
-            </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button type="button" className="flex items-center gap-1 text-sm font-medium bg-secondary px-3 py-1.5 rounded-xl capitalize">
-                  {filter === "all" ? "All" : filter === "unread" ? "Unread" : "Read"}
-                  <ChevronDown className="h-3.5 w-3.5 ml-0.5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-28">
-                {(["all", "unread", "read"] as const).map((f) => (
-                  <DropdownMenuItem key={f} onClick={() => setFilter(f)}
-                    className={cn("capitalize", filter === f && "text-primary font-medium")}>
-                    {f.charAt(0).toUpperCase() + f.slice(1)}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between" style={{ padding: "12px 16px", borderBottom: "1px solid #2A2A2A" }}>
+          <span className="font-semibold text-white">Notifications</span>
+          <button type="button" onClick={markAllRead} className="text-sm font-medium" style={{ color: "#7C3AED" }}>
+            Mark all read
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto divide-y divide-border">
-          {visible.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-12">
-              {filter === "all" ? "All caught up!" : `No ${filter} notifications`}
-            </p>
+
+        {/* List (max 10, scrollable to 400px) */}
+        <div className="overflow-y-auto" style={{ maxHeight: 400 }}>
+          {recent.length === 0 ? (
+            <p className="text-center" style={{ color: "#9CA3AF", padding: 40, fontSize: 14 }}>No notifications yet</p>
           ) : (
-            visible.slice(0, 20).map((n: any) => (
-              <div
-                key={n.id}
-                className={`flex items-start gap-3 px-5 py-4 ${!n.is_read ? "bg-primary/5" : "bg-card"} ${n.type === "settlement_account_needed" ? "cursor-pointer active:bg-secondary/40" : ""}`}
-                onClick={n.type === "settlement_account_needed" ? () => onNavigate("/accounts") : undefined}
-              >
-                <div className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${!n.is_read ? "bg-primary" : "bg-transparent border border-border"}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{n.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{n.message}</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">
-                    {format(new Date(n.created_at), "MMM d · h:mm a")}
-                  </p>
-                  {n.type === "settlement_account_needed" && (
-                    <p className="text-xs text-primary mt-1">Tap to go to Accounts →</p>
+            recent.map((n: any) => {
+              const { bg, color, Icon } = getNotificationIcon(n.type);
+              return (
+                <button key={n.id} type="button" onClick={() => handleTap(n)}
+                  className="w-full flex items-start text-left transition-colors hover:bg-[#2A2A2A] active:bg-[#2A2A2A]"
+                  style={{ gap: 12, padding: "12px 16px", borderBottom: "1px solid #2A2A2A" }}>
+                  <div className="shrink-0 rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: bg }}>
+                    <Icon style={{ width: 18, height: 18, color }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-medium text-sm">{n.title}</p>
+                    <p className="text-[13px] mt-0.5 line-clamp-2" style={{ color: "#9CA3AF" }}>{n.message}</p>
+                    <p className="text-[11px] mt-1" style={{ color: "#6B7280" }}>{timeAgo(n.created_at)}</p>
+                  </div>
+                  {!n.is_read && (
+                    <span className="shrink-0 mt-1.5 rounded-full" style={{ width: 8, height: 8, background: "#3B82F6" }} />
                   )}
-                </div>
-              </div>
-            ))
+                </button>
+              );
+            })
           )}
         </div>
+
+        {/* Footer */}
+        <button type="button" onClick={() => { onOpenChange(false); onNavigate("/settings/notifications"); }}
+          className="text-center text-sm font-medium" style={{ padding: "12px 16px", borderTop: "1px solid #2A2A2A", color: "#7C3AED" }}>
+          View all
+        </button>
       </SheetContent>
     </Sheet>
   );
