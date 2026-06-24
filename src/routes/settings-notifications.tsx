@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { notificationsQuery } from "@/lib/queries";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Users, Trash2, Check, ShieldAlert, Bell } from "lucide-react";
+import { ArrowLeft, Users, Trash2, Check, ShieldAlert, Bell, Wallet } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
@@ -14,6 +14,7 @@ function getNotificationIcon(type: string) {
     case "split_deleted": return { bg: "#7F1D1D", color: "#EF4444", Icon: Trash2 };
     case "settlement_created": return { bg: "#064E3B", color: "#10B981", Icon: Check };
     case "delete_attempt": return { bg: "#374151", color: "#6B7280", Icon: ShieldAlert };
+    case "account_selection": return { bg: "#78350F", color: "#F59E0B", Icon: Wallet };
     default: return { bg: "#374151", color: "#9CA3AF", Icon: Bell };
   }
 }
@@ -78,6 +79,9 @@ export default function NotificationsPage() {
       await supabase.from("notifications").update({ is_read: true }).eq("id", n.id);
       qc.invalidateQueries({ queryKey: ["notifications"] });
     }
+
+    // account_selection → Split page Pending tab, where the payer picks which account they used.
+    if (n.type === "account_selection") { navigate("/split?tab=pending"); return; }
 
     // split_added / settlement_created → counterpart person's detail page.
     // notifications carry related_split_id (not from_user_id); resolve via the split's creator.

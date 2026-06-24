@@ -436,7 +436,9 @@ export type Database = {
       }
       splits: {
         Row: {
+          account_confirmed_at: string | null
           account_id: string | null
+          account_pending: boolean
           category_id: string | null
           created_at: string
           created_by: string
@@ -446,6 +448,7 @@ export type Database = {
           id: string
           paid_by: string
           paid_by_person_id: string | null
+          pending_for_user_id: string | null
           person_id: string | null
           split_type: string
           sub_category_id: string | null
@@ -454,7 +457,9 @@ export type Database = {
           type: string
         }
         Insert: {
+          account_confirmed_at?: string | null
           account_id?: string | null
+          account_pending?: boolean
           category_id?: string | null
           created_at?: string
           created_by: string
@@ -464,6 +469,7 @@ export type Database = {
           id?: string
           paid_by: string
           paid_by_person_id?: string | null
+          pending_for_user_id?: string | null
           person_id?: string | null
           split_type: string
           sub_category_id?: string | null
@@ -472,7 +478,9 @@ export type Database = {
           type: string
         }
         Update: {
+          account_confirmed_at?: string | null
           account_id?: string | null
+          account_pending?: boolean
           category_id?: string | null
           created_at?: string
           created_by?: string
@@ -482,6 +490,7 @@ export type Database = {
           id?: string
           paid_by?: string
           paid_by_person_id?: string | null
+          pending_for_user_id?: string | null
           person_id?: string | null
           split_type?: string
           sub_category_id?: string | null

@@ -6,7 +6,7 @@ import { formatMoney, greeting } from "@/lib/format";
 import { AccountIcon } from "@/components/AccountIcon";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
 import { Fab } from "@/components/Fab";
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users, ChevronDown, ChevronRight, Check, Bell, X, Trash2, ShieldAlert } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Users, ChevronDown, ChevronRight, Check, Bell, X, Trash2, ShieldAlert, Wallet } from "lucide-react";
 import { format, startOfWeek, startOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -65,6 +65,7 @@ function showToastIfEnabled(n: any, prefs: any) {
       break;
     }
     case "delete_attempt": shouldShow = !!prefs.toast_delete_attempt; break;
+    case "account_selection": shouldShow = !!prefs.toast_account_selection; break;
   }
   if (shouldShow) notifyToast(n.type, n.title, n.message);
 }
@@ -76,6 +77,7 @@ function getNotificationIcon(type: string) {
     case "split_deleted": return { bg: "#7F1D1D", color: "#EF4444", Icon: Trash2 };
     case "settlement_created": return { bg: "#064E3B", color: "#10B981", Icon: Check };
     case "delete_attempt": return { bg: "#374151", color: "#6B7280", Icon: ShieldAlert };
+    case "account_selection": return { bg: "#78350F", color: "#F59E0B", Icon: Wallet };
     default: return { bg: "#374151", color: "#9CA3AF", Icon: Bell };
   }
 }
@@ -691,9 +693,11 @@ export function SplitDirectRow({ s, lentOweOverride }: { s: any; lentOweOverride
   const perShare = shares.length > 0 ? totalShares / shares.length : total;
   const owersCount = shares.length; // people who owe the viewer when the viewer paid
 
-  // Account line — shown only when the viewer paid. Own split → account label; incoming → not recorded.
+  // Account line — shown only when the viewer paid. Shows the chosen account once known
+  // (own split, or an incoming split the viewer confirmed via the Pending tab); otherwise
+  // "No account selected" (e.g. an account_pending split awaiting the payer's confirmation).
   const accountLabel = isMePaid
-    ? (isIncoming ? "No account selected" : (s.accounts?.label ?? "No account selected"))
+    ? (s.accounts?.label ?? "No account selected")
     : null;
 
   const dateNode = (
@@ -1423,6 +1427,9 @@ function NotificationSheet({ open, onOpenChange, notifications, onNavigate, user
     onOpenChange(false);
 
     if (n.type === "settlement_account_needed") { onNavigate("/accounts"); return; }
+
+    // account_selection → Split page Pending tab, where the payer picks which account they used.
+    if (n.type === "account_selection") { onNavigate("/split?tab=pending"); return; }
 
     // split_added / settlement_created → navigate to the counterpart person's detail page.
     // notifications has related_split_id (not from_user_id), so resolve via the split's creator.

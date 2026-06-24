@@ -385,6 +385,24 @@ export const notificationsQuery = () =>
     },
   });
 
+// Splits awaiting an account selection by the current user (they paid, but haven't said from where).
+export const pendingSplitsQuery = () =>
+  queryOptions({
+    queryKey: ["pending-splits"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("splits")
+        .select("*, split_shares(*, person:people(id, linked_user_id, name)), creator:created_by(id, full_name)")
+        .eq("account_pending", true)
+        .eq("pending_for_user_id", u.user.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
 export const profileQuery = (userId: string | undefined) =>
   queryOptions({
     queryKey: ["profile", userId],

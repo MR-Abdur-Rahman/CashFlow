@@ -1,14 +1,20 @@
-import { useQuery } from "@tanstack/react-query";
-import { peopleQuery, groupsQuery, splitBalancesQuery } from "@/lib/queries";
-import { Users, Plus, ChevronRight, Archive, QrCode, History } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { peopleQuery, groupsQuery, splitBalancesQuery, pendingSplitsQuery, accountsQuery } from "@/lib/queries";
+import { Users, Plus, ChevronRight, Archive, QrCode, History, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { AccountIcon } from "@/components/AccountIcon";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { QrScannerDialog } from "@/components/QrScannerDialog";
 import { formatMoney } from "@/lib/format";
+import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 export default function SplitPage() {
   const { data: people = [] } = useQuery(peopleQuery());
@@ -21,7 +27,11 @@ export default function SplitPage() {
   const [addGroup, setAddGroup] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanned, setScanned] = useState<{ name?: string; phone?: string } | undefined>();
-  const [tab, setTab] = useState<"people" | "groups" | "pending">("people");
+  const { data: pendingSplits = [] } = useQuery(pendingSplitsQuery());
+  const pendingCount = (pendingSplits as any[]).length;
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") === "pending" ? "pending" : "people";
+  const [tab, setTab] = useState<"people" | "groups" | "pending">(initialTab);
 
   function handleScan(text: string) {
     let obj: any;
@@ -54,7 +64,14 @@ export default function SplitPage() {
         <TabsList className="grid grid-cols-3 w-full">
           <TabsTrigger value="people">People</TabsTrigger>
           <TabsTrigger value="groups">Groups</TabsTrigger>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
+          <TabsTrigger value="pending">
+            Pending
+            {pendingCount > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center rounded-full text-[10px] font-bold text-white px-1.5 min-w-[18px] h-[18px] leading-none" style={{ background: "#EF4444" }}>
+                {pendingCount}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* People */}
@@ -122,11 +139,9 @@ export default function SplitPage() {
           </div>
         </TabsContent>
 
-        {/* Pending — placeholder until the account-selection system is built */}
+        {/* Pending — account selection for splits where I paid */}
         <TabsContent value="pending">
-          <div className="rounded-2xl p-10 text-center" style={{ background: "#1A1A1A" }}>
-            <p className="text-sm" style={{ color: "#9CA3AF" }}>No pending payments</p>
-          </div>
+          <PendingTab pendingSplits={pendingSplits as any[]} />
         </TabsContent>
       </Tabs>
 
@@ -186,6 +201,129 @@ function bilateralBalance(splits: any[], target: any, currentUserId: string | nu
     // Third party paid → skip
   }
   return net;
+}
+
+function PendingTab({ pendingSplits }: { pendingSplits: any[] }) {
+  const { data: accounts = [] } = useQuery(accountsQuery());
+
+  if (pendingSplits.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center text-center" style={{ padding: "60px 16px", gap: 12 }}>
+        <CheckCircle style={{ width: 48, height: 48, color: "#6B7280" }} />
+        <p className="text-sm" style={{ color: "#9CA3AF" }}>No pending payments</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {pendingSplits.map((s) => (
+        <PendingRow key={s.id} split={s} accounts={accounts as any[]} />
+      ))}
+    </div>
+  );
+}
+
+function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
+  const qc = useQueryClient();
+  const [accountId, setAccountId] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const selectedAccount = accounts.find((a) => a.id === accountId);
+  const creatorName = split.creator?.full_name ?? "Someone";
+
+  async function confirmSelection() {
+    if (!selectedAccount || saving) return;
+    setSaving(true);
+    try {
+      const { error: e1 } = await supabase
+        .from("splits")
+        .update({
+          account_id: selectedAccount.id,
+          account_pending: false,
+          account_confirmed_at: new Date().toISOString(),
+        })
+        .eq("id", split.id);
+      if (e1) throw e1;
+
+      const { error: e2 } = await supabase
+        .from("accounts")
+        .update({ current_balance: Number(selectedAccount.current_balance) - Number(split.total_amount) })
+        .eq("id", selectedAccount.id);
+      if (e2) throw e2;
+
+      qc.invalidateQueries({ queryKey: ["pending-splits"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+      qc.invalidateQueries({ queryKey: ["splits"] });
+      toast.success("Account confirmed");
+      setConfirmOpen(false);
+    } catch (err: any) {
+      toast.error(err.message ?? "Could not confirm");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl p-4 space-y-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
+      {/* Line 1: description + amount */}
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium text-white">{split.description || "Untitled"}</p>
+        <span className="text-sm font-mono font-semibold shrink-0" style={{ color: "#F59E0B" }}>
+          {formatMoney(Number(split.total_amount))}
+        </span>
+      </div>
+
+      {/* Line 2: creator + date */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs" style={{ color: "#9CA3AF" }}>{creatorName} added this split</p>
+        <span className="text-xs shrink-0" style={{ color: "#6B7280" }}>{format(new Date(split.created_at), "MMM d, yyyy")}</span>
+      </div>
+
+      {/* Line 3: account dropdown + confirm */}
+      <div className="flex items-center gap-2">
+        <Select value={accountId} onValueChange={setAccountId}>
+          <SelectTrigger className="flex-1"><SelectValue placeholder="Select account" /></SelectTrigger>
+          <SelectContent>
+            {accounts.map((a) => (
+              <SelectItem key={a.id} value={a.id}>
+                <span className="flex items-center gap-2">
+                  <AccountIcon iconType={a.icon_type} iconName={a.icon_name} iconColor={a.icon_color} iconUrl={a.icon_url} size={20} rounded="rounded-md" />
+                  <span>{[a.institution, a.label].filter(Boolean).join(" · ")}</span>
+                  <span className="text-muted-foreground">{formatMoney(Number(a.current_balance))}</span>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          disabled={!accountId}
+          onClick={() => setConfirmOpen(true)}
+          className="text-white shrink-0"
+          style={{ background: "#78350F" }}
+        >
+          Confirm
+        </Button>
+      </div>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogTitle>Confirm Account Selection</DialogTitle>
+          <DialogDescription>
+            The amount {formatMoney(Number(split.total_amount))} will be deducted from{" "}
+            {selectedAccount ? [selectedAccount.institution, selectedAccount.label].filter(Boolean).join(" · ") : "the selected account"}. This cannot be changed later.
+          </DialogDescription>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={saving}>Cancel</Button>
+            <Button onClick={confirmSelection} disabled={saving} className="text-white" style={{ background: "#78350F" }}>
+              {saving ? "Confirming…" : "Confirm"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
 
 function Avatar({ name }: { name: string }) {

@@ -885,6 +885,26 @@ function SplitForm({ onClose }: { onClose: () => void }) {
       if (target !== "group" && participants.length === 0) throw new Error("Select at least one person");
       if (target === "group" && !groupId) throw new Error("Select a group");
 
+      // Account-pending: if someone OTHER than me paid and that payer is a linked CashFlow user,
+      // we don't yet know which of THEIR accounts the money came from — they must confirm it later.
+      const payerPerson = whoPaid !== "me" && paidByPersonId
+        ? (people as any[]).find((p) => p.id === paidByPersonId)
+        : null;
+      const payerLinkedUserId: string | null = payerPerson?.linked_user_id ?? null;
+      const isAccountPending = !!payerLinkedUserId;
+
+      // Cap unconfirmed payments per payer so they don't pile up.
+      if (isAccountPending) {
+        const { count } = await supabase
+          .from("splits")
+          .select("*", { count: "exact", head: true })
+          .eq("account_pending", true)
+          .eq("pending_for_user_id", payerLinkedUserId);
+        if (count && count >= 3) {
+          throw new Error("This user has 3 unconfirmed payments pending. Ask them to confirm before adding more.");
+        }
+      }
+
       const { data: split, error } = await supabase.from("splits").insert({
         type: target === "group" ? "group" : "individual",
         person_id: target === "person" && personId ? personId : null,
@@ -897,6 +917,8 @@ function SplitForm({ onClose }: { onClose: () => void }) {
         category_id: categoryId || null,
         sub_category_id: subCatId || null,
         account_id: whoPaid === "me" && accountId ? accountId : null,
+        account_pending: isAccountPending,
+        pending_for_user_id: isAccountPending ? payerLinkedUserId : null,
         date, time, created_by: u.user.id,
       }).select("*").single();
       if (error) throw error;
