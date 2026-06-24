@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import type { CSSProperties } from "react";
 import { Users, Trash2, Check, ShieldAlert, Bell } from "lucide-react";
 
 // Type-based background + border for each toast.
@@ -23,18 +24,19 @@ export function getToastIcon(type: string) {
 // Compact toast with a type-colored background + white icon.
 // Pass `description` to render a two-line title + description toast (capped at 400px).
 export function notifyToast(type: string, message: string, description?: string) {
-  const style = toastStyles[type] ?? { background: "#1A1A1A", border: "1px solid #2A2A2A" };
-  toast(message, {
-    icon: getToastIcon(type),
-    duration: 4000,
-    description,
-    style: {
-      ...style,
-      color: "#FFFFFF",
-      borderRadius: "12px",
-      fontSize: "14px",
-      padding: "12px 16px",
-      ...(description ? { maxWidth: "400px", margin: "0 auto" } : {}),
-    },
-  });
+  const { background, border } = toastStyles[type] ?? { background: "#1A1A1A", border: "1px solid #2A2A2A" };
+  const style = {
+    background,
+    border,
+    color: "#FFFFFF",
+    borderRadius: "12px",
+    fontSize: "14px",
+    padding: "12px 16px",
+    // Override sonner's CSS variables too, so the colored background wins even with richColors.
+    "--normal-bg": background,
+    "--normal-border": border,
+    "--normal-text": "#FFFFFF",
+    ...(description ? { maxWidth: "400px", margin: "0 auto" } : {}),
+  } as CSSProperties;
+  toast(message, { icon: getToastIcon(type), duration: 4000, description, style });
 }

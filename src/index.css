@@ -170,3 +170,14 @@ html.light {
   --split-bg: oklch(0.93 0.07 70);
   color-scheme: light;
 }
+
+/* Force toasts to stay centered at the top and never overflow on mobile. */
+[data-sonner-toaster] {
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+}
+[data-sonner-toast] {
+  max-width: min(400px, calc(100vw - 32px)) !important;
+  margin: 0 auto !important;
+}
