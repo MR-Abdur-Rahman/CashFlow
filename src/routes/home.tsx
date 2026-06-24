@@ -562,7 +562,7 @@ function SplitRowContent({ t }: { t: any }) {
   );
 }
 
-export function SplitDirectRow({ s }: { s: any }) {
+export function SplitDirectRow({ s, lentOweOverride }: { s: any; lentOweOverride?: number }) {
   const shares = (s.split_shares ?? []) as any[];
   const total = Number(s.total_amount);
   const totalShares = shares.reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
@@ -663,11 +663,11 @@ export function SplitDirectRow({ s }: { s: any }) {
             {isMePaid ? (
               <div className="flex items-center justify-between gap-2 mt-0.5">
                 <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{accountLabel}</p>
-                <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">You lent {formatMoney(youLent)}</p>
+                <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">You lent {formatMoney(lentOweOverride ?? youLent)}</p>
               </div>
             ) : (
               <div className="flex items-center justify-end gap-2 mt-0.5">
-                <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">You owe {formatMoney(youOwe)}</p>
+                <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">You owe {formatMoney(lentOweOverride ?? youOwe)}</p>
               </div>
             )}
             {dateNode}

@@ -234,7 +234,7 @@ export default function PersonDetail() {
           <div className="rounded-2xl overflow-hidden border border-border divide-y divide-border">
             {filteredSplits.map((s: any) => (
               <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
-                <SplitDirectRow s={s} />
+                <SplitDirectRow s={s} lentOweOverride={bilateralRowAmount(s)} />
               </SwipeRow>
             ))}
           </div>
@@ -354,6 +354,38 @@ function getPayerAuthId(split: any): string | null {
     if (m?.person?.linked_user_id) return m.person.linked_user_id;
   }
   return null;
+}
+
+// ─── Helper: bilateral lent/owe amount for a People/Group row on the person page ───
+// Returns the TARGET person's (or current user's) specific share — not the whole-split total.
+// Individual rows return undefined (already correct: only two people involved).
+function bilateralRowAmount(s: any): number | undefined {
+  const shares = (s.split_shares ?? []) as any[];
+  const isGroup = s.type === "group";
+  const isIndividual = !isGroup && shares.length <= 1;
+  if (isIndividual) return undefined;
+
+  const total = Number(s.total_amount);
+  const sumShares = shares.reduce((a: number, sh: any) => a + Number(sh.share_amount), 0);
+  const currentUserId: string | null = s._currentUserId ?? null;
+  const targetLui: string | null = s._targetLinkedUserId ?? null;
+  const targetPid: string | undefined = s._targetPersonId;
+  const myPersonIds: string[] = s._myPersonIds ?? [];
+  const payer = getPayerAuthId(s);
+
+  const targetShareEntry = shares.find((ss: any) =>
+    (targetLui && ss.person?.linked_user_id === targetLui) || ss.person_id === targetPid);
+  const myShareEntry = shares.find((ss: any) =>
+    myPersonIds.includes(ss.person_id) || ss.person?.linked_user_id === currentUserId);
+
+  if (payer && payer === currentUserId) {
+    if (targetShareEntry) return Number(targetShareEntry.share_amount);
+    if (targetLui && s.created_by === targetLui) return total - sumShares;
+  } else if (payer && targetLui && payer === targetLui) {
+    if (myShareEntry) return Number(myShareEntry.share_amount);
+    if (s.created_by === currentUserId) return total - sumShares;
+  }
+  return undefined; // can't determine → fall back to default whole-split amount
 }
 
 // ─── Helper: get display label for a split ────────────────────────────────
