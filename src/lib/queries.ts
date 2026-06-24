@@ -253,10 +253,12 @@ export const personSplitsQuery = (personId: string) =>
 
       const { data, error } = await supabase
         .from("splits")
-        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name)")
+        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name), accounts:account_id(label)")
         .in("id", splitIds)
-        .order("date", { ascending: false });
-      
+        .order("date", { ascending: false })
+        .order("time", { ascending: false })
+        .order("created_at", { ascending: false });
+
 
       if (error) throw error;
 

@@ -1,15 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { personQuery, personSplitsQuery, peopleQuery, groupsQuery, accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
-import { ArrowLeft, Bell, Plus, Users, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, QrCode, X, Check } from "lucide-react";
+import { ArrowLeft, Bell, Plus, ChevronLeft, ChevronRight, ChevronDown, QrCode, X, Check } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { SendReminderDialog } from "@/components/SendReminderDialog";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
 import { SettleUpDialog } from "@/components/SettleUpDialog";
 import { SwipeRow } from "@/components/SwipeRow";
+import { SplitDirectRow } from "./home";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useState, useMemo, useEffect, Fragment } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
@@ -50,7 +51,6 @@ export default function PersonDetail() {
   const qc = useQueryClient();
   const { data: person } = useQuery(personQuery(personId!));
   const { data: splits = [] } = useQuery(personSplitsQuery(personId!));
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>("monthly");
   const [anchor, setAnchor] = useState(new Date());
   const [reminderOpen, setReminderOpen] = useState(false);
@@ -58,49 +58,46 @@ export default function PersonDetail() {
   const [settleOpen, setSettleOpen] = useState(false);
   const [deleteSplit, setDeleteSplit] = useState<any | null>(null);
   const [editSplit, setEditSplit] = useState<any | null>(null);
-  const [settleItem, setSettleItem] = useState<{ share: any; split: any } | null>(null);
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
-  }, []);
+  // Bilateral net balance between current user and target person.
+  // Positive = target owes me; negative = I owe target. Third-party-paid splits are skipped.
+  const balance = useMemo(() => {
+    let net = 0;
+    for (const s of splits as any[]) {
+      const shares = (s.split_shares ?? []) as any[];
+      const settlements = (s.settlements ?? []) as any[];
+      const total = Number(s.total_amount);
+      const sumShares = shares.reduce((a: number, sh: any) => a + Number(sh.share_amount), 0);
+      const shareOf = (pid: string | null) => {
+        const sh = shares.find((x: any) => x.person_id === pid);
+        return sh ? Number(sh.share_amount) : 0;
+      };
+      const settledOf = (pid: string | null) => {
+        const sh = shares.find((x: any) => x.person_id === pid);
+        if (!sh) return 0;
+        return settlements.filter((x: any) => x.split_share_id === sh.id).reduce((a: number, x: any) => a + Number(x.amount), 0);
+      };
 
-  const totals = (splits as any[]).reduce((acc, s) => {
-    const targetPersonId = s._isIncoming ? s._myPersonId : personId;
-    if (!targetPersonId) return acc;
-
-    if (s._isIncoming) {
-      const myShareRecord = (s.split_shares ?? []).find((sh: any) => sh.person_id === targetPersonId);
-      if (!myShareRecord) return acc;
-      const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === myShareRecord.id)
-        .reduce((a: number, x: any) => a + Number(x.amount), 0);
-
-      // For incoming: paid_by="me" = creator paid → I owe; paid_by_person_id===mine → I paid → they owe me
-      const isCreatorPaid = s.paid_by === "me";
-      const iMePaid = s.paid_by_person_id != null
-        ? s.paid_by_person_id === targetPersonId
-        : !isCreatorPaid;
-
-      if (iMePaid) {
-        // I paid → creator owes me their implicit share
-        const totalSharesSum = (s.split_shares ?? []).reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
-        acc.owed += Number(s.total_amount) - totalSharesSum;
-      } else {
-        // Creator paid → I owe my share
-        acc.iOwe += Number(myShareRecord.share_amount) - settled;
+      if (!s._isIncoming) {
+        // Own split — I'm the creator (implicit share = total - sumShares); target = personId.
+        const iPaid = s.paid_by_person_id == null ? s.paid_by === "me" : false;
+        const targetPaid = s.paid_by_person_id != null
+          ? s.paid_by_person_id === personId
+          : (s.paid_by !== "me" && s.paid_by === person?.name);
+        if (iPaid) net += shareOf(personId!) - settledOf(personId!);          // target owes me their share
+        else if (targetPaid) net -= total - sumShares;                         // I owe target my implicit share
+        // else third-party paid → skip
+      } else if (person?.linked_user_id && s.created_by === person.linked_user_id) {
+        // Incoming split where the TARGET is the creator → bilateral me ↔ target.
+        const myPid = s._myPersonId;
+        const iPaid = s.paid_by_person_id != null ? s.paid_by_person_id === myPid : s.paid_by !== "me";
+        if (iPaid) net += total - sumShares;                                   // target (creator) owes me the implicit share
+        else net -= shareOf(myPid) - settledOf(myPid);                         // creator paid → I owe my share
       }
-    } else {
-      for (const sh of (s.split_shares ?? [])) {
-        if (sh.person_id !== targetPersonId) continue;
-        const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
-          .reduce((a: number, x: any) => a + Number(x.amount), 0);
-        acc.owed += Number(sh.share_amount);
-        acc.paid += settled;
-      }
+      // incoming where target is a co-participant (not creator) → skip; handled on the creator's page
     }
-    return acc;
-  }, { owed: 0, paid: 0, iOwe: 0 });
-
-  const balance = (totals.owed - totals.paid) - totals.iOwe;
+    return net;
+  }, [splits, personId, person]);
 
   const unsettledItems = useMemo(() => {
     return (splits as any[]).flatMap((s) => {
@@ -217,72 +214,11 @@ export default function PersonDetail() {
           </div>
         ) : (
           <div className="rounded-2xl overflow-hidden border border-border divide-y divide-border">
-            {filteredSplits.map((s: any) => {
-              const targetPersonId = s._isIncoming ? s._myPersonId : personId;
-              const myShares = (s.split_shares ?? []).filter((sh: any) => sh.person_id === targetPersonId);
-              const myTotal = myShares.reduce((a: number, sh: any) => a + Number(sh.share_amount), 0);
-              const totalSettled = myShares.reduce((acc: number, sh: any) =>
-                acc + (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
-                  .reduce((a: number, x: any) => a + Number(x.amount), 0), 0);
-              const remaining = myTotal - totalSettled;
-              const isSettled = remaining <= 0.005;
-              const unsettledShare = myShares.find((sh: any) => !sh.is_settled);
-              const label = getSplitLabel(s, person?.name);
-
-              const shareSettlements = myShares.flatMap((sh: any) =>
-                (s.settlements ?? []).filter((st: any) => st.split_share_id === sh.id)
-              ).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
-              let runningPaid = 0;
-              const settlementRows = shareSettlements.map((st: any) => {
-                runningPaid += Number(st.amount);
-                const bal = myTotal - runningPaid;
-                const done = bal <= 0.005;
-                const settlerName = st.created_by === currentUserId ? "You" : (person?.name ?? "");
-                return { st, bal, done, settlerName };
-              });
-
-              return (
-                <Fragment key={s.id}>
-                  <SwipeRow onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
-                    <div className="flex items-center gap-3 px-4 py-3 bg-card">
-                      <div className="h-9 w-9 rounded-full bg-split/20 flex items-center justify-center text-split shrink-0">
-                        <Users className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{label}</p>
-                        <p className="text-xs text-muted-foreground">paid by {s.paid_by}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-sm font-mono font-semibold text-split">{formatMoney(myTotal)}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{formatMoney(s.total_amount)}</p>
-                        {!isSettled && unsettledShare && (
-                          <button type="button"
-                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); setSettleItem({ share: unsettledShare, split: s }); }}
-                            className="text-[10px] text-primary underline mt-0.5">
-                            Settle up
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </SwipeRow>
-                  {settlementRows.map(({ st, bal, done, settlerName }) => (
-                    <div key={st.id} className="flex items-center gap-3 px-4 py-2 bg-secondary/30 pl-16">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-foreground">{settlerName}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-sm font-mono font-semibold text-income">+{formatMoney(Number(st.amount))}</p>
-                        {done
-                          ? <p className="text-xs text-income inline-flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3" /> Settled</p>
-                          : <p className="text-xs text-muted-foreground font-mono">{formatMoney(bal)} remaining</p>
-                        }
-                      </div>
-                    </div>
-                  ))}
-                </Fragment>
-              );
-            })}
+            {filteredSplits.map((s: any) => (
+              <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}>
+                <SplitDirectRow s={s} />
+              </SwipeRow>
+            ))}
           </div>
         )}
       </div>
@@ -306,15 +242,6 @@ export default function PersonDetail() {
           onOpenChange={setSettleOpen}
           personName={person.name}
           unsettledItems={unsettledItems}
-        />
-      )}
-
-      {settleItem && (
-        <SettleUpDialog
-          open={!!settleItem}
-          onOpenChange={(o) => { if (!o) setSettleItem(null); }}
-          share={settleItem.share}
-          split={settleItem.split}
         />
       )}
 
