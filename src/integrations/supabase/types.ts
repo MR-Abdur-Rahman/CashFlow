@@ -333,6 +333,10 @@ export type Database = {
           id: string
           method: string
           note: string | null
+          pending_for_user_id: string | null
+          receiver_account_id: string | null
+          receiver_account_pending: boolean
+          receiver_confirmed_at: string | null
           split_id: string
           split_share_id: string
         }
@@ -344,6 +348,10 @@ export type Database = {
           id?: string
           method: string
           note?: string | null
+          pending_for_user_id?: string | null
+          receiver_account_id?: string | null
+          receiver_account_pending?: boolean
+          receiver_confirmed_at?: string | null
           split_id: string
           split_share_id: string
         }
@@ -355,6 +363,10 @@ export type Database = {
           id?: string
           method?: string
           note?: string | null
+          pending_for_user_id?: string | null
+          receiver_account_id?: string | null
+          receiver_account_pending?: boolean
+          receiver_confirmed_at?: string | null
           split_id?: string
           split_share_id?: string
         }

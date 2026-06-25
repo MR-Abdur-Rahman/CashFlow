@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { notifyToast } from "@/lib/notify";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AddAccountSheet } from "@/components/AddAccountSheet";
 import { SwipeRow } from "@/components/SwipeRow";
 import {
@@ -102,6 +102,8 @@ export default function AccountDetail() {
   const [deleteSplitItem, setDeleteSplitItem] = useState<any | null>(null);
   const [deleteSettlement, setDeleteSettlement] = useState<any | null>(null);
   const [editSettlement, setEditSettlement] = useState<any | null>(null);
+  const [userId, setUserId] = useState<string | undefined>();
+  useEffect(() => { supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id)); }, []);
 
   const { dateFrom, dateTo } = useMemo(() => getPeriodRange(period, anchor), [period, anchor]);
 
@@ -344,7 +346,10 @@ export default function AccountDetail() {
           ) : (
             splitsTabItems.map((item: any) =>
               item._itemType === "settlement" ? (
-                <SwipeRow key={`set-${item.id}`} onEdit={() => setEditSettlement(item)} onDelete={() => setDeleteSettlement(item)}>
+                <SwipeRow key={`set-${item.id}`} onEdit={() => setEditSettlement(item)} onDelete={() => setDeleteSettlement(item)}
+                  canEdit={item.created_by === userId} canDelete={item.created_by === userId}
+                  editDeniedMessage="Only the creator can edit this settlement"
+                  deleteDeniedMessage="Only the creator can delete this settlement">
                   <SettlementRow s={item} />
                 </SwipeRow>
               ) : (

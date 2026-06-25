@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { peopleQuery, groupsQuery, splitBalancesQuery, pendingSplitsQuery, accountsQuery } from "@/lib/queries";
+import { peopleQuery, groupsQuery, splitBalancesQuery, pendingSplitsQuery, pendingSettlementsQuery, accountsQuery } from "@/lib/queries";
 import { Users, Plus, ChevronRight, Archive, QrCode, History, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -28,7 +28,8 @@ export default function SplitPage() {
   const [scanOpen, setScanOpen] = useState(false);
   const [scanned, setScanned] = useState<{ name?: string; phone?: string } | undefined>();
   const { data: pendingSplits = [] } = useQuery(pendingSplitsQuery());
-  const pendingCount = (pendingSplits as any[]).length;
+  const { data: pendingSettlements = [] } = useQuery(pendingSettlementsQuery());
+  const pendingCount = (pendingSplits as any[]).length + (pendingSettlements as any[]).length;
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") === "pending" ? "pending" : "people";
   const [tab, setTab] = useState<"people" | "groups" | "pending">(initialTab);
@@ -141,7 +142,7 @@ export default function SplitPage() {
 
         {/* Pending — account selection for splits where I paid */}
         <TabsContent value="pending">
-          <PendingTab pendingSplits={pendingSplits as any[]} />
+          <PendingTab pendingSplits={pendingSplits as any[]} pendingSettlements={pendingSettlements as any[]} />
         </TabsContent>
       </Tabs>
 
@@ -203,10 +204,10 @@ function bilateralBalance(splits: any[], target: any, currentUserId: string | nu
   return net;
 }
 
-function PendingTab({ pendingSplits }: { pendingSplits: any[] }) {
+function PendingTab({ pendingSplits, pendingSettlements }: { pendingSplits: any[]; pendingSettlements: any[] }) {
   const { data: accounts = [] } = useQuery(accountsQuery());
 
-  if (pendingSplits.length === 0) {
+  if (pendingSplits.length === 0 && pendingSettlements.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center text-center" style={{ padding: "60px 16px", gap: 12 }}>
         <CheckCircle style={{ width: 48, height: 48, color: "#6B7280" }} />
@@ -220,6 +221,104 @@ function PendingTab({ pendingSplits }: { pendingSplits: any[] }) {
       {pendingSplits.map((s) => (
         <PendingRow key={s.id} split={s} accounts={accounts as any[]} />
       ))}
+      {pendingSettlements.map((s) => (
+        <PendingSettlementRow key={s.id} settlement={s} accounts={accounts as any[]} />
+      ))}
+    </div>
+  );
+}
+
+function PendingSettlementRow({ settlement, accounts }: { settlement: any; accounts: any[] }) {
+  const qc = useQueryClient();
+  const [accountId, setAccountId] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const selectedAccount = accounts.find((a) => a.id === accountId);
+  const settlerName = settlement.creator?.full_name ?? "Someone";
+  const desc = settlement.splits?.description || "Settlement";
+  const methodLabel = String(settlement.method ?? "transfer").replace("_", " ");
+
+  async function confirmSelection() {
+    if (!selectedAccount || saving) return;
+    setSaving(true);
+    try {
+      // The receiver's account is credited by the settlement_receiver_balance DB trigger on this update.
+      const { error } = await supabase
+        .from("settlements")
+        .update({
+          receiver_account_id: selectedAccount.id,
+          receiver_account_pending: false,
+          receiver_confirmed_at: new Date().toISOString(),
+        })
+        .eq("id", settlement.id);
+      if (error) throw error;
+
+      qc.invalidateQueries({ queryKey: ["pending-settlements"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+      qc.invalidateQueries({ queryKey: ["settlements"] });
+      qc.invalidateQueries({ queryKey: ["splits"] });
+      toast.success("Account confirmed");
+      setConfirmOpen(false);
+    } catch (err: any) {
+      toast.error(err.message ?? "Could not confirm");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl p-4 space-y-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
+      {/* Line 1: description + amount received */}
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium text-white">{desc}</p>
+        <span className="text-sm font-mono font-semibold shrink-0" style={{ color: "#10B981" }}>
+          +{formatMoney(Number(settlement.amount))}
+        </span>
+      </div>
+
+      {/* Line 2: who paid + date */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs" style={{ color: "#9CA3AF" }}>{settlerName} paid you via {methodLabel}</p>
+        <span className="text-xs shrink-0" style={{ color: "#6B7280" }}>{format(new Date(settlement.created_at), "MMM d, yyyy")}</span>
+      </div>
+
+      {/* Line 3: receiving account dropdown + confirm */}
+      <div className="flex items-center gap-2">
+        <Select value={accountId} onValueChange={setAccountId}>
+          <SelectTrigger className="flex-1"><SelectValue placeholder="Select account" /></SelectTrigger>
+          <SelectContent>
+            {accounts.map((a) => (
+              <SelectItem key={a.id} value={a.id}>
+                <span className="flex items-center gap-2">
+                  <AccountIcon iconType={a.icon_type} iconName={a.icon_name} iconColor={a.icon_color} iconUrl={a.icon_url} size={20} rounded="rounded-md" />
+                  <span>{[a.institution, a.label].filter(Boolean).join(" · ")}</span>
+                  <span className="text-muted-foreground">{formatMoney(Number(a.current_balance))}</span>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button disabled={!accountId} onClick={() => setConfirmOpen(true)} className="text-white shrink-0" style={{ background: "#064E3B" }}>
+          Confirm
+        </Button>
+      </div>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogTitle>Confirm Account Selection</DialogTitle>
+          <DialogDescription>
+            The amount {formatMoney(Number(settlement.amount))} will be added to{" "}
+            {selectedAccount ? [selectedAccount.institution, selectedAccount.label].filter(Boolean).join(" · ") : "the selected account"}. This cannot be changed later.
+          </DialogDescription>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={saving}>Cancel</Button>
+            <Button onClick={confirmSelection} disabled={saving} className="text-white" style={{ background: "#064E3B" }}>
+              {saving ? "Confirming…" : "Confirm"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

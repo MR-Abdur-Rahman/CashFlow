@@ -124,6 +124,14 @@ export function SettleUpDialog({
         const item = items.find((i) => i.shareId === shareId);
         if (!item) continue;
 
+        // The receiver (person being paid) is the split's creator, when they aren't the settler.
+        // For bank/e-wallet settlements they must confirm which of THEIR accounts received the money
+        // (handled in Split → Pending). Their account is credited by a DB trigger on confirm.
+        const { data: splitData } = await supabase
+          .from("splits").select("created_by").eq("id", item.splitId).maybeSingle();
+        const receiverId = splitData && splitData.created_by !== u.user.id ? splitData.created_by : null;
+        const receiverPending = (method === "bank_transfer" || method === "e-wallet") && !!receiverId;
+
         const { error } = await supabase.from("settlements").insert({
           split_id: item.splitId,
           split_share_id: shareId,
@@ -132,6 +140,8 @@ export function SettleUpDialog({
           account_id: accountId || null,
           note: note || null,
           created_by: u.user.id,
+          receiver_account_pending: receiverPending,
+          pending_for_user_id: receiverPending ? receiverId : null,
         });
         if (error) throw error;
 
@@ -162,24 +172,6 @@ export function SettleUpDialog({
           }).eq("id", shareId);
         }
 
-        // Notify split creator when settled via bank_transfer or e-wallet
-        if (method === "bank_transfer" || method === "e-wallet") {
-          const { data: splitData } = await supabase
-            .from("splits").select("created_by").eq("id", item.splitId).maybeSingle();
-          if (splitData && splitData.created_by !== u.user.id) {
-            const { data: settlerProfile } = await supabase
-              .from("profiles").select("full_name").eq("id", u.user.id).maybeSingle();
-            const settlerName = settlerProfile?.full_name ?? personName ?? "Someone";
-            await supabase.from("notifications").insert({
-              user_id: splitData.created_by,
-              type: "settlement_account_needed",
-              title: "Settlement received",
-              message: `${settlerName} settled LKR ${amt} — tap to select which account to credit`,
-              related_split_id: item.splitId,
-              is_read: false,
-            });
-          }
-        }
       }
     },
     onSuccess: () => {

@@ -403,6 +403,24 @@ export const pendingSplitsQuery = () =>
     },
   });
 
+// Settlements awaiting the receiver picking which of THEIR accounts received the money.
+export const pendingSettlementsQuery = () =>
+  queryOptions({
+    queryKey: ["pending-settlements"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("settlements")
+        .select("*, creator:created_by(id, full_name), splits:split_id(description)")
+        .eq("receiver_account_pending", true)
+        .eq("pending_for_user_id", u.user.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
 export const profileQuery = (userId: string | undefined) =>
   queryOptions({
     queryKey: ["profile", userId],

@@ -66,6 +66,7 @@ function showToastIfEnabled(n: any, prefs: any) {
     }
     case "delete_attempt": shouldShow = !!prefs.toast_delete_attempt; break;
     case "account_selection": shouldShow = !!prefs.toast_account_selection; break;
+    case "settlement_account_selection": shouldShow = !!prefs.toast_account_selection; break;
   }
   if (shouldShow) notifyToast(n.type, n.title, n.message);
 }
@@ -78,6 +79,8 @@ function getNotificationIcon(type: string) {
     case "settlement_created": return { bg: "#064E3B", color: "#10B981", Icon: Check };
     case "delete_attempt": return { bg: "#374151", color: "#6B7280", Icon: ShieldAlert };
     case "account_selection": return { bg: "#78350F", color: "#F59E0B", Icon: Wallet };
+    case "settlement_account_selection":
+    case "settlement_account_needed": return { bg: "#064E3B", color: "#10B981", Icon: Wallet };
     default: return { bg: "#374151", color: "#9CA3AF", Icon: Bell };
   }
 }
@@ -371,7 +374,10 @@ export default function Home() {
                   <div className="divide-y divide-border">
                     {splitsTabItems.map((item: any) =>
                       item._itemType === "settlement" ? (
-                        <SwipeRow key={`set-${item.id}`} onEdit={() => setEditSettlement(item)} onDelete={() => setDeleteHomeSettlement(item)}>
+                        <SwipeRow key={`set-${item.id}`} onEdit={() => setEditSettlement(item)} onDelete={() => setDeleteHomeSettlement(item)}
+                          canEdit={item.created_by === userId} canDelete={item.created_by === userId}
+                          editDeniedMessage="Only the creator can edit this settlement"
+                          deleteDeniedMessage="Only the creator can delete this settlement">
                           <HomeSettlementRow s={item} />
                         </SwipeRow>
                       ) : (
@@ -1426,10 +1432,11 @@ function NotificationSheet({ open, onOpenChange, notifications, onNavigate, user
     qc.invalidateQueries({ queryKey: ["notifications"] });
     onOpenChange(false);
 
-    if (n.type === "settlement_account_needed") { onNavigate("/accounts"); return; }
-
-    // account_selection → Split page Pending tab, where the payer picks which account they used.
-    if (n.type === "account_selection") { onNavigate("/split?tab=pending"); return; }
+    // Account selection (split payer, or settlement receiver) → Split page Pending tab.
+    // settlement_account_needed is the legacy type, now routed to Pending too.
+    if (n.type === "account_selection" || n.type === "settlement_account_selection" || n.type === "settlement_account_needed") {
+      onNavigate("/split?tab=pending"); return;
+    }
 
     // split_added / settlement_created → navigate to the counterpart person's detail page.
     // notifications has related_split_id (not from_user_id), so resolve via the split's creator.

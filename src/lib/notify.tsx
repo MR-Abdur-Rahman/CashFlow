@@ -7,6 +7,7 @@ const toastStyles: Record<string, { background: string; border: string }> = {
   settlement_created: { background: "#064E3B", border: "1px solid #10B981" },
   delete_attempt: { background: "#374151", border: "1px solid #6B7280" },
   account_selection: { background: "#78350F", border: "1px solid #F59E0B" },
+  settlement_account_selection: { background: "#064E3B", border: "1px solid #10B981" },
 };
 
 function getToastIcon(type: string) {
@@ -17,6 +18,7 @@ function getToastIcon(type: string) {
     case "settlement_created": return <Check {...props} />;
     case "delete_attempt": return <ShieldAlert {...props} />;
     case "account_selection": return <Wallet {...props} />;
+    case "settlement_account_selection": return <Wallet {...props} />;
     default: return <Bell {...props} />;
   }
 }

@@ -15,6 +15,8 @@ function getNotificationIcon(type: string) {
     case "settlement_created": return { bg: "#064E3B", color: "#10B981", Icon: Check };
     case "delete_attempt": return { bg: "#374151", color: "#6B7280", Icon: ShieldAlert };
     case "account_selection": return { bg: "#78350F", color: "#F59E0B", Icon: Wallet };
+    case "settlement_account_selection":
+    case "settlement_account_needed": return { bg: "#064E3B", color: "#10B981", Icon: Wallet };
     default: return { bg: "#374151", color: "#9CA3AF", Icon: Bell };
   }
 }
@@ -80,8 +82,10 @@ export default function NotificationsPage() {
       qc.invalidateQueries({ queryKey: ["notifications"] });
     }
 
-    // account_selection → Split page Pending tab, where the payer picks which account they used.
-    if (n.type === "account_selection") { navigate("/split?tab=pending"); return; }
+    // Account selection (split payer, or settlement receiver) → Split page Pending tab.
+    if (n.type === "account_selection" || n.type === "settlement_account_selection" || n.type === "settlement_account_needed") {
+      navigate("/split?tab=pending"); return;
+    }
 
     // split_added / settlement_created → counterpart person's detail page.
     // notifications carry related_split_id (not from_user_id); resolve via the split's creator.
