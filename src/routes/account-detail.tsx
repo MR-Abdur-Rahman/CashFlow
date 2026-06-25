@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { accountQuery, transactionsQuery, splitsQuery } from "@/lib/queries";
+import { accountQuery, transactionsQuery } from "@/lib/queries";
 import { AccountIcon } from "@/components/AccountIcon";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { EditSplitSheet, EditTxSheet } from "@/routes/home";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
+import { SettlementRow } from "@/components/SettlementRow";
+import { settlementDirection, shareRemaining } from "@/lib/settlement";
 import {
   format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfYear, endOfYear, subDays, addDays, subWeeks, addWeeks,
@@ -108,7 +110,6 @@ export default function AccountDetail() {
   const { dateFrom, dateTo } = useMemo(() => getPeriodRange(period, anchor), [period, anchor]);
 
   const { data: txns = [] } = useQuery(transactionsQuery({ accountId, dateFrom, dateTo }));
-  const { data: allSplits = [] } = useQuery(splitsQuery());
 
   const { data: splits = [] } = useQuery({
     queryKey: ["splits", "account", accountId, dateFrom, dateTo],
@@ -135,7 +136,7 @@ export default function AccountDetail() {
       if (!accountId) return [];
       const { data, error } = await supabase
         .from("settlements")
-        .select("*, split_shares:split_share_id(person_name, share_amount), accounts:account_id(label, institution)")
+        .select("*, split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(creator:created_by(full_name)), accounts:account_id(label, institution)")
         .or(`account_id.eq.${accountId},receiver_account_id.eq.${accountId}`)
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999")
@@ -147,30 +148,6 @@ export default function AccountDetail() {
   });
 
   const splitsTabItems = useMemo(() => {
-    // Build all-time person maps from every split in the user's data
-    const personTotalOwed = new Map<string, number>();
-    const personAllSettlements = new Map<string, { id: string; amount: number; created_at: string }[]>();
-    for (const split of allSplits as any[]) {
-      const shares = (split.split_shares ?? []) as any[];
-      const shareIdToName = new Map<string, string>(
-        shares.map((sh: any) => [sh.id as string, (sh.person_name ?? "Unknown") as string])
-      );
-      for (const sh of shares) {
-        const nm = (sh.person_name ?? "Unknown") as string;
-        personTotalOwed.set(nm, (personTotalOwed.get(nm) ?? 0) + Number(sh.share_amount ?? 0));
-      }
-      for (const sett of (split.settlements ?? []) as any[]) {
-        const nm = shareIdToName.get(sett.split_share_id as string);
-        if (!nm) continue;
-        const arr = personAllSettlements.get(nm) ?? [];
-        arr.push({ id: sett.id as string, amount: Number(sett.amount ?? 0), created_at: (sett.created_at ?? "") as string });
-        personAllSettlements.set(nm, arr);
-      }
-    }
-    for (const arr of personAllSettlements.values()) {
-      arr.sort((a, b) => a.created_at.localeCompare(b.created_at));
-    }
-
     const items = [
       ...(splits as any[]).map((s) => ({
         ...s,
@@ -178,25 +155,21 @@ export default function AccountDetail() {
         _sortKey: s.created_at ?? `${s.date}T${s.time ?? "00:00"}`,
       })),
       ...(settlements as any[]).map((s) => {
-        const personName = ((s.split_shares as any)?.person_name ?? "Unknown") as string;
-        const totalOwed = personTotalOwed.get(personName) ?? 0;
-        const sorted = personAllSettlements.get(personName) ?? [];
-        const idx = sorted.findIndex((x) => x.id === (s.id as string));
-        const cumulative = idx >= 0
-          ? sorted.slice(0, idx + 1).reduce((sum, x) => sum + x.amount, 0)
-          : Number(s.amount ?? 0);
-        const remaining = Math.max(0, totalOwed - cumulative);
+        const { iPaid, otherName } = settlementDirection(s, userId);
+        const { remaining, fullySettled } = shareRemaining(s, settlements as any[]);
         return {
           ...s,
           _itemType: "settlement" as const,
           _sortKey: (s.created_at ?? "") as string,
+          _iPaid: iPaid,
+          _otherName: otherName,
           _remaining: remaining,
-          _isFullySettled: totalOwed > 0 && remaining <= 0,
+          _fullySettled: fullySettled,
         };
       }),
     ];
     return items.sort((a, b) => b._sortKey.localeCompare(a._sortKey));
-  }, [splits, settlements, allSplits]);
+  }, [splits, settlements, userId]);
 
   const delAccount = useMutation({
     mutationFn: async () => {
@@ -350,7 +323,7 @@ export default function AccountDetail() {
                   canEdit={item.created_by === userId} canDelete={item.created_by === userId}
                   editDeniedMessage="Only the creator can edit this settlement"
                   deleteDeniedMessage="Only the creator can delete this settlement">
-                  <SettlementRow s={item} />
+                  <SettlementRow iPaid={item._iPaid} otherName={item._otherName} amount={Number(item.amount)} remaining={item._remaining} fullySettled={item._fullySettled} createdAt={item.created_at} />
                 </SwipeRow>
               ) : (
                 <SwipeRow key={`sp-${item.id}`} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplitItem(item)}
@@ -572,44 +545,6 @@ function SplitRow({ s }: { s: any }) {
           </>
         )}
         <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{formatDateTime(s.date, s.time)}</p>
-      </div>
-    </div>
-  );
-}
-
-// ─── Settlement Row ─────────────────────────────────────────────────────────
-function SettlementRow({ s }: { s: any }) {
-  const share = s.split_shares as any;
-  const settled = Number(s.amount);
-  const remaining: number = s._remaining !== undefined
-    ? s._remaining
-    : Math.max(0, Number(share?.share_amount ?? 0) - settled);
-  const isFullySettled: boolean = s._isFullySettled !== undefined
-    ? s._isFullySettled
-    : Number(share?.share_amount ?? 0) > 0 && remaining === 0;
-  const payerName = share?.person_name ?? "Unknown";
-  const dateStr = s.created_at
-    ? format(new Date(s.created_at), "MMM dd, yyyy · hh:mm a")
-    : "";
-
-  return (
-    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
-      <div className="px-4 py-3">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium truncate flex-1">{payerName} → You</p>
-          <p className="text-sm font-mono text-[#9CA3AF] shrink-0">{formatMoney(settled)}</p>
-        </div>
-        <div className="flex items-center justify-between gap-2 mt-0.5">
-          {isFullySettled ? (
-            <p className="text-[12px] font-medium text-[#10B981]">Fully settled</p>
-          ) : (
-            <>
-              <p className="text-[12px] text-[#9CA3AF]">Still owes</p>
-              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">{formatMoney(remaining)} remaining</p>
-            </>
-          )}
-        </div>
-        <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5 text-right">{dateStr}</p>
       </div>
     </div>
   );

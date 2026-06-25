@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsQuery, incomingSplitsQuery, splitsQuery } from "@/lib/queries";
 import { SplitDirectRow, EditSplitSheet } from "./home";
+import { SettlementRow } from "@/components/SettlementRow";
+import { settlementDirection, shareRemaining } from "@/lib/settlement";
+import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import { formatMoney } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { useState, useMemo } from "react";
@@ -54,7 +57,7 @@ export default function HistoryPage() {
       if (!u.user) return [];
       const { data } = await supabase
         .from("settlements")
-        .select("*, split_shares:split_share_id(person_name, person:people(linked_user_id)), splits:split_id(description)")
+        .select("*, split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(description, creator:created_by(full_name))")
         .order("created_at", { ascending: false });
       return (data ?? []).map((s: any) => ({ ...s, _uid: u.user!.id }));
     },
@@ -67,6 +70,8 @@ export default function HistoryPage() {
   const [deleteTxn, setDeleteTxn] = useState<any | null>(null);
   const [editSplit, setEditSplit] = useState<any | null>(null);
   const [deleteSplit, setDeleteSplit] = useState<any | null>(null);
+  const [editSettlement, setEditSettlement] = useState<any | null>(null);
+  const [deleteSettlement, setDeleteSettlement] = useState<any | null>(null);
   const qc = useQueryClient();
 
   const { from: periodFrom, to: periodTo } = useMemo(
@@ -214,7 +219,12 @@ export default function HistoryPage() {
                   <SplitDirectRow s={item} />
                 </SwipeRow>
               ) : item._kind === "settlement" ? (
-                <HistorySettlementRow key={`set-${item.id}`} s={item} />
+                <SwipeRow key={`set-${item.id}`} onEdit={() => setEditSettlement(item)} onDelete={() => setDeleteSettlement(item)}
+                  canEdit={item.created_by === item._uid} canDelete={item.created_by === item._uid}
+                  editDeniedMessage="Only the creator can edit this settlement"
+                  deleteDeniedMessage="Only the creator can delete this settlement">
+                  <HistorySettlementRow s={item} all={settlements as any[]} />
+                </SwipeRow>
               ) : (
                 <SwipeRow key={item.id} onEdit={() => setEditTxn(item)} onDelete={() => setDeleteTxn(item)}>
                   <Row t={item} />
@@ -232,6 +242,34 @@ export default function HistoryPage() {
       {editSplit && (
         <EditSplitSheet split={editSplit} open={!!editSplit} onOpenChange={(o) => { if (!o) setEditSplit(null); }} />
       )}
+
+      {editSettlement && (
+        <SettlementEditSheet settlement={editSettlement} open={!!editSettlement} onOpenChange={(o) => { if (!o) setEditSettlement(null); }} />
+      )}
+
+      <AlertDialog open={!!deleteSettlement} onOpenChange={(o) => { if (!o) setDeleteSettlement(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete settlement?</AlertDialogTitle>
+            <AlertDialogDescription>This re-opens the debt between you two. Cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
+              if (!deleteSettlement) return;
+              const { error } = await supabase.from("settlements").delete().eq("id", deleteSettlement.id);
+              if (error) toast.error(error.message);
+              else {
+                notifyToast("settlement_created", "Settlement deleted");
+                qc.invalidateQueries({ queryKey: ["history-settlements"] });
+                qc.invalidateQueries({ queryKey: ["splits"] });
+                qc.invalidateQueries({ queryKey: ["accounts"] });
+              }
+              setDeleteSettlement(null);
+            }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!deleteSplit} onOpenChange={(o) => { if (!o) setDeleteSplit(null); }}>
         <AlertDialogContent>
@@ -296,26 +334,13 @@ export default function HistoryPage() {
   );
 }
 
-// Settlement history row (display only). Direction from the settled share's owner.
-function HistorySettlementRow({ s }: { s: any }) {
-  const amount = Number(s.amount);
-  const other = s.split_shares?.person_name ?? "Someone";
-  const iPaid = s.split_shares?.person?.linked_user_id === s._uid;
-  const label = iPaid ? `You → ${other}` : `${other} → You`;
-  const dateStr = s.created_at ? format(new Date(s.created_at), "MMM dd, yyyy · hh:mm a") : "";
+// Settlement history row — uses the shared SettlementRow with per-share remaining + viewer direction.
+function HistorySettlementRow({ s, all }: { s: any; all: any[] }) {
+  const { iPaid, otherName } = settlementDirection(s, s._uid);
+  const { remaining, fullySettled } = shareRemaining(s, all);
   return (
-    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
-      <div className="px-4 py-3">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium truncate flex-1">{label}</p>
-          <p className="text-sm font-mono text-[#9CA3AF] shrink-0">{formatMoney(amount)}</p>
-        </div>
-        <div className="flex items-center justify-between gap-2 mt-0.5">
-          <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{s.splits?.description ?? "Settlement"}</p>
-          <p className="text-[10px] text-[#9CA3AF] font-mono shrink-0">{dateStr}</p>
-        </div>
-      </div>
-    </div>
+    <SettlementRow iPaid={iPaid} otherName={otherName} amount={Number(s.amount)}
+      remaining={remaining} fullySettled={fullySettled} createdAt={s.created_at} />
   );
 }
 

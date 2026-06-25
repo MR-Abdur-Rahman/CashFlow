@@ -28,6 +28,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
+import { SettlementRow } from "@/components/SettlementRow";
+import { settlementDirection, shareRemaining } from "@/lib/settlement";
 
 type FilterPeriod = "today" | "week" | "month";
 
@@ -112,6 +114,10 @@ export default function Home() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [txnTab, setTxnTab] = useState<"transactions" | "splits">("transactions");
   const qc = useQueryClient();
+  const [userId, setUserId] = useState<string | undefined>();
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
+  }, []);
 
   const { dateFrom, dateTo } = getDateRange(period);
   const { data: accounts = [] } = useQuery(accountsQuery());
@@ -128,7 +134,7 @@ export default function Home() {
       // ones on splits I created, or ones on my shares), so receiver-side settlements show too.
       const { data, error } = await supabase
         .from("settlements")
-        .select("*, split_shares:split_share_id(person_name, share_amount)")
+        .select("*, split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(creator:created_by(full_name))")
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999");
       if (error) throw error;
@@ -162,30 +168,6 @@ export default function Home() {
   }, [ownSplits, incomingSplits, dateFrom, dateTo]);
 
   const splitsTabItems = useMemo(() => {
-    // Build all-time person maps from every split owned by the user
-    const personTotalOwed = new Map<string, number>();
-    const personAllSettlements = new Map<string, { id: string; amount: number; created_at: string }[]>();
-    for (const split of ownSplits as any[]) {
-      const shares = (split.split_shares ?? []) as any[];
-      const shareIdToName = new Map<string, string>(
-        shares.map((sh: any) => [sh.id as string, (sh.person_name ?? "Unknown") as string])
-      );
-      for (const sh of shares) {
-        const nm = (sh.person_name ?? "Unknown") as string;
-        personTotalOwed.set(nm, (personTotalOwed.get(nm) ?? 0) + Number(sh.share_amount ?? 0));
-      }
-      for (const sett of (split.settlements ?? []) as any[]) {
-        const nm = shareIdToName.get(sett.split_share_id as string);
-        if (!nm) continue;
-        const arr = personAllSettlements.get(nm) ?? [];
-        arr.push({ id: sett.id as string, amount: Number(sett.amount ?? 0), created_at: (sett.created_at ?? "") as string });
-        personAllSettlements.set(nm, arr);
-      }
-    }
-    for (const arr of personAllSettlements.values()) {
-      arr.sort((a, b) => a.created_at.localeCompare(b.created_at));
-    }
-
     const splitItems = allSplitsForTab.map((s: any) => ({
       ...s,
       _itemType: "split" as const,
@@ -193,30 +175,22 @@ export default function Home() {
     }));
 
     const settlementItems = (homeSettlements as any[]).map((s) => {
-      const personName = ((s.split_shares as any)?.person_name ?? "Unknown") as string;
-      const totalOwed = personTotalOwed.get(personName) ?? 0;
-      const sorted = personAllSettlements.get(personName) ?? [];
-      const idx = sorted.findIndex((x) => x.id === (s.id as string));
-      const cumulative = idx >= 0
-        ? sorted.slice(0, idx + 1).reduce((sum, x) => sum + x.amount, 0)
-        : Number(s.amount ?? 0);
-      const remaining = Math.max(0, totalOwed - cumulative);
+      const { iPaid, otherName } = settlementDirection(s, userId);
+      const { remaining, fullySettled } = shareRemaining(s, homeSettlements as any[]);
       return {
         ...s,
         _itemType: "settlement" as const,
         _sortKey: (s.created_at ?? "") as string,
+        _iPaid: iPaid,
+        _otherName: otherName,
         _remaining: remaining,
-        _isFullySettled: totalOwed > 0 && remaining <= 0,
+        _fullySettled: fullySettled,
       };
     });
 
     return [...splitItems, ...settlementItems].sort((a, b) => b._sortKey.localeCompare(a._sortKey));
-  }, [allSplitsForTab, homeSettlements, ownSplits]);
+  }, [allSplitsForTab, homeSettlements, userId]);
 
-  const [userId, setUserId] = useState<string | undefined>();
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
-  }, []);
   const { data: profile } = useQuery(profileQuery(userId));
   const { data: notifications = [] } = useQuery(notificationsQuery());
   const unreadCount = (notifications as any[]).filter((n: any) => !n.is_read).length;
@@ -379,7 +353,7 @@ export default function Home() {
                           canEdit={item.created_by === userId} canDelete={item.created_by === userId}
                           editDeniedMessage="Only the creator can edit this settlement"
                           deleteDeniedMessage="Only the creator can delete this settlement">
-                          <HomeSettlementRow s={item} />
+                          <SettlementRow iPaid={item._iPaid} otherName={item._otherName} amount={Number(item.amount)} remaining={item._remaining} fullySettled={item._fullySettled} createdAt={item.created_at} />
                         </SwipeRow>
                       ) : (
                         <SwipeRow key={item.id} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}
@@ -762,43 +736,6 @@ export function SplitDirectRow({ s, lentOweOverride }: { s: any; lentOweOverride
             {dateNode}
           </>
         )}
-      </div>
-    </div>
-  );
-}
-
-function HomeSettlementRow({ s }: { s: any }) {
-  const share = s.split_shares as any;
-  const settled = Number(s.amount);
-  const remaining: number = s._remaining !== undefined
-    ? s._remaining
-    : Math.max(0, Number(share?.share_amount ?? 0) - settled);
-  const isFullySettled: boolean = s._isFullySettled !== undefined
-    ? s._isFullySettled
-    : Number(share?.share_amount ?? 0) > 0 && remaining === 0;
-  const payerName = share?.person_name ?? "Unknown";
-  const dateStr = s.created_at
-    ? format(new Date(s.created_at), "MMM dd, yyyy · hh:mm a")
-    : "";
-
-  return (
-    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
-      <div className="px-4 py-3">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium truncate flex-1">{payerName} → You</p>
-          <p className="text-sm font-mono text-[#9CA3AF] shrink-0">{formatMoney(settled)}</p>
-        </div>
-        <div className="flex items-center justify-between gap-2 mt-0.5">
-          {isFullySettled ? (
-            <p className="text-[12px] font-medium text-[#10B981]">Fully settled</p>
-          ) : (
-            <>
-              <p className="text-[12px] text-[#9CA3AF]">Still owes</p>
-              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">{formatMoney(remaining)} remaining</p>
-            </>
-          )}
-        </div>
-        <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5 text-right">{dateStr}</p>
       </div>
     </div>
   );

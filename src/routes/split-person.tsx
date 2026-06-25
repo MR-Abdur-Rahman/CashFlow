@@ -8,6 +8,8 @@ import { AddTransactionSheet } from "@/components/AddTransactionSheet";
 import { SettleUpDialog } from "@/components/SettleUpDialog";
 import { SwipeRow } from "@/components/SwipeRow";
 import { SplitDirectRow } from "./home";
+import { SettlementRow } from "@/components/SettlementRow";
+import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import { notifyToast } from "@/lib/notify";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -59,6 +61,8 @@ export default function PersonDetail() {
   const [settleOpen, setSettleOpen] = useState(false);
   const [deleteSplit, setDeleteSplit] = useState<any | null>(null);
   const [editSplit, setEditSplit] = useState<any | null>(null);
+  const [editSettlement, setEditSettlement] = useState<any | null>(null);
+  const [deleteSettlement, setDeleteSettlement] = useState<any | null>(null);
 
   // Bilateral net balance between current user and target person.
   // Positive = target owes me; negative = I owe target. Third-party-paid splits are skipped.
@@ -168,7 +172,19 @@ export default function PersonDetail() {
         if (day < fromStr || day > toStr) continue;
         const share = (s.split_shares ?? []).find((sh: any) => sh.id === st.split_share_id);
         const iPaid = !!share && (myPersonIds.includes(share.person_id) || share.person?.linked_user_id === currentUserId);
-        out.push({ ...st, _itemType: "settlement", _iPaid: iPaid, _splitLabel: getSplitLabel(s) });
+        // Per-share remaining: share amount minus settlements on this share up to and incl. this one.
+        const shareSettlements = (s.settlements ?? [])
+          .filter((x: any) => x.split_share_id === st.split_share_id)
+          .sort((a: any, b: any) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")));
+        const cidx = shareSettlements.findIndex((x: any) => x.id === st.id);
+        const cumulative = shareSettlements.slice(0, cidx + 1).reduce((sum: number, x: any) => sum + Number(x.amount ?? 0), 0);
+        const shareAmount = Number(share?.share_amount ?? 0);
+        const remaining = Math.max(0, shareAmount - cumulative);
+        out.push({
+          ...st, _itemType: "settlement", _iPaid: iPaid,
+          _remaining: remaining, _fullySettled: shareAmount > 0 && remaining <= 0,
+          _currentUserId: currentUserId,
+        });
       }
     }
     return out;
@@ -268,7 +284,12 @@ export default function PersonDetail() {
         ) : (
           <div className="rounded-2xl overflow-hidden border border-border divide-y divide-border">
             {combinedItems.map((item: any) => item._itemType === "settlement" ? (
-              <PersonSettlementRow key={`set-${item.id}`} s={item} targetName={person.name} />
+              <SwipeRow key={`set-${item.id}`} onEdit={() => setEditSettlement(item)} onDelete={() => setDeleteSettlement(item)}
+                canEdit={item.created_by === item._currentUserId} canDelete={item.created_by === item._currentUserId}
+                editDeniedMessage="Only the creator can edit this settlement"
+                deleteDeniedMessage="Only the creator can delete this settlement">
+                <SettlementRow iPaid={item._iPaid} otherName={person.name} amount={Number(item.amount)} remaining={item._remaining} fullySettled={item._fullySettled} createdAt={item.created_at} />
+              </SwipeRow>
             ) : (
               <SwipeRow key={item.id} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}
                 canEdit={!item._isIncoming} canDelete={!item._isIncoming}
@@ -350,6 +371,38 @@ export default function PersonDetail() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {editSettlement && (
+        <SettlementEditSheet
+          settlement={editSettlement}
+          open={!!editSettlement}
+          onOpenChange={(o) => { if (!o) setEditSettlement(null); }}
+        />
+      )}
+
+      <AlertDialog open={!!deleteSettlement} onOpenChange={(o) => { if (!o) setDeleteSettlement(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete settlement?</AlertDialogTitle>
+            <AlertDialogDescription>This re-opens the debt between you two. Cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
+              if (!deleteSettlement) return;
+              const { error } = await supabase.from("settlements").delete().eq("id", deleteSettlement.id);
+              if (error) toast.error(error.message);
+              else {
+                notifyToast("settlement_created", "Settlement deleted");
+                qc.invalidateQueries({ queryKey: ["splits"] });
+                qc.invalidateQueries({ queryKey: ["settlements"] });
+                qc.invalidateQueries({ queryKey: ["accounts"] });
+              }
+              setDeleteSettlement(null);
+            }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {editSplit && (
         <EditSplitSheet
           split={editSplit}
@@ -415,27 +468,6 @@ function getSplitLabel(s: any, creatorName?: string): string {
   const names = (s.split_shares ?? []).map((sh: any) => sh.person_name).filter(Boolean);
   if (names.length > 0) return names.join(", ");
   return s.description || "Split";
-}
-
-// Directional settlement row for the person page: "You → Name" if I paid, else "Name → You".
-function PersonSettlementRow({ s, targetName }: { s: any; targetName: string }) {
-  const amount = Number(s.amount);
-  const label = s._iPaid ? `You → ${targetName}` : `${targetName} → You`;
-  const dateStr = s.created_at ? format(new Date(s.created_at), "MMM dd, yyyy · hh:mm a") : "";
-  return (
-    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
-      <div className="px-4 py-3">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium truncate flex-1">{label}</p>
-          <p className="text-sm font-mono text-[#9CA3AF] shrink-0">{formatMoney(amount)}</p>
-        </div>
-        <div className="flex items-center justify-between gap-2 mt-0.5">
-          <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{s._splitLabel ?? "Settlement"}</p>
-          <p className="text-[10px] text-[#9CA3AF] font-mono shrink-0">{dateStr}</p>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ─── Full Edit Split Sheet ────────────────────────────────────────────────
