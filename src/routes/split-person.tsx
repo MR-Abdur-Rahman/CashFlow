@@ -152,6 +152,40 @@ export default function PersonDetail() {
     [visibleSplits, fromStr, toStr]
   );
 
+  // Settlement rows between the two users — display only. These are already nested in the split
+  // data; the balance math above already accounts for them (via settledOf), so we do NOT re-add them.
+  // Direction comes from which share was settled: if it's mine, I paid the target; else they paid me.
+  const filteredSettlements = useMemo(() => {
+    const seen = new Set<string>();
+    const out: any[] = [];
+    for (const s of visibleSplits) {
+      const myPersonIds: string[] = s._myPersonIds ?? [];
+      const currentUserId: string | null = s._currentUserId ?? null;
+      for (const st of (s.settlements ?? []) as any[]) {
+        if (seen.has(st.id)) continue;
+        seen.add(st.id);
+        const day = String(st.created_at ?? "").slice(0, 10);
+        if (day < fromStr || day > toStr) continue;
+        const share = (s.split_shares ?? []).find((sh: any) => sh.id === st.split_share_id);
+        const iPaid = !!share && (myPersonIds.includes(share.person_id) || share.person?.linked_user_id === currentUserId);
+        out.push({ ...st, _itemType: "settlement", _iPaid: iPaid, _splitLabel: getSplitLabel(s) });
+      }
+    }
+    return out;
+  }, [visibleSplits, fromStr, toStr]);
+
+  const combinedItems = useMemo(() => {
+    const items = [
+      ...filteredSplits.map((s: any) => ({ ...s, _itemType: "split" as const })),
+      ...filteredSettlements,
+    ];
+    return items.sort((a, b) => {
+      const da = a._itemType === "split" ? a.date : String(a.created_at ?? "").slice(0, 10);
+      const db = b._itemType === "split" ? b.date : String(b.created_at ?? "").slice(0, 10);
+      return db.localeCompare(da);
+    });
+  }, [filteredSplits, filteredSettlements]);
+
   if (!person) return <div className="p-6">Person not found</div>;
 
   return (
@@ -227,18 +261,20 @@ export default function PersonDetail() {
           </div>
         </div>
 
-        {filteredSplits.length === 0 ? (
+        {combinedItems.length === 0 ? (
           <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-            {(splits as any[]).length === 0 ? "No splits yet" : "No splits this period"}
+            {(splits as any[]).length === 0 ? "No splits yet" : "Nothing this period"}
           </div>
         ) : (
           <div className="rounded-2xl overflow-hidden border border-border divide-y divide-border">
-            {filteredSplits.map((s: any) => (
-              <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}
-                canEdit={!s._isIncoming} canDelete={!s._isIncoming}
+            {combinedItems.map((item: any) => item._itemType === "settlement" ? (
+              <PersonSettlementRow key={`set-${item.id}`} s={item} targetName={person.name} />
+            ) : (
+              <SwipeRow key={item.id} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}
+                canEdit={!item._isIncoming} canDelete={!item._isIncoming}
                 editDeniedMessage="Only the creator can edit this split"
                 deleteDeniedMessage="Only the creator can delete this split">
-                <SplitDirectRow s={s} lentOweOverride={bilateralRowAmount(s)} />
+                <SplitDirectRow s={item} lentOweOverride={bilateralRowAmount(item)} />
               </SwipeRow>
             ))}
           </div>
@@ -379,6 +415,27 @@ function getSplitLabel(s: any, creatorName?: string): string {
   const names = (s.split_shares ?? []).map((sh: any) => sh.person_name).filter(Boolean);
   if (names.length > 0) return names.join(", ");
   return s.description || "Split";
+}
+
+// Directional settlement row for the person page: "You → Name" if I paid, else "Name → You".
+function PersonSettlementRow({ s, targetName }: { s: any; targetName: string }) {
+  const amount = Number(s.amount);
+  const label = s._iPaid ? `You → ${targetName}` : `${targetName} → You`;
+  const dateStr = s.created_at ? format(new Date(s.created_at), "MMM dd, yyyy · hh:mm a") : "";
+  return (
+    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
+      <div className="px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium truncate flex-1">{label}</p>
+          <p className="text-sm font-mono text-[#9CA3AF] shrink-0">{formatMoney(amount)}</p>
+        </div>
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{s._splitLabel ?? "Settlement"}</p>
+          <p className="text-[10px] text-[#9CA3AF] font-mono shrink-0">{dateStr}</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── Full Edit Split Sheet ────────────────────────────────────────────────

@@ -124,10 +124,11 @@ export default function Home() {
     queryFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return [];
+      // No created_by filter — RLS returns every settlement that involves me (ones I recorded,
+      // ones on splits I created, or ones on my shares), so receiver-side settlements show too.
       const { data, error } = await supabase
         .from("settlements")
         .select("*, split_shares:split_share_id(person_name, share_amount)")
-        .eq("created_by", u.user.id)
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999");
       if (error) throw error;

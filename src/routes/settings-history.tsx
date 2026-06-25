@@ -46,6 +46,19 @@ export default function HistoryPage() {
   const { data: txns = [] } = useQuery(transactionsQuery());
   const { data: ownSplits = [] } = useQuery(splitsQuery());
   const { data: incomingSplits = [] } = useQuery(incomingSplitsQuery());
+  // Settlements involving me (RLS-scoped). Display only — balances already account for them.
+  const { data: settlements = [] } = useQuery({
+    queryKey: ["history-settlements"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data } = await supabase
+        .from("settlements")
+        .select("*, split_shares:split_share_id(person_name, person:people(linked_user_id)), splits:split_id(description)")
+        .order("created_at", { ascending: false });
+      return (data ?? []).map((s: any) => ({ ...s, _uid: u.user!.id }));
+    },
+  });
   const [q, setQ] = useState("");
   const [type, setType] = useState<string>(searchParams.get("filter") ?? "all");
   const [period, setPeriod] = useState<Period>("monthly");
@@ -111,6 +124,18 @@ export default function HistoryPage() {
     });
   }, [allSplits, q, type, fromStr, toStr]);
 
+  const filteredSettlements = useMemo(() => {
+    if (type !== "all" && type !== "split") return [];
+    return (settlements as any[]).filter((s) => {
+      const day = String(s.created_at ?? "").slice(0, 10);
+      if (day < fromStr || day > toStr) return false;
+      if (!q) return true;
+      const hay = [s.splits?.description, s.split_shares?.person_name, s.method]
+        .filter(Boolean).join(" ").toLowerCase();
+      return hay.includes(q.toLowerCase());
+    });
+  }, [settlements, q, type, fromStr, toStr]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, any[]>();
     const push = (date: string, item: any) => {
@@ -119,6 +144,7 @@ export default function HistoryPage() {
     };
     for (const t of filteredTxns) push(t.date, { ...t, _kind: "txn" });
     for (const s of filteredSplits) push(s.date, { ...s, _kind: "split" });
+    for (const s of filteredSettlements) push(String(s.created_at ?? "").slice(0, 10), { ...s, _kind: "settlement" });
     // Sort within each date: time DESC, then created_at DESC (most recently created first).
     for (const arr of map.values()) arr.sort((a, b) => {
       const at = (a.time ?? "00:00").slice(0, 8), bt = (b.time ?? "00:00").slice(0, 8);
@@ -126,7 +152,7 @@ export default function HistoryPage() {
       return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
     });
     return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a));
-  }, [filteredTxns, filteredSplits]);
+  }, [filteredTxns, filteredSplits, filteredSettlements]);
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-4">
@@ -187,6 +213,8 @@ export default function HistoryPage() {
                   deleteDeniedMessage="Only the creator can delete this split">
                   <SplitDirectRow s={item} />
                 </SwipeRow>
+              ) : item._kind === "settlement" ? (
+                <HistorySettlementRow key={`set-${item.id}`} s={item} />
               ) : (
                 <SwipeRow key={item.id} onEdit={() => setEditTxn(item)} onDelete={() => setDeleteTxn(item)}>
                   <Row t={item} />
@@ -264,6 +292,29 @@ export default function HistoryPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// Settlement history row (display only). Direction from the settled share's owner.
+function HistorySettlementRow({ s }: { s: any }) {
+  const amount = Number(s.amount);
+  const other = s.split_shares?.person_name ?? "Someone";
+  const iPaid = s.split_shares?.person?.linked_user_id === s._uid;
+  const label = iPaid ? `You → ${other}` : `${other} → You`;
+  const dateStr = s.created_at ? format(new Date(s.created_at), "MMM dd, yyyy · hh:mm a") : "";
+  return (
+    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
+      <div className="px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium truncate flex-1">{label}</p>
+          <p className="text-sm font-mono text-[#9CA3AF] shrink-0">{formatMoney(amount)}</p>
+        </div>
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{s.splits?.description ?? "Settlement"}</p>
+          <p className="text-[10px] text-[#9CA3AF] font-mono shrink-0">{dateStr}</p>
+        </div>
+      </div>
     </div>
   );
 }

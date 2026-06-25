@@ -136,7 +136,7 @@ export default function AccountDetail() {
       const { data, error } = await supabase
         .from("settlements")
         .select("*, split_shares:split_share_id(person_name, share_amount), accounts:account_id(label, institution)")
-        .eq("account_id", accountId)
+        .or(`account_id.eq.${accountId},receiver_account_id.eq.${accountId}`)
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999")
         .order("created_at", { ascending: false });
