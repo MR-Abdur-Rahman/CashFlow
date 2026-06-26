@@ -96,14 +96,18 @@ export default function PersonDetail() {
       const targetShareEntry = shares.find((ss: any) =>
         (targetLui && ss.person?.linked_user_id === targetLui) || ss.person_id === targetPid);
 
+      // For an implicit creator share there is no split_share row to attach settlements to, so they
+      // land on the OTHER party's share. On a bilateral split every settlement reduces the single
+      // bilateral debt, so subtract ALL settlements on the split for the implicit branches.
+      const allSettledOnSplit = settlements.reduce((a: number, x: any) => a + Number(x.amount ?? 0), 0);
       if (payerAuthId && payerAuthId === currentUserId) {
         // I paid → target owes me their share (or their implicit creator share)
         if (targetShareEntry) net += Number(targetShareEntry.share_amount) - settledOf(targetShareEntry);
-        else if (targetLui && s.created_by === targetLui) net += total - sumShares;
+        else if (targetLui && s.created_by === targetLui) net += (total - sumShares) - allSettledOnSplit;
       } else if (payerAuthId && targetLui && payerAuthId === targetLui) {
         // Target paid → I owe my share (or my implicit creator share)
         if (myShareEntry) net -= Number(myShareEntry.share_amount) - settledOf(myShareEntry);
-        else if (s.created_by === currentUserId) net -= total - sumShares;
+        else if (s.created_by === currentUserId) net -= (total - sumShares) - allSettledOnSplit;
       }
       // Third party paid → skip (no direct bilateral debt)
     }
@@ -114,13 +118,14 @@ export default function PersonDetail() {
     return (splits as any[]).flatMap((s) => {
       const targetPersonId = s._isIncoming ? s._myPersonId : personId;
       if (!targetPersonId) return [];
-      // A share is a real debt only if its person did NOT pay the split. The payer doesn't owe
-      // their own share, so it must not be settleable (that produced malformed settlements where
-      // the payer "settled" their own share).
       const payerAuthId = getPayerAuthId(s);
       return (s.split_shares ?? [])
         .filter((sh: any) => sh.person_id === targetPersonId && !sh.is_settled)
         .filter((sh: any) => {
+          // Malformed guard: in an INCOMING split the offered share is the viewer's OWN. If the
+          // viewer was the payer, that share isn't a debt — don't offer it (prevents settling your
+          // own share). Own-split proxy shares (used to settle an implicit creator debt) stay allowed.
+          if (!s._isIncoming) return true;
           const sharePersonUid = sh.person?.linked_user_id;
           return !(payerAuthId && sharePersonUid && sharePersonUid === payerAuthId);
         })
@@ -173,30 +178,42 @@ export default function PersonDetail() {
     for (const s of visibleSplits) {
       const myPersonIds: string[] = s._myPersonIds ?? [];
       const currentUserId: string | null = s._currentUserId ?? null;
+      const targetLui: string | null = s._targetLinkedUserId ?? null;
+      const targetPid: string = s._targetPersonId ?? personId!;
+      const shares = (s.split_shares ?? []) as any[];
+      const total = Number(s.total_amount);
+      const sumShares = shares.reduce((a: number, sh: any) => a + Number(sh.share_amount ?? 0), 0);
+      // Direction comes from who paid the SPLIT, not which share the settlement is attached to
+      // (the debtor may be the creator, who has no explicit share). Viewer is the debtor unless
+      // they paid.
+      const payerAuthId = getPayerAuthId(s);
+      const iPaid = !!payerAuthId && payerAuthId !== currentUserId;
+      // The debtor's debt = their explicit share, or the implicit creator share (total - sumShares).
+      const debtorShare = iPaid
+        ? shares.find((sh: any) => myPersonIds.includes(sh.person_id) || sh.person?.linked_user_id === currentUserId)
+        : shares.find((sh: any) => (targetLui && sh.person?.linked_user_id === targetLui) || sh.person_id === targetPid);
+      const debtAmount = debtorShare ? Number(debtorShare.share_amount) : (total - sumShares);
+      // Remaining is computed at the SPLIT level (all settlements on this bilateral split), so it is
+      // correct even when the debt is an implicit creator share with no own split_share row.
+      const splitSettlements = [...(s.settlements ?? [])]
+        .sort((a: any, b: any) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")));
       for (const st of (s.settlements ?? []) as any[]) {
         if (seen.has(st.id)) continue;
         seen.add(st.id);
         const day = String(st.created_at ?? "").slice(0, 10);
         if (day < fromStr || day > toStr) continue;
-        const share = (s.split_shares ?? []).find((sh: any) => sh.id === st.split_share_id);
-        const iPaid = !!share && (myPersonIds.includes(share.person_id) || share.person?.linked_user_id === currentUserId);
-        // Per-share remaining: share amount minus settlements on this share up to and incl. this one.
-        const shareSettlements = (s.settlements ?? [])
-          .filter((x: any) => x.split_share_id === st.split_share_id)
-          .sort((a: any, b: any) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")));
-        const cidx = shareSettlements.findIndex((x: any) => x.id === st.id);
-        const cumulative = shareSettlements.slice(0, cidx + 1).reduce((sum: number, x: any) => sum + Number(x.amount ?? 0), 0);
-        const shareAmount = Number(share?.share_amount ?? 0);
-        const remaining = Math.max(0, shareAmount - cumulative);
+        const cidx = splitSettlements.findIndex((x: any) => x.id === st.id);
+        const cumulative = splitSettlements.slice(0, cidx + 1).reduce((sum: number, x: any) => sum + Number(x.amount ?? 0), 0);
+        const remaining = Math.max(0, debtAmount - cumulative);
         out.push({
           ...st, _itemType: "settlement", _iPaid: iPaid,
-          _remaining: remaining, _fullySettled: shareAmount > 0 && remaining <= 0,
+          _remaining: remaining, _fullySettled: debtAmount > 0 && remaining <= 0,
           _currentUserId: currentUserId,
         });
       }
     }
     return out;
-  }, [visibleSplits, fromStr, toStr]);
+  }, [visibleSplits, fromStr, toStr, personId]);
 
   const combinedItems = useMemo(() => {
     const items = [

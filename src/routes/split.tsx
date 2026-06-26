@@ -190,14 +190,17 @@ function bilateralBalance(splits: any[], target: any, currentUserId: string | nu
     const myShareEntry = shares.find((ss: any) =>
       myPersonIds.includes(ss.person_id) || ss.person?.linked_user_id === currentUserId);
 
+    // Implicit creator shares have no split_share row, so settlements on a bilateral split all land
+    // on the other party's share. Subtract ALL settlements on the split for the implicit branches.
+    const allSettledOnSplit = settlements.reduce((a: number, x: any) => a + Number(x.amount ?? 0), 0);
     if (payerAuthId && payerAuthId === currentUserId) {
       // I paid → target owes me their share (or their implicit creator share)
       if (targetShareEntry) net += Number(targetShareEntry.share_amount) - settledOf(targetShareEntry);
-      else if (creatorIsTarget) net += total - sumShares;
+      else if (creatorIsTarget) net += (total - sumShares) - allSettledOnSplit;
     } else if (payerAuthId && targetLui && payerAuthId === targetLui) {
       // Target paid → I owe my share (or my implicit creator share)
       if (myShareEntry) net -= Number(myShareEntry.share_amount) - settledOf(myShareEntry);
-      else if (s.created_by === currentUserId) net -= total - sumShares;
+      else if (s.created_by === currentUserId) net -= (total - sumShares) - allSettledOnSplit;
     }
     // Third party paid → skip
   }

@@ -134,7 +134,7 @@ export default function Home() {
       // ones on splits I created, or ones on my shares), so receiver-side settlements show too.
       const { data, error } = await supabase
         .from("settlements")
-        .select("*, split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(creator:created_by(full_name))")
+        .select("*, split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name))")
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999");
       if (error) throw error;

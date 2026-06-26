@@ -17,15 +17,30 @@ export function shareRemaining(s: any, allSettlements: any[]): { remaining: numb
 }
 
 // Viewer-relative direction + the other party's display name.
-//   iPaid = the settled share belongs to the viewer (its person is linked to them).
-//   otherName: when the viewer paid, the other party is the split creator; otherwise it's the
-//   settled share's person_name. Pass `otherNameOverride` on bilateral pages (person detail).
+//   Direction is decided by who paid the SPLIT, not which share the settlement is attached to —
+//   the debtor may be the creator, who has no explicit split_share row. The viewer is the debtor
+//   (iPaid) unless they paid the split. Falls back to the settled-share owner when split payer data
+//   isn't available. Pass `otherNameOverride` on bilateral pages (person detail).
 export function settlementDirection(
   s: any, currentUserId: string | undefined, otherNameOverride?: string,
 ): { iPaid: boolean; otherName: string } {
   const share = s.split_shares as any;
-  const iPaid = !!currentUserId && share?.person?.linked_user_id === currentUserId;
+  const split = s.splits as any;
+  // Resolve the split's payer to an auth user id.
+  let payerAuthId: string | null = null;
+  if (split) {
+    if (split.paid_by === "me") payerAuthId = split.created_by ?? null;
+    else if (split.paid_by_person?.linked_user_id) payerAuthId = split.paid_by_person.linked_user_id;
+  }
+  const iPaid = payerAuthId
+    ? payerAuthId !== currentUserId
+    : (!!currentUserId && share?.person?.linked_user_id === currentUserId); // fallback: settled share owner
+  // When the viewer paid (creditor), the other party is the settled share's person (the debtor).
+  // When the viewer owes (debtor), the other party is whoever paid the split (creditor).
+  const creditorName = split?.paid_by === "me"
+    ? (split?.creator?.full_name ?? "Someone")
+    : (split?.paid_by_person?.name ?? split?.creator?.full_name ?? "Someone");
   const otherName = otherNameOverride
-    ?? (iPaid ? ((s.splits as any)?.creator?.full_name ?? "Someone") : (share?.person_name ?? "Someone"));
+    ?? (iPaid ? creditorName : (share?.person_name ?? "Someone"));
   return { iPaid, otherName };
 }
