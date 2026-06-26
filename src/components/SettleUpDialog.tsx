@@ -147,7 +147,12 @@ export function SettleUpDialog({
         });
         if (error) throw error;
 
-        if ((method === "bank_transfer" || method === "e-wallet") && accountId) {
+        // Only record an expense transaction when the settler is the DEBTOR paying someone else
+        // (receiverId set). When the settler is the creditor recording money they RECEIVED
+        // (receiverId null), the settlement trigger already credits their account (+amount) — an
+        // expense here would wrongly cancel it, so it's skipped. This makes the creditor's chosen
+        // account increase by the amount for both cash and bank/e-wallet.
+        if ((method === "bank_transfer" || method === "e-wallet") && accountId && receiverId) {
           const txLabel = personName || item.description || "Split";
           const { error: txError } = await supabase.from("transactions").insert({
             type: "expense",
