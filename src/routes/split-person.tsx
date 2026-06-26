@@ -114,8 +114,16 @@ export default function PersonDetail() {
     return (splits as any[]).flatMap((s) => {
       const targetPersonId = s._isIncoming ? s._myPersonId : personId;
       if (!targetPersonId) return [];
+      // A share is a real debt only if its person did NOT pay the split. The payer doesn't owe
+      // their own share, so it must not be settleable (that produced malformed settlements where
+      // the payer "settled" their own share).
+      const payerAuthId = getPayerAuthId(s);
       return (s.split_shares ?? [])
         .filter((sh: any) => sh.person_id === targetPersonId && !sh.is_settled)
+        .filter((sh: any) => {
+          const sharePersonUid = sh.person?.linked_user_id;
+          return !(payerAuthId && sharePersonUid && sharePersonUid === payerAuthId);
+        })
         .map((sh: any) => {
           const paid = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
             .reduce((a: number, x: any) => a + Number(x.amount), 0);
