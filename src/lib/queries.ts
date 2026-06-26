@@ -187,7 +187,7 @@ export const incomingSplitsQuery = () =>
       // Step 3: fetch those splits, excluding ones the current user created
       const { data, error: e3 } = await supabase
         .from("splits")
-        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name)")
+        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name), accounts:account_id(label)")
         .in("id", splitIds)
         .neq("created_by", u.user.id)
         .order("date", { ascending: false });
