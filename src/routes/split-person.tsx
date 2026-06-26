@@ -195,11 +195,12 @@ export default function PersonDetail() {
       ...filteredSplits.map((s: any) => ({ ...s, _itemType: "split" as const })),
       ...filteredSettlements,
     ];
-    return items.sort((a, b) => {
-      const da = a._itemType === "split" ? a.date : String(a.created_at ?? "").slice(0, 10);
-      const db = b._itemType === "split" ? b.date : String(b.created_at ?? "").slice(0, 10);
-      return db.localeCompare(da);
-    });
+    // Sort all items (splits + settlements) by full timestamp DESC. Splits use date+time;
+    // settlements use created_at (they have no date/time column).
+    const sortKey = (x: any) => x._itemType === "split"
+      ? `${x.date}T${x.time ?? "00:00:00"}`
+      : String(x.created_at ?? "");
+    return items.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
   }, [filteredSplits, filteredSettlements]);
 
   if (!person) return <div className="p-6">Person not found</div>;
@@ -288,7 +289,7 @@ export default function PersonDetail() {
                 canEdit={item.created_by === item._currentUserId} canDelete={item.created_by === item._currentUserId}
                 editDeniedMessage="Only the creator can edit this settlement"
                 deleteDeniedMessage="Only the creator can delete this settlement">
-                <SettlementRow iPaid={item._iPaid} otherName={person.name} amount={Number(item.amount)} remaining={item._remaining} fullySettled={item._fullySettled} createdAt={item.created_at} />
+                <SettlementRow description={item.description} iPaid={item._iPaid} otherName={person.name} amount={Number(item.amount)} remaining={item._remaining} fullySettled={item._fullySettled} createdAt={item.created_at} />
               </SwipeRow>
             ) : (
               <SwipeRow key={item.id} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}

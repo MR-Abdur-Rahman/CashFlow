@@ -330,6 +330,7 @@ export type Database = {
           amount: number
           created_at: string
           created_by: string
+          description: string | null
           id: string
           method: string
           note: string | null
@@ -345,6 +346,7 @@ export type Database = {
           amount: number
           created_at?: string
           created_by: string
+          description?: string | null
           id?: string
           method: string
           note?: string | null
@@ -360,6 +362,7 @@ export type Database = {
           amount?: number
           created_at?: string
           created_by?: string
+          description?: string | null
           id?: string
           method?: string
           note?: string | null

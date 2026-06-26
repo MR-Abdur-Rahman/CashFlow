@@ -6,8 +6,9 @@ import { format } from "date-fns";
 //   iPaid  → "You → Other"  + "Still owes"   (the viewer is the one who paid / owes)
 //   !iPaid → "Other → You"  + "Still lent"   (the other person paid; the viewer is owed)
 export function SettlementRow({
-  iPaid, otherName, amount, remaining, fullySettled, createdAt,
+  description, iPaid, otherName, amount, remaining, fullySettled, createdAt,
 }: {
+  description?: string | null;
   iPaid: boolean;
   otherName: string;
   amount: number;
@@ -19,14 +20,16 @@ export function SettlementRow({
   return (
     <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
       <div className="px-4 py-3">
-        {/* Line 1: payer → receiver + amount */}
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium truncate flex-1">
+        {/* Line 1: description (defaults to "Settlement") */}
+        <p className="text-sm font-medium text-foreground truncate">{description?.trim() || "Settlement"}</p>
+        {/* Line 2: payer → receiver + amount */}
+        <div className="flex items-start justify-between gap-2 mt-0.5">
+          <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
             {iPaid ? `You → ${otherName}` : `${otherName} → You`}
           </p>
           <p className="text-sm font-mono text-[#9CA3AF] shrink-0">{formatMoney(amount)}</p>
         </div>
-        {/* Line 2: viewer-relative status + remaining */}
+        {/* Line 3: viewer-relative status + remaining */}
         <div className="flex items-center justify-between gap-2 mt-0.5">
           {fullySettled ? (
             <p className="text-[12px] font-medium text-[#10B981]">Fully settled</p>
@@ -37,7 +40,7 @@ export function SettlementRow({
             </>
           )}
         </div>
-        {/* Line 3: date · time */}
+        {/* Line 4: date · time */}
         <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5 text-right">{dateStr}</p>
       </div>
     </div>

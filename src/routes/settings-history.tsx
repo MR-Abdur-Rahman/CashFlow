@@ -151,8 +151,12 @@ export default function HistoryPage() {
     for (const s of filteredSplits) push(s.date, { ...s, _kind: "split" });
     for (const s of filteredSettlements) push(String(s.created_at ?? "").slice(0, 10), { ...s, _kind: "settlement" });
     // Sort within each date: time DESC, then created_at DESC (most recently created first).
+    // Settlements have no `time` column, so derive their time from created_at to interleave correctly.
+    const timeOf = (x: any) => x._kind === "settlement"
+      ? String(x.created_at ?? "").slice(11, 19)
+      : String(x.time ?? "00:00:00").slice(0, 8);
     for (const arr of map.values()) arr.sort((a, b) => {
-      const at = (a.time ?? "00:00").slice(0, 8), bt = (b.time ?? "00:00").slice(0, 8);
+      const at = timeOf(a), bt = timeOf(b);
       if (at !== bt) return bt.localeCompare(at);
       return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
     });
@@ -339,7 +343,7 @@ function HistorySettlementRow({ s, all }: { s: any; all: any[] }) {
   const { iPaid, otherName } = settlementDirection(s, s._uid);
   const { remaining, fullySettled } = shareRemaining(s, all);
   return (
-    <SettlementRow iPaid={iPaid} otherName={otherName} amount={Number(s.amount)}
+    <SettlementRow description={s.description} iPaid={iPaid} otherName={otherName} amount={Number(s.amount)}
       remaining={remaining} fullySettled={fullySettled} createdAt={s.created_at} />
   );
 }

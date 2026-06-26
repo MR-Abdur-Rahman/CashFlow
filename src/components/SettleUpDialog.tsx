@@ -46,6 +46,7 @@ export function SettleUpDialog({
   const [method, setMethod] = useState<"cash" | "bank_transfer" | "e-wallet">("cash");
   const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
+  const [description, setDescription] = useState("");
 
   const methodToAccountType: Record<string, string> = {
     cash: "cash",
@@ -139,6 +140,7 @@ export function SettleUpDialog({
           method,
           account_id: accountId || null,
           note: note || null,
+          description: description.trim() || null,
           created_by: u.user.id,
           receiver_account_pending: receiverPending,
           pending_for_user_id: receiverPending ? receiverId : null,
@@ -265,6 +267,12 @@ export function SettleUpDialog({
               <span className="font-mono text-income">{formatMoney(totalSettling)}</span>
             </div>
           )}
+
+          {/* Description */}
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Paid via bank, Coffee money" />
+          </div>
 
           {/* Method */}
           <div className="space-y-1.5">

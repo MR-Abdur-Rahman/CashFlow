@@ -353,7 +353,7 @@ export default function Home() {
                           canEdit={item.created_by === userId} canDelete={item.created_by === userId}
                           editDeniedMessage="Only the creator can edit this settlement"
                           deleteDeniedMessage="Only the creator can delete this settlement">
-                          <SettlementRow iPaid={item._iPaid} otherName={item._otherName} amount={Number(item.amount)} remaining={item._remaining} fullySettled={item._fullySettled} createdAt={item.created_at} />
+                          <SettlementRow description={item.description} iPaid={item._iPaid} otherName={item._otherName} amount={Number(item.amount)} remaining={item._remaining} fullySettled={item._fullySettled} createdAt={item.created_at} />
                         </SwipeRow>
                       ) : (
                         <SwipeRow key={item.id} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}
