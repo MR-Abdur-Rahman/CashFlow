@@ -220,12 +220,12 @@ export default function PersonDetail() {
       ...filteredSplits.map((s: any) => ({ ...s, _itemType: "split" as const })),
       ...filteredSettlements,
     ];
-    // Sort all items (splits + settlements) by full timestamp DESC. Splits use date+time;
-    // settlements use created_at (they have no date/time column).
-    const sortKey = (x: any) => x._itemType === "split"
-      ? `${x.date}T${x.time ?? "00:00:00"}`
-      : String(x.created_at ?? "");
-    return items.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+    // Sort all items (splits + settlements) by numeric timestamp DESC. String compare mixed local
+    // split date+time with UTC settlement created_at; getTime() normalizes both to epoch ms.
+    const getTime = (x: any) => x._itemType === "settlement"
+      ? new Date(x.created_at).getTime()
+      : new Date(`${x.date || "1970-01-01"}T${x.time || "00:00:00"}`).getTime();
+    return items.sort((a, b) => getTime(b) - getTime(a));
   }, [filteredSplits, filteredSettlements]);
 
   if (!person) return <div className="p-6">Person not found</div>;

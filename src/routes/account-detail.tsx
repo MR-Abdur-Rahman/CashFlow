@@ -118,8 +118,10 @@ export default function AccountDetail() {
       const { data, error } = await supabase
         .from("splits")
         .select("*, split_shares(*), groups:group_id(name), people:person_id(name)")
+        // Any split that used THIS account — whether the current user paid ("me") or they confirmed
+        // it as the payer on a pending split someone else created. RLS already limits to splits the
+        // user participates in, so no extra paid_by filter is needed (that wrongly hid confirmed ones).
         .eq("account_id", accountId)
-        .eq("paid_by", "me")
         .gte("date", dateFrom)
         .lte("date", dateTo)
         .order("date", { ascending: false })
