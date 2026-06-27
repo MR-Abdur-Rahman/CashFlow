@@ -378,6 +378,29 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
     enabled: isExpense,
   });
 
+  // Incoming splits the current user paid (confirmed) for this expense category.
+  const { data: drillPayerSplits = [] } = useQuery({
+    queryKey: ["drill", "payer-splits", drillItem.name, drillItem.drillType, dateFrom, dateTo],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("splits")
+        .select("*, categories:category_id(name,icon), split_shares(*), accounts:account_id(label,institution), groups:group_id(name), people:person_id(name)")
+        .eq("pending_for_user_id", u.user.id)
+        .eq("account_pending", false)
+        .not("category_id", "is", null)
+        .gte("date", dateFrom)
+        .lte("date", dateTo)
+        .order("date", { ascending: false })
+        .order("time", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).filter((s: any) =>
+        ((s.categories as any)?.name ?? "Uncategorized") === drillItem.name);
+    },
+    enabled: isExpenseCat,
+  });
+
   // Income transactions
   const { data: incTxns = [] } = useQuery({
     queryKey: ["drill", "inc-txns", drillItem.name, drillItem.drillType, dateFrom, dateTo],
@@ -468,6 +491,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
     if (isExpenseCat) {
       for (const t of expTxns as any[]) { const k = txnKey(t.date, t.time); sums.set(k, (sums.get(k) ?? 0) + Number(t.amount)); }
       for (const s of drillSplits as any[]) { const k = txnKey(s.date, s.time); sums.set(k, (sums.get(k) ?? 0) + Number(s.total_amount)); }
+      for (const s of drillPayerSplits as any[]) { const k = txnKey(s.date, s.time); sums.set(k, (sums.get(k) ?? 0) + Number(s.total_amount)); }
     } else if (isExpensePerson) {
       for (const s of drillSplits as any[]) { const k = txnKey(s.date, s.time); sums.set(k, (sums.get(k) ?? 0) + Number(s.total_amount)); }
     } else {
@@ -477,7 +501,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       }
     }
     return chartBuckets.map(b => ({ label: b.label, value: sums.get(b.key) ?? 0 }));
-  }, [chartBuckets, expTxns, drillSplits, incTxns, drillSettlements, drillPeriod, isExpenseCat, isExpensePerson, isIncomePerson]);
+  }, [chartBuckets, expTxns, drillSplits, drillPayerSplits, incTxns, drillSettlements, drillPeriod, isExpenseCat, isExpensePerson, isIncomePerson]);
 
   // Sub-categories for filter list (expense-category only, from expense txns)
   const subItems = useMemo(() => {
@@ -504,6 +528,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       filteredTxns.forEach(t => items.push({ ...t, _type: "exp", _sort: `${t.date}T${t.time ?? "00:00"}` }));
       if (!selectedSub) {
         (drillSplits as any[]).forEach(s => items.push({ ...s, _type: "split", _sort: `${s.date}T${s.time ?? "00:00"}` }));
+        (drillPayerSplits as any[]).forEach(s => items.push({ ...s, _type: "split", _sort: `${s.date}T${s.time ?? "00:00"}` }));
       }
     } else if (isExpensePerson) {
       (drillSplits as any[]).forEach(s => items.push({ ...s, _type: "split", _sort: `${s.date}T${s.time ?? "00:00"}` }));
@@ -514,7 +539,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       (drillSettlements as any[]).forEach(s => items.push({ ...s, _type: "set-inc", _sort: s.created_at ?? "" }));
     }
     return items.sort((a, b) => b._sort.localeCompare(a._sort));
-  }, [expTxns, drillSplits, incTxns, drillSettlements, selectedSub, isExpenseCat, isExpensePerson, isIncomeSource, isIncomePerson]);
+  }, [expTxns, drillSplits, drillPayerSplits, incTxns, drillSettlements, selectedSub, isExpenseCat, isExpensePerson, isIncomeSource, isIncomePerson]);
 
   const total = useMemo(() => allItems.reduce((s, item) => {
     if (item._type === "exp") return s + Number(item.amount);
@@ -529,8 +554,9 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
     let t = 0;
     (expTxns as any[]).forEach(x => { t += Number(x.amount); });
     (drillSplits as any[]).forEach(x => { t += Number(x.total_amount); });
+    (drillPayerSplits as any[]).forEach(x => { t += Number(x.total_amount); });
     return t;
-  }, [expTxns, drillSplits]);
+  }, [expTxns, drillSplits, drillPayerSplits]);
 
   return (
     <div className="flex flex-col h-full">
@@ -758,6 +784,27 @@ export default function ReportsPage() {
     },
   });
 
+  // Incoming splits where I'm the PAYER and I've confirmed an account + category (Pending tab).
+  // pending_for_user_id = me identifies these; they never create a transaction, so they'd otherwise
+  // be missing from expenses. No overlap with mySplits (those have pending_for_user_id = null).
+  const { data: payerSplits = [] } = useQuery({
+    queryKey: ["splits", "reports-payer", dateFrom, dateTo],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("splits")
+        .select("*, categories:category_id(name,icon)")
+        .eq("pending_for_user_id", u.user.id)
+        .eq("account_pending", false)
+        .not("category_id", "is", null)
+        .gte("date", dateFrom)
+        .lte("date", dateTo);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   // Settlements received (income) in this period
   const { data: incomeSettlements = [] } = useQuery({
     queryKey: ["settlements", "reports-main", dateFrom, dateTo],
@@ -787,10 +834,15 @@ export default function ReportsPage() {
       const name = (s.categories as any)?.name ?? "Uncategorized";
       map.set(name, (map.get(name) ?? 0) + Number(s.total_amount));
     });
+    // Incoming splits I paid (full amount left my account on confirm).
+    (payerSplits as any[]).forEach(s => {
+      const name = (s.categories as any)?.name ?? "Uncategorized";
+      map.set(name, (map.get(name) ?? 0) + Number(s.total_amount));
+    });
     return Array.from(map.entries())
       .map(([name, value]) => ({ name, value, drillType: "expense-category" as DrillType }))
       .sort((a, b) => b.value - a.value);
-  }, [txns, mySplits]);
+  }, [txns, mySplits, payerSplits]);
 
   const expenseTotal = useMemo(
     () => expenseData.reduce((s, d) => s + d.value, 0),
