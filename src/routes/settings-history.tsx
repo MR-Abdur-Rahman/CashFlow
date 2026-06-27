@@ -113,13 +113,19 @@ export default function HistoryPage() {
   }, [ownSplits, incomingSplits]);
 
   const filteredSplits = useMemo(() => {
-    // "all"/"split" → all splits. "expense" → only incoming splits the current user PAID and
-    // confirmed (account_pending=false): those are the user's own expense and create no transaction
-    // row. Non-payer incoming splits are NOT expenses, so they're excluded under "expense".
+    // "all"/"split" → all splits. "expense" → only splits the current user PAID (their own expense):
+    //   • own splits they created and paid ("me"), and
+    //   • incoming splits where they were the payer and have confirmed (account_pending=false).
+    // Neither creates a transaction row, so this is the single representation. Non-payer splits are
+    // not expenses and are excluded under "expense".
     let base: any[];
     if (type === "all" || type === "split") base = allSplits;
-    else if (type === "expense") base = allSplits.filter((s) =>
-      s._isIncoming && s.paid_by_person_id != null && s.paid_by_person_id === s._myPersonId && s.account_pending === false);
+    else if (type === "expense") base = allSplits.filter((s) => {
+      const incomingPayer = s._isIncoming && s.paid_by_person_id != null
+        && s.paid_by_person_id === s._myPersonId && s.account_pending === false;
+      const ownPaid = !s._isIncoming && s.paid_by === "me" && s.category_id != null;
+      return incomingPayer || ownPaid;
+    });
     else return [];
     return base.filter((s) => {
       if (s.date < fromStr || s.date > toStr) return false;
