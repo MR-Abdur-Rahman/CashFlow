@@ -920,8 +920,9 @@ function SplitForm({ onClose }: { onClose: () => void }) {
         paid_by: paidByValue,
         paid_by_person_id: paidByPersonId,
         split_type: splitType,
-        category_id: categoryId || null,
-        sub_category_id: subCatId || null,
+        // When someone else paid, category is the payer's choice (set later in the Pending tab).
+        category_id: whoPaid === "me" ? (categoryId || null) : null,
+        sub_category_id: whoPaid === "me" ? (subCatId || null) : null,
         account_id: whoPaid === "me" && accountId ? accountId : null,
         account_pending: isAccountPending,
         pending_for_user_id: isAccountPending ? payerLinkedUserId : null,
@@ -971,7 +972,7 @@ function SplitForm({ onClose }: { onClose: () => void }) {
           if (target === "person" && !personId) { toast.error("Please select a person"); return; }
           if (target === "multi" && multiPeople.length === 0) { toast.error("Please select at least one person"); return; }
           if (target === "group" && !groupId) { toast.error("Please select a group"); return; }
-          if (!categoryId) { toast.error("Please select a category"); return; }
+          if (whoPaid === "me" && !categoryId) { toast.error("Please select a category"); return; }
           if (whoPaid === "me" && !accountId) { toast.error("Please select an account"); return; }
           mutation.mutate();
         }}>
@@ -1111,17 +1112,20 @@ function SplitForm({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {/* Category */}
-        <div className="space-y-1.5">
-          <Label>Category</Label>
-          <button type="button" onClick={() => setCatPickerOpen(true)}
-            className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
-            <span className={categoryId ? "text-foreground" : "text-muted-foreground"}>
-              {categoryId ? `${categoryIcon} ${categoryName}${subCatName ? " · " + subCatName : ""}` : "Select category"}
-            </span>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          </button>
-        </div>
+        {/* Category — only when "You paid". When someone else paid, the payer picks their own
+            category later (in the Pending tab), so it's hidden and saved as null here. */}
+        {whoPaid === "me" && (
+          <div className="space-y-1.5">
+            <Label>Category</Label>
+            <button type="button" onClick={() => setCatPickerOpen(true)}
+              className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary rounded-lg text-sm">
+              <span className={categoryId ? "text-foreground" : "text-muted-foreground"}>
+                {categoryId ? `${categoryIcon} ${categoryName}${subCatName ? " · " + subCatName : ""}` : "Select category"}
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
+        )}
 
         <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
         <div className="space-y-1.5"><Label>Note</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></div>

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { peopleQuery, groupsQuery, splitBalancesQuery, pendingSplitsQuery, pendingSettlementsQuery, accountsQuery } from "@/lib/queries";
+import { peopleQuery, groupsQuery, splitBalancesQuery, pendingSplitsQuery, pendingSettlementsQuery, accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
 import { Users, Plus, ChevronRight, Archive, QrCode, History, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -329,14 +329,22 @@ function PendingSettlementRow({ settlement, accounts }: { settlement: any; accou
 function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
   const qc = useQueryClient();
   const [accountId, setAccountId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [subCatId, setSubCatId] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // The payer (current user) picks their OWN category — the creator didn't set one for "other paid".
+  const { data: categories = [] } = useQuery(categoriesQuery("expense"));
+  const { data: subCategories = [] } = useQuery(subCategoriesQuery(categoryId || null));
+
   const selectedAccount = accounts.find((a) => a.id === accountId);
+  const selectedCategory = (categories as any[]).find((c) => c.id === categoryId);
   const creatorName = split.creator?.full_name ?? "Someone";
+  const ddStyle = { background: "#0A0A0A", borderColor: "#2A2A2A", color: "#FFFFFF" } as const;
 
   async function confirmSelection() {
-    if (!selectedAccount || saving) return;
+    if (!selectedAccount || !categoryId || saving) return;
     setSaving(true);
     try {
       const { error: e1 } = await supabase
@@ -345,6 +353,8 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
           account_id: selectedAccount.id,
           account_pending: false,
           account_confirmed_at: new Date().toISOString(),
+          category_id: categoryId,
+          sub_category_id: subCatId || null,
         })
         .eq("id", split.id);
       if (e1) throw e1;
@@ -383,10 +393,32 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
         <span className="text-xs shrink-0" style={{ color: "#6B7280" }}>{format(new Date(split.created_at), "MMM d, yyyy")}</span>
       </div>
 
-      {/* Line 3: account dropdown + confirm */}
+      {/* Line 3: category + sub-category (sub appears after a category is chosen) */}
+      <div className="space-y-2">
+        <Select value={categoryId} onValueChange={(v) => { setCategoryId(v); setSubCatId(""); }}>
+          <SelectTrigger className="w-full" style={ddStyle}><SelectValue placeholder="Select category" /></SelectTrigger>
+          <SelectContent>
+            {(categories as any[]).map((c) => (
+              <SelectItem key={c.id} value={c.id}>{c.icon ? `${c.icon} ` : ""}{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {categoryId && (
+          <Select value={subCatId} onValueChange={setSubCatId}>
+            <SelectTrigger className="w-full" style={ddStyle}><SelectValue placeholder="Sub-category (optional)" /></SelectTrigger>
+            <SelectContent>
+              {(subCategories as any[]).map((sc) => (
+                <SelectItem key={sc.id} value={sc.id}>{sc.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      {/* Line 4: account dropdown + confirm */}
       <div className="flex items-center gap-2">
         <Select value={accountId} onValueChange={setAccountId}>
-          <SelectTrigger className="flex-1"><SelectValue placeholder="Select account" /></SelectTrigger>
+          <SelectTrigger className="flex-1" style={ddStyle}><SelectValue placeholder="Select account" /></SelectTrigger>
           <SelectContent>
             {accounts.map((a) => (
               <SelectItem key={a.id} value={a.id}>
@@ -400,7 +432,7 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
           </SelectContent>
         </Select>
         <Button
-          disabled={!accountId}
+          disabled={!accountId || !categoryId}
           onClick={() => setConfirmOpen(true)}
           className="text-white shrink-0"
           style={{ background: "#78350F" }}
@@ -414,7 +446,8 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
           <DialogTitle>Confirm Account Selection</DialogTitle>
           <DialogDescription>
             The amount {formatMoney(Number(split.total_amount))} will be deducted from{" "}
-            {selectedAccount ? [selectedAccount.institution, selectedAccount.label].filter(Boolean).join(" · ") : "the selected account"}. This cannot be changed later.
+            {selectedAccount ? [selectedAccount.institution, selectedAccount.label].filter(Boolean).join(" · ") : "the selected account"}
+            {selectedCategory ? ` under ${selectedCategory.name}` : ""}. This cannot be changed later.
           </DialogDescription>
           <div className="flex justify-end gap-2 mt-2">
             <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={saving}>Cancel</Button>
