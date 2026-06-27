@@ -81,12 +81,12 @@ function DateTime({ date, time, setDate, setTime }: { date: string; time: string
   );
 }
 
-function FormShell({ children, onSubmit, button, color }: { children: React.ReactNode; onSubmit: (e: React.FormEvent) => void; button: string; color: string }) {
+function FormShell({ children, onSubmit, button, color, disabled }: { children: React.ReactNode; onSubmit: (e: React.FormEvent) => void; button: string; color: string; disabled?: boolean }) {
   return (
     <form onSubmit={onSubmit} className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto px-5 pb-4 space-y-4">{children}</div>
       <div className="p-4 pt-2 border-t border-border bg-card">
-        <Button type="submit" className={cn("w-full text-white", color)}>{button}</Button>
+        <Button type="submit" disabled={disabled} className={cn("w-full text-white", color)}>{button}</Button>
       </div>
     </form>
   );
@@ -963,9 +963,11 @@ function SplitForm({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <FormShell color="bg-[oklch(0.40_0.13_70)] hover:bg-[oklch(0.45_0.13_70)]" button="Save split"
+      <FormShell color="bg-[oklch(0.40_0.13_70)] hover:bg-[oklch(0.45_0.13_70)]" button={mutation.isPending ? "Saving…" : "Save split"}
+        disabled={mutation.isPending}
         onSubmit={(e) => {
           e.preventDefault();
+          if (mutation.isPending) return; // guard against double-submit → double deduction
           const amt = Number(amount);
           if (!amount || isNaN(amt) || amt <= 0) { toast.error("Amount must be greater than 0"); return; }
           if (!description.trim()) { toast.error("Please enter a description"); return; }
