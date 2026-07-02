@@ -13,6 +13,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { SwipeRow } from "@/components/SwipeRow";
 import { toast } from "sonner";
 import { notifyToast } from "@/lib/notify";
+import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -357,9 +358,9 @@ export default function Home() {
                         </SwipeRow>
                       ) : (
                         <SwipeRow key={item.id} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}
-                          canEdit={!item._isIncoming} canDelete={!item._isIncoming}
-                          editDeniedMessage="Only the creator can edit this split"
-                          deleteDeniedMessage="Only the creator can delete this split">
+                          canEdit={canModifySplit(item)} canDelete={canModifySplit(item)}
+                          editDeniedMessage="Only the creator or payer can edit this split"
+                          deleteDeniedMessage="Only the creator or payer can delete this split">
                           <SplitDirectRow s={item} />
                         </SwipeRow>
                       )
@@ -441,14 +442,7 @@ export default function Home() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
               if (!deleteSplit) return;
-              const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
-              if (error) toast.error(error.message);
-              else {
-                notifyToast("split_deleted", "Split deleted");
-                qc.invalidateQueries({ queryKey: ["splits"] });
-                qc.invalidateQueries({ queryKey: ["transactions"] });
-                qc.invalidateQueries({ queryKey: ["accounts"] });
-              }
+              await runSplitDelete(deleteSplit.id, qc);
               setDeleteSplit(null);
             }}>Delete</AlertDialogAction>
           </AlertDialogFooter>

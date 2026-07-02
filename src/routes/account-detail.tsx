@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { notifyToast } from "@/lib/notify";
+import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
 import { useState, useMemo, useEffect } from "react";
 import { AddAccountSheet } from "@/components/AddAccountSheet";
 import { SwipeRow } from "@/components/SwipeRow";
@@ -329,9 +330,9 @@ export default function AccountDetail() {
                 </SwipeRow>
               ) : (
                 <SwipeRow key={`sp-${item.id}`} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplitItem(item)}
-                  canEdit={!item._isIncoming} canDelete={!item._isIncoming}
-                  editDeniedMessage="Only the creator can edit this split"
-                  deleteDeniedMessage="Only the creator can delete this split">
+                  canEdit={canModifySplit(item)} canDelete={canModifySplit(item)}
+                  editDeniedMessage="Only the creator or payer can edit this split"
+                  deleteDeniedMessage="Only the creator or payer can delete this split">
                   <SplitRow s={item} />
                 </SwipeRow>
               )
@@ -366,15 +367,7 @@ export default function AccountDetail() {
               className="bg-destructive text-white hover:bg-destructive/90"
               onClick={async () => {
                 if (!deleteSplitItem) return;
-                await supabase.from("split_shares").delete().eq("split_id", deleteSplitItem.id);
-                const { error } = await supabase.from("splits").delete().eq("id", deleteSplitItem.id);
-                if (error) toast.error(error.message);
-                else {
-                  notifyToast("split_deleted", "Split deleted");
-                  qc.invalidateQueries({ queryKey: ["splits"] });
-                  qc.invalidateQueries({ queryKey: ["transactions"] });
-                  qc.invalidateQueries({ queryKey: ["accounts"] });
-                }
+                await runSplitDelete(deleteSplitItem.id, qc);
                 setDeleteSplitItem(null);
               }}
             >

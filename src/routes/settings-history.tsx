@@ -16,6 +16,7 @@ import { SwipeRow } from "@/components/SwipeRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { notifyToast } from "@/lib/notify";
+import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -230,9 +231,9 @@ export default function HistoryPage() {
             {items.map((item) =>
               item._kind === "split" ? (
                 <SwipeRow key={`split-${item.id}`} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}
-                  canEdit={!item._isIncoming} canDelete={!item._isIncoming}
-                  editDeniedMessage="Only the creator can edit this split"
-                  deleteDeniedMessage="Only the creator can delete this split">
+                  canEdit={canModifySplit(item)} canDelete={canModifySplit(item)}
+                  editDeniedMessage="Only the creator or payer can edit this split"
+                  deleteDeniedMessage="Only the creator or payer can delete this split">
                   <SplitDirectRow s={item} />
                 </SwipeRow>
               ) : item._kind === "settlement" ? (
@@ -300,14 +301,7 @@ export default function HistoryPage() {
               className="bg-destructive text-white hover:bg-destructive/90"
               onClick={async () => {
                 if (!deleteSplit) return;
-                const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
-                if (error) toast.error(error.message);
-                else {
-                  notifyToast("split_deleted", "Split deleted");
-                  qc.invalidateQueries({ queryKey: ["splits"] });
-                  qc.invalidateQueries({ queryKey: ["transactions"] });
-                  qc.invalidateQueries({ queryKey: ["accounts"] });
-                }
+                await runSplitDelete(deleteSplit.id, qc);
                 setDeleteSplit(null);
               }}
             >

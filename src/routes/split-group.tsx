@@ -7,6 +7,7 @@ import { SwipeRow } from "@/components/SwipeRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { notifyToast } from "@/lib/notify";
+import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
 import { useState, useMemo, useEffect } from "react";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
@@ -205,9 +206,9 @@ export default function GroupDetail() {
               const label = getSplitLabel(s);
               return (
                 <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}
-                  canEdit={!s._isIncoming} canDelete={!s._isIncoming}
-                  editDeniedMessage="Only the creator can edit this split"
-                  deleteDeniedMessage="Only the creator can delete this split">
+                  canEdit={canModifySplit(s)} canDelete={canModifySplit(s)}
+                  editDeniedMessage="Only the creator or payer can edit this split"
+                  deleteDeniedMessage="Only the creator or payer can delete this split">
                   <div className="flex items-center gap-3 px-4 py-3 bg-card">
                     <div className="h-9 w-9 rounded-full bg-split/20 flex items-center justify-center text-split shrink-0">
                       <Users className="h-4 w-4" />
@@ -257,9 +258,7 @@ export default function GroupDetail() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
               if (!deleteSplit) return;
-              const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
-              if (error) toast.error(error.message);
-              else { notifyToast("split_deleted", "Split deleted"); qc.invalidateQueries({ queryKey: ["splits"] }); }
+              await runSplitDelete(deleteSplit.id, qc);
               setDeleteSplit(null);
             }}>Delete</AlertDialogAction>
           </AlertDialogFooter>

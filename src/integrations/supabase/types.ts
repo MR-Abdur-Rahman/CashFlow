@@ -709,6 +709,7 @@ export type Database = {
     }
     Functions: {
       can_see_split: { Args: { _split_id: string }; Returns: boolean }
+      delete_split: { Args: { p_split_id: string }; Returns: undefined }
       has_unsettled_splits: { Args: { _user_id: string }; Returns: boolean }
       run_rls_tests: {
         Args: never

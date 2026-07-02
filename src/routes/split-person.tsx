@@ -11,6 +11,7 @@ import { SplitDirectRow } from "./home";
 import { SettlementRow } from "@/components/SettlementRow";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import { notifyToast } from "@/lib/notify";
+import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState, useMemo, useEffect } from "react";
@@ -318,9 +319,9 @@ export default function PersonDetail() {
               </SwipeRow>
             ) : (
               <SwipeRow key={item.id} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}
-                canEdit={!item._isIncoming} canDelete={!item._isIncoming}
-                editDeniedMessage="Only the creator can edit this split"
-                deleteDeniedMessage="Only the creator can delete this split">
+                canEdit={canModifySplit(item)} canDelete={canModifySplit(item)}
+                editDeniedMessage="Only the creator or payer can edit this split"
+                deleteDeniedMessage="Only the creator or payer can delete this split">
                 <SplitDirectRow s={item} lentOweOverride={bilateralRowAmount(item)} />
               </SwipeRow>
             ))}
@@ -360,37 +361,10 @@ export default function PersonDetail() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
               if (!deleteSplit) return;
-              const { data: u } = await supabase.auth.getUser();
-              if (!u.user) return;
-
-              const isCreator = deleteSplit.created_by === u.user.id;
-
-              if (!isCreator) {
-                toast.error("Only the creator can delete this split");
-                const { data: myProfile } = await supabase
-                  .from("profiles").select("full_name").eq("id", u.user.id).maybeSingle();
-                await supabase.from("notifications").insert({
-                  user_id: deleteSplit.created_by,
-                  type: "delete_attempt",
-                  title: "Delete attempt",
-                  message: `${myProfile?.full_name ?? "Someone"} tried to delete: ${deleteSplit.description || "Split"}`,
-                  related_split_id: deleteSplit.id,
-                  is_read: false,
-                });
-                setDeleteSplit(null);
-                return;
-              }
-
-              // split_deleted notifications are now sent by the DB trigger
-              // (trigger_notify_split_deleted, gated by each recipient's split_notifications pref).
-              const { error } = await supabase.from("splits").delete().eq("id", deleteSplit.id);
-              if (error) toast.error(error.message);
-              else {
-                notifyToast("split_deleted", "Split deleted");
-                qc.invalidateQueries({ queryKey: ["splits"] });
-                qc.invalidateQueries({ queryKey: ["transactions"] });
-                qc.invalidateQueries({ queryKey: ["accounts"] });
-              }
+              // The delete_split RPC enforces creator-or-payer permission, blocks
+              // deletion when settlements exist, restores balance, and notifies
+              // all other participants — all server-side.
+              await runSplitDelete(deleteSplit.id, qc);
               setDeleteSplit(null);
             }}>Delete</AlertDialogAction>
           </AlertDialogFooter>
