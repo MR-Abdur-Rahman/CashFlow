@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { notifyToast } from "@/lib/notify";
 import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
+import { canDeleteSettlement, deleteSettlement as deleteSettlementRpc } from "@/lib/deleteSettlement";
 import { useState, useMemo, useEffect } from "react";
 import { AddAccountSheet } from "@/components/AddAccountSheet";
 import { SwipeRow } from "@/components/SwipeRow";
@@ -323,9 +324,9 @@ export default function AccountDetail() {
             splitsTabItems.map((item: any) =>
               item._itemType === "settlement" ? (
                 <SwipeRow key={`set-${item.id}`} onEdit={() => setEditSettlement(item)} onDelete={() => setDeleteSettlement(item)}
-                  canEdit={item.created_by === userId} canDelete={item.created_by === userId}
+                  canEdit={item.created_by === userId} canDelete={canDeleteSettlement(item, userId)}
                   editDeniedMessage="Only the creator can edit this settlement"
-                  deleteDeniedMessage="Only the creator can delete this settlement">
+                  deleteDeniedMessage="Only the creator or payer can delete this settlement">
                   <SettlementRow description={item.description} iPaid={item._iPaid} otherName={item._otherName} amount={Number(item.amount)} remaining={item._remaining} fullySettled={item._fullySettled} createdAt={item.created_at} />
                 </SwipeRow>
               ) : (
@@ -389,14 +390,7 @@ export default function AccountDetail() {
               className="bg-destructive text-white hover:bg-destructive/90"
               onClick={async () => {
                 if (!deleteSettlement) return;
-                const s = deleteSettlement;
-                const { error } = await supabase.from("settlements").delete().eq("id", s.id);
-                if (error) { toast.error(error.message); setDeleteSettlement(null); return; }
-                notifyToast("settlement_created", "Settlement deleted");
-                qc.invalidateQueries({ queryKey: ["settlements"] });
-                qc.invalidateQueries({ queryKey: ["accounts"] });
-                qc.invalidateQueries({ queryKey: ["splits"] });
-                qc.invalidateQueries({ queryKey: ["split_shares"] });
+                await deleteSettlementRpc(deleteSettlement.id, qc);
                 setDeleteSettlement(null);
               }}
             >

@@ -11,6 +11,7 @@ import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { QrScannerDialog } from "@/components/QrScannerDialog";
 import { formatMoney } from "@/lib/format";
+import { methodToAccountType } from "@/lib/settlement";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -237,7 +238,11 @@ function PendingSettlementRow({ settlement, accounts }: { settlement: any; accou
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const selectedAccount = accounts.find((a) => a.id === accountId);
+  // Only accounts whose type matches how the payment was made can receive it
+  // (cash → cash, bank_transfer → bank, e-wallet → e-wallet).
+  const allowedType = methodToAccountType[settlement.method as string];
+  const filteredAccounts = allowedType ? accounts.filter((a) => a.type === allowedType) : accounts;
+  const selectedAccount = filteredAccounts.find((a) => a.id === accountId);
   const settlerName = settlement.creator?.full_name ?? "Someone";
   const desc = settlement.splits?.description || "Settlement";
   const methodLabel = String(settlement.method ?? "transfer").replace("_", " ");
@@ -287,25 +292,31 @@ function PendingSettlementRow({ settlement, accounts }: { settlement: any; accou
       </div>
 
       {/* Line 3: receiving account dropdown + confirm */}
-      <div className="flex items-center gap-2">
-        <Select value={accountId} onValueChange={setAccountId}>
-          <SelectTrigger className="flex-1"><SelectValue placeholder="Select account" /></SelectTrigger>
-          <SelectContent>
-            {accounts.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                <span className="flex items-center gap-2">
-                  <AccountIcon iconType={a.icon_type} iconName={a.icon_name} iconColor={a.icon_color} iconUrl={a.icon_url} size={20} rounded="rounded-md" />
-                  <span>{[a.institution, a.label].filter(Boolean).join(" · ")}</span>
-                  <span className="text-muted-foreground">{formatMoney(Number(a.current_balance))}</span>
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button disabled={!accountId} onClick={() => setConfirmOpen(true)} className="text-white shrink-0" style={{ background: "#064E3B" }}>
-          Confirm
-        </Button>
-      </div>
+      {filteredAccounts.length === 0 ? (
+        <p className="text-xs" style={{ color: "#9CA3AF" }}>
+          No {allowedType ?? "matching"} accounts found — add one in the Accounts tab.
+        </p>
+      ) : (
+        <div className="flex items-center gap-2">
+          <Select value={accountId} onValueChange={setAccountId}>
+            <SelectTrigger className="flex-1"><SelectValue placeholder="Select account" /></SelectTrigger>
+            <SelectContent>
+              {filteredAccounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  <span className="flex items-center gap-2">
+                    <AccountIcon iconType={a.icon_type} iconName={a.icon_name} iconColor={a.icon_color} iconUrl={a.icon_url} size={20} rounded="rounded-md" />
+                    <span>{[a.institution, a.label].filter(Boolean).join(" · ")}</span>
+                    <span className="text-muted-foreground">{formatMoney(Number(a.current_balance))}</span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button disabled={!accountId} onClick={() => setConfirmOpen(true)} className="text-white shrink-0" style={{ background: "#064E3B" }}>
+            Confirm
+          </Button>
+        </div>
+      )}
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>

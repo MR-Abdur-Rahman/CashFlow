@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { accountsQuery } from "@/lib/queries";
+import { methodToAccountType } from "@/lib/settlement";
 import { toast } from "sonner";
 import { notifyToast } from "@/lib/notify";
 import { formatMoney } from "@/lib/format";
@@ -47,12 +48,6 @@ export function SettleUpDialog({
   const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
   const [description, setDescription] = useState("");
-
-  const methodToAccountType: Record<string, string> = {
-    cash: "cash",
-    bank_transfer: "bank",
-    "e-wallet": "e-wallet",
-  };
 
   const filteredAccounts = useMemo(
     () => (accounts as any[]).filter((a) => a.type === methodToAccountType[method]),

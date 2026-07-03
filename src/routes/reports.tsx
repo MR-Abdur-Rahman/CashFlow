@@ -18,6 +18,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SwipeRow } from "@/components/SwipeRow";
+import { deleteSettlement as deleteSettlementRpc } from "@/lib/deleteSettlement";
 import { EditTxSheet, EditSplitSheet } from "@/routes/home";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import {
@@ -734,14 +735,11 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
                   qc.invalidateQueries({ queryKey: ["drill"] });
                 }
               } else if (item._type === "set-inc") {
-                ({ error } = await supabase.from("settlements").delete().eq("id", item.id));
-                if (!error) {
-                  qc.invalidateQueries({ queryKey: ["settlements"] });
-                  qc.invalidateQueries({ queryKey: ["splits"] });
-                  qc.invalidateQueries({ queryKey: ["split_shares"] });
-                  qc.invalidateQueries({ queryKey: ["accounts"] });
-                  qc.invalidateQueries({ queryKey: ["drill"] });
-                }
+                // Routed through the delete_settlement RPC (permission + balance triggers +
+                // notifications). It shows its own toast, so return before the generic one.
+                await deleteSettlementRpc(item.id, qc);
+                qc.invalidateQueries({ queryKey: ["drill"] });
+                return;
               }
               if (error) toast.error(error.message);
               else toast.success("Deleted");

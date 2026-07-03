@@ -1,5 +1,14 @@
 // Shared settlement row helpers (kept out of the component file so React Fast Refresh stays happy).
 
+// Maps a settlement's payment `method` to the account `type` that can receive/send it.
+// Used to filter account dropdowns (SettleUpDialog + the Pending-tab settlement row) so a
+// user can only pick an account whose type matches how the payment was made.
+export const methodToAccountType: Record<string, string> = {
+  cash: "cash",
+  bank_transfer: "bank",
+  "e-wallet": "e-wallet",
+};
+
 // Per-share remaining: share_amount minus the cumulative settlements on the SAME split_share_id
 // up to and including this one (chronological). This is symmetric for both users (it reads the
 // share + its settlement rows, not viewer-local share-name sums), so it fixes the receiver-side

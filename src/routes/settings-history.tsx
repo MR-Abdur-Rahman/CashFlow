@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { notifyToast } from "@/lib/notify";
 import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
+import { canDeleteSettlement, deleteSettlement as deleteSettlementRpc } from "@/lib/deleteSettlement";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -238,9 +239,9 @@ export default function HistoryPage() {
                 </SwipeRow>
               ) : item._kind === "settlement" ? (
                 <SwipeRow key={`set-${item.id}`} onEdit={() => setEditSettlement(item)} onDelete={() => setDeleteSettlement(item)}
-                  canEdit={item.created_by === item._uid} canDelete={item.created_by === item._uid}
+                  canEdit={item.created_by === item._uid} canDelete={canDeleteSettlement(item, item._uid)}
                   editDeniedMessage="Only the creator can edit this settlement"
-                  deleteDeniedMessage="Only the creator can delete this settlement">
+                  deleteDeniedMessage="Only the creator or payer can delete this settlement">
                   <HistorySettlementRow s={item} all={settlements as any[]} />
                 </SwipeRow>
               ) : (
@@ -275,14 +276,7 @@ export default function HistoryPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
               if (!deleteSettlement) return;
-              const { error } = await supabase.from("settlements").delete().eq("id", deleteSettlement.id);
-              if (error) toast.error(error.message);
-              else {
-                notifyToast("settlement_created", "Settlement deleted");
-                qc.invalidateQueries({ queryKey: ["history-settlements"] });
-                qc.invalidateQueries({ queryKey: ["splits"] });
-                qc.invalidateQueries({ queryKey: ["accounts"] });
-              }
+              await deleteSettlementRpc(deleteSettlement.id, qc);
               setDeleteSettlement(null);
             }}>Delete</AlertDialogAction>
           </AlertDialogFooter>
