@@ -111,22 +111,20 @@ export function SettleUpDialog({
       const entries = Object.entries(selected).filter(([, v]) => Number(v) > 0);
       if (entries.length === 0) throw new Error("Select at least one split to settle");
 
-      const today = new Date();
-      const dateStr = today.toISOString().split("T")[0];
-      const timeStr = today.toTimeString().split(" ")[0];
-
       for (const [shareId, amtStr] of entries) {
         const amt = Number(amtStr);
         const item = items.find((i) => i.shareId === shareId);
         if (!item) continue;
 
         // The receiver (person being paid) is the split's creator, when they aren't the settler.
-        // For bank/e-wallet settlements they must confirm which of THEIR accounts received the money
-        // (handled in Split → Pending). Their account is credited by a DB trigger on confirm.
+        // Whenever there IS a remote receiver, the settler is the DEBTOR paying out: the payment
+        // must go to the receiver's account, so they confirm which of THEIR accounts received it
+        // (Split → Pending) for EVERY method. `pending_for_user_id` also flags this settlement as a
+        // debtor payment, which the balance trigger uses to DEBIT the settler's account_id.
         const { data: splitData } = await supabase
           .from("splits").select("created_by").eq("id", item.splitId).maybeSingle();
         const receiverId = splitData && splitData.created_by !== u.user.id ? splitData.created_by : null;
-        const receiverPending = (method === "bank_transfer" || method === "e-wallet") && !!receiverId;
+        const receiverPending = !!receiverId;
 
         const { error } = await supabase.from("settlements").insert({
           split_id: item.splitId,
@@ -142,25 +140,9 @@ export function SettleUpDialog({
         });
         if (error) throw error;
 
-        // Only record an expense transaction when the settler is the DEBTOR paying someone else
-        // (receiverId set). When the settler is the creditor recording money they RECEIVED
-        // (receiverId null), the settlement trigger already credits their account (+amount) — an
-        // expense here would wrongly cancel it, so it's skipped. This makes the creditor's chosen
-        // account increase by the amount for both cash and bank/e-wallet.
-        if ((method === "bank_transfer" || method === "e-wallet") && accountId && receiverId) {
-          const txLabel = personName || item.description || "Split";
-          const { error: txError } = await supabase.from("transactions").insert({
-            type: "expense",
-            amount: amt,
-            account_id: accountId,
-            note: `Settlement — ${txLabel}`,
-            date: dateStr,
-            time: timeStr,
-            is_split: false,
-            user_id: u.user.id,
-          });
-          if (txError) throw txError;
-        }
+        // No expense transaction: the balance trigger update_account_balance_on_settlement now
+        // debits the debtor's account_id directly (and credits the creditor when they record a
+        // receipt), so a separate expense row would double-count.
 
         const totalSettled = item.paidAmount + amt;
         if (totalSettled >= item.shareAmount) {
