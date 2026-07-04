@@ -64,6 +64,15 @@
 
 ## Fixed
 
+### [P2] Symmetric Settle Up — either party can record, correct account direction + red/green — fixed 2026-07-04
+- Commit: c5a3490 · Migration: settlement_symmetric_direction
+- Before: only the debtor could record a settlement. If the creditor recorded it, their account went up but the debtor was never prompted and their account never went down.
+- Fix: added `settler_is_creditor` to settlements; the two balance triggers now key the sign off it (settler's own account: + creditor receipt / − debtor payment; prompted party's account: the opposite, on confirm). Backfilled as `(pending_for_user_id IS NULL)` so existing balances are unchanged — verified with a rolled-back 4-phase test (no-op/insert/confirm/delete all correct).
+- Client: SettleUpDialog colors the amount red (you owe) / green (you're owed) from `netBalance`, sets `settler_is_creditor`, and prompts the OTHER party in both directions (passes `personLinkedUserId`). The Pending row shows the debtor's outflow (red "−", "You paid X", "deducted from") vs the creditor's inflow; notification wording is direction-aware.
+- Test Log:
+  1. 2026-07-04 — PASS (DB rolled-back): creditor records → creditor +500, debtor confirms → debtor −500, delete restores; existing rows untouched. Typecheck + build clean.
+  2. Pending — live: as User B settle a debt A owes → confirm A gets the prompt and A's account goes down when A confirms; check red/green colors both ways.
+
 ### [P2] Settle Up redesign — net-balance-only (removes split checkboxes) + FIFO allocation — fixed 2026-07-04
 - Commit: (see git)
 - Also closes: [P2] FIFO settlement allocation (delivered by the same change).

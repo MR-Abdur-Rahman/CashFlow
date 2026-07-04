@@ -78,6 +78,19 @@ Both entry points are unchanged: split-person passes `unsettledItems` (all the p
 
 **Known tradeoff.** A net payment spanning several splits still writes one settlement row per split consumed, so a debtor-payment can raise one account-selection prompt per distinct split (the notify trigger dedupes per split). Acceptable for now; a single-row model would need the detached-settlement data change above.
 
+### [P2] Symmetric Settle Up — either party records, correct account direction — 2026-07-04
+**Goal.** Both the debtor and the creditor can open Settle Up. Whoever records it sets their own account now; the other party is prompted to record theirs later. Amount is red when the viewer owes (paying out), green when owed (receiving).
+
+**What was broken.** The old model was asymmetric: `pending_for_user_id` set ⇒ the settler was assumed to be the debtor (account debited) and the creditor was prompted (credited); `pending` null ⇒ the settler was the creditor (credited) and *nobody* was prompted. So when the creditor recorded a payment, their account went up but the debtor was never prompted and their account never went down.
+
+**Fix (migration `settlement_symmetric_direction`).** Added `settler_is_creditor boolean` to `settlements` and rewrote the two balance triggers to key the sign off it instead of off `pending_for_user_id`:
+- `update_account_balance_on_settlement` (settler's own `account_id`): `+` when settler is creditor (receipt), `−` when debtor (payment).
+- `settlement_receiver_balance` (prompted party's `receiver_account_id`): the OPPOSITE sign — so a prompted debtor's account is *debited*, a prompted creditor's is *credited*.
+- `notify_settlement_account_selection`: message now says "which account the payment was made from" (debtor) vs "received the payment" (creditor).
+Backfilled `settler_is_creditor = (pending_for_user_id IS NULL)`, which reproduces every existing row's previous sign exactly, so no live balance moved. Verified before applying with a rolled-back 4-phase test against real accounts (no-op update, creditor-records insert, debtor-confirms update, delete) — all deltas correct, existing balances untouched.
+
+**Client.** `SettleUpDialog` gained `personLinkedUserId` + `netBalance` props: it colors the amount red/green from the net direction, computes `settler_is_creditor` per split (creditor = whoever paid), and sets `pending_for_user_id` to the other party in BOTH directions (so the debtor is prompted in the creditor-records case). `PendingSettlementRow` reads `settler_is_creditor` to show the prompted party's true side — an outflow (red "−", "You paid X", "will be deducted from") when they're the debtor, an inflow otherwise. Net balance still reduces immediately for both users; account selection only records where the money moved.
+
 (Finished bugs move here permanently, in the order they were completed. Never delete or shorten an entry — this is your permanent record of how CashFlow was actually built.)
 
 ## Queue
