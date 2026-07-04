@@ -23,37 +23,12 @@ import { cn } from "@/lib/utils";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfYear, endOfYear, subMonths, addMonths, subWeeks, addWeeks, subYears, addYears } from "date-fns";
+import { format } from "date-fns";
+import { type Period, PERIODS, getPeriodRange, navigateAnchor, formatAnchorLabel } from "@/lib/period";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-// ─── Helper: get display label for a split ────────────────────────────────
-function getSplitLabel(s: any): string {
-  if (s.type === "group" && s.groups?.name) return s.groups.name;
-  if (s.type === "individual" && s.people?.name) return s.people.name;
-  const names = (s.split_shares ?? []).map((sh: any) => sh.person_name).filter(Boolean);
-  if (names.length > 0) return names.join(", ");
-  return s.description || "Split";
-}
-
-type Period = "weekly" | "monthly" | "annually";
-function getPeriodRange(period: Period, anchor: Date) {
-  if (period === "weekly") return { from: startOfWeek(anchor, { weekStartsOn: 1 }), to: endOfWeek(anchor, { weekStartsOn: 1 }) };
-  if (period === "monthly") return { from: startOfMonth(anchor), to: endOfMonth(anchor) };
-  return { from: startOfYear(anchor), to: endOfYear(anchor) };
-}
-function navigateAnchor(period: Period, anchor: Date, dir: -1 | 1): Date {
-  if (period === "weekly") return dir === -1 ? subWeeks(anchor, 1) : addWeeks(anchor, 1);
-  if (period === "monthly") return dir === -1 ? subMonths(anchor, 1) : addMonths(anchor, 1);
-  return dir === -1 ? subYears(anchor, 1) : addYears(anchor, 1);
-}
-function formatAnchorLabel(period: Period, anchor: Date) {
-  if (period === "weekly") return `${format(startOfWeek(anchor, { weekStartsOn: 1 }), "MMM d")} – ${format(endOfWeek(anchor, { weekStartsOn: 1 }), "MMM d, yyyy")}`;
-  if (period === "monthly") return format(anchor, "MMM yyyy");
-  return format(anchor, "yyyy");
-}
 
 export default function GroupDetail() {
   const { groupId } = useParams<{ groupId: string }>();
@@ -204,7 +179,7 @@ export default function GroupDetail() {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-36">
-                {(["weekly", "monthly", "annually"] as Period[]).map((p) => (
+                {PERIODS.map((p) => (
                   <DropdownMenuItem key={p} onClick={() => { setPeriod(p); setAnchor(new Date()); }}
                     className={cn("capitalize py-3 text-base", period === p && "text-primary font-medium")}>
                     {p}
