@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { groupQuery, groupSplitsQuery, accountsQuery, categoriesQuery, subCategoriesQuery, peopleQuery, groupsQuery } from "@/lib/queries";
+import { groupQuery, splitBalancesQuery } from "@/lib/queries";
+import { bilateralBalance } from "@/lib/balance";
 import { ArrowLeft, Archive, Pencil, Trash2, Plus, Users, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SettleUpDialog } from "@/components/SettleUpDialog";
 import { SwipeRow } from "@/components/SwipeRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -14,7 +14,7 @@ import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { formatMoney } from "@/lib/format";
-import { EditSplitSheet } from "./home";
+import { EditSplitSheet, SplitDirectRow } from "./home";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -60,14 +60,16 @@ export default function GroupDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: group } = useQuery(groupQuery(groupId!));
-  const { data: splits = [] } = useQuery(groupSplitsQuery(groupId!));
+  const { data: balanceData } = useQuery(splitBalancesQuery());
+  const allSplits = balanceData?.splits ?? [];
+  const currentUserId = balanceData?.currentUserId ?? null;
+  const myPersonIds = balanceData?.myPersonIds ?? [];
   const [edit, setEdit] = useState(false);
   const [addSplitOpen, setAddSplitOpen] = useState(false);
   const [period, setPeriod] = useState<Period>("monthly");
   const [anchor, setAnchor] = useState(new Date());
   const [deleteSplit, setDeleteSplit] = useState<any | null>(null);
   const [editSplit, setEditSplit] = useState<any | null>(null);
-  const [settleItem, setSettleItem] = useState<{ share: any; split: any } | null>(null);
 
   const archive = useMutation({
     mutationFn: async () => {
@@ -86,18 +88,18 @@ export default function GroupDetail() {
     onError: (e) => toast.error(e.message),
   });
 
-  const memberBalances = (group as any)?.group_members?.map((m: any) => {
-    let owed = 0;
-    for (const s of splits as any[]) {
-      for (const sh of (s.split_shares ?? [])) {
-        if (sh.person_id !== m.person_id) continue;
-        const settled = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
-          .reduce((a: number, x: any) => a + Number(x.amount), 0);
-        owed += Number(sh.share_amount) - settled;
-      }
-    }
-    return { name: m.people?.name ?? "?", balance: owed };
-  }) ?? [];
+  // Each member's balance is the FULL bilateral net between the viewer and that member (all
+  // splits, same as the person detail page) — not just this group's splits. Self excluded.
+  const memberBalances = useMemo(() => {
+    return (((group as any)?.group_members ?? []) as any[])
+      .map((m: any) => m.people)
+      .filter((p: any) => p && p.linked_user_id !== currentUserId)
+      .map((p: any) => ({
+        id: p.id as string,
+        name: (p.name ?? "?") as string,
+        balance: bilateralBalance(allSplits as any[], p, currentUserId, myPersonIds),
+      }));
+  }, [group, allSplits, currentUserId, myPersonIds]);
 
   const { from: periodFrom, to: periodTo } = useMemo(
     () => getPeriodRange(period, anchor),
@@ -106,9 +108,22 @@ export default function GroupDetail() {
   const fromStr = useMemo(() => format(periodFrom, "yyyy-MM-dd"), [periodFrom]);
   const toStr = useMemo(() => format(periodTo, "yyyy-MM-dd"), [periodTo]);
 
+  // Group splits the viewer is involved in, enriched with the per-split fields SplitDirectRow
+  // needs (_myPersonId, group name) so the rows render exactly like the person page.
+  const groupSplits = useMemo(() => {
+    const mine = new Set(myPersonIds);
+    return (allSplits as any[])
+      .filter((s) => s.group_id === groupId)
+      .map((s) => {
+        const myShare = (s.split_shares ?? []).find((sh: any) =>
+          mine.has(sh.person_id) || sh.person?.linked_user_id === currentUserId);
+        return { ...s, _myPersonId: myShare?.person_id ?? null, groups: s.groups ?? { name: (group as any)?.name } };
+      });
+  }, [allSplits, groupId, myPersonIds, currentUserId, group]);
+
   const filteredSplits = useMemo(() =>
-    (splits as any[]).filter((s) => s.date >= fromStr && s.date <= toStr),
-    [splits, fromStr, toStr]
+    groupSplits.filter((s) => s.date >= fromStr && s.date <= toStr),
+    [groupSplits, fromStr, toStr]
   );
 
   if (!group) return <div className="p-6">Group not found</div>;
@@ -131,14 +146,21 @@ export default function GroupDetail() {
       </div>
 
       {memberBalances.length > 0 && (
-        <div className="surface-card p-3 space-y-2">
-          {memberBalances.map((m: any) => (
-            <div key={m.name} className="flex justify-between text-sm">
-              <span>{m.name}</span>
-              <span className={m.balance > 0 ? "text-income font-mono" : m.balance < 0 ? "text-expense font-mono" : "text-muted-foreground"}>
-                {m.balance > 0 ? "+" : ""}{formatMoney(m.balance)}
-              </span>
-            </div>
+        <div className="surface-card p-0 overflow-hidden divide-y divide-border">
+          {memberBalances.map((m) => (
+            <Link key={m.id} to={`/split/person/${m.id}`} className="flex items-center justify-between px-4 py-3 text-sm active:bg-secondary/40">
+              <span className="font-medium">{m.name}</span>
+              <div className="flex items-center gap-1">
+                {Math.abs(m.balance) >= 0.005 ? (
+                  <span className="font-mono font-semibold" style={{ color: m.balance > 0 ? "#22C55E" : "#EF4444" }}>
+                    {m.balance > 0 ? "+" : "-"}{formatMoney(Math.abs(m.balance))}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">settled</span>
+                )}
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </Link>
           ))}
         </div>
       )}
@@ -195,59 +217,24 @@ export default function GroupDetail() {
 
         {filteredSplits.length === 0 ? (
           <div className="surface-card p-6 text-center text-sm text-muted-foreground">
-            {(splits as any[]).length === 0 ? "No splits yet" : "No splits this period"}
+            {groupSplits.length === 0 ? "No splits yet" : "No splits this period"}
           </div>
         ) : (
-          <div className="rounded-xl overflow-hidden border border-border divide-y divide-border">
-            {filteredSplits.map((s: any) => {
-              const totalShares = (s.split_shares ?? []).length;
-              const settledShares = (s.split_shares ?? []).filter((sh: any) => sh.is_settled).length;
-              const isFullySettled = totalShares > 0 && settledShares === totalShares;
-              const unsettledShare = (s.split_shares ?? []).find((sh: any) => !sh.is_settled);
-              const label = getSplitLabel(s);
-              return (
-                <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}
-                  canEdit={canModifySplit(s)} canDelete={canModifySplit(s)}
-                  editDeniedMessage="Only the creator or payer can edit this split"
-                  deleteDeniedMessage="Only the creator or payer can delete this split">
-                  <div className="flex items-center gap-3 px-4 py-3 bg-card">
-                    <div className="h-9 w-9 rounded-full bg-split/20 flex items-center justify-center text-split shrink-0">
-                      <Users className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{label}</p>
-                      <p className="text-xs text-muted-foreground">{s.date} · paid by {s.paid_by}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {isFullySettled
-                          ? <span className="text-income inline-flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3" /> All settled</span>
-                          : `${settledShares}/${totalShares} settled`}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-mono font-semibold text-split">{formatMoney(s.total_amount)}</p>
-                      {!isFullySettled && unsettledShare && (
-                        <button type="button"
-                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); setSettleItem({ share: unsettledShare, split: s }); }}
-                          className="text-[10px] text-primary underline mt-0.5">
-                          Settle up
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </SwipeRow>
-              );
-            })}
+          <div className="rounded-2xl overflow-hidden border border-border divide-y divide-border">
+            {filteredSplits.map((s: any) => (
+              <SwipeRow key={s.id} onEdit={() => setEditSplit(s)} onDelete={() => setDeleteSplit(s)}
+                canEdit={canModifySplit(s)} canDelete={canModifySplit(s)}
+                editDeniedMessage="Only the creator or payer can edit this split"
+                deleteDeniedMessage="Only the creator or payer can delete this split">
+                <SplitDirectRow s={s} />
+              </SwipeRow>
+            ))}
           </div>
         )}
       </div>
 
       <AddGroupDialog open={edit} onOpenChange={setEdit} edit={group} />
       <AddTransactionSheet open={addSplitOpen} onOpenChange={setAddSplitOpen} defaultTab="split" />
-
-      {settleItem && (
-        <SettleUpDialog open={!!settleItem} onOpenChange={(o) => { if (!o) setSettleItem(null); }}
-          share={settleItem.share} split={settleItem.split} />
-      )}
 
       <AlertDialog open={!!deleteSplit} onOpenChange={(o) => { if (!o) setDeleteSplit(null); }}>
         <AlertDialogContent>

@@ -327,7 +327,7 @@ export const splitBalancesQuery = () =>
         .from("people").select("id").eq("linked_user_id", currentUserId);
       const myPersonIds = (myPeople ?? []).map((p: any) => p.id);
 
-      const SEL = "*, split_shares(*, person:people(id, linked_user_id, name)), settlements(*)";
+      const SEL = "*, split_shares(*, person:people(id, linked_user_id, name)), settlements(*), creator:created_by(full_name), accounts:account_id(label, institution)";
 
       // Own splits
       const { data: own } = await supabase.from("splits").select(SEL).eq("created_by", currentUserId);
