@@ -2,18 +2,6 @@
 
 ## Open
 
-### [P1] Account type filtering broken on Pending tab dropdowns
-- Scope: single-user
-- Severity: major
-- Users involved: TBD — reproduce with one user first
-- Steps to reproduce:
-  1. Go to Pending tab, open the account selector dropdown for a settlement.
-  2. Select a payment method (cash/bank/e-wallet).
-- Expected: Dropdown should only show accounts matching that type.
-- Actual: Filtering doesn't work — shows unrelated account types too, or doesn't filter at all.
-- Added: 2026-07-04
-- Test Log: (none yet)
-
 ### [P1] Split edit corruption bug
 - Scope: TBD — confirm single-user vs multi-user-sync before diagnosing
 - Severity: blocking
@@ -105,6 +93,14 @@
 - Test Log: (none yet)
 
 ## Fixed
+
+### [P1] Account type filtering broken on Pending tab dropdowns — already fixed (verified 2026-07-04)
+- Commit: (pre-existing — no change needed)
+- Investigation: The Pending-tab receiver row (`PendingSettlementRow`, split.tsx:243-244) already filters accounts by `methodToAccountType[settlement.method]`, and the payer-side `SettleUpDialog` does the same. Account types written by the app (`cash`/`bank`/`e-wallet`) match the mapping targets; settlement methods (`cash`/`bank_transfer`/`e-wallet`) match the mapping keys; `accountsQuery` returns `type`. Logic is correct.
+- Why it looked broken: the account set is currently all `cash` and settlements are `cash`, so every account passes the cash filter — visually indistinguishable from "no filtering." Report predates the filter being implemented.
+- Resolution: confirmed already-fixed with the user; no code change.
+- Test Log:
+  1. 2026-07-04 — PASS (by inspection + user confirmation) — filter runs correctly; symptom was a homogeneous all-cash-accounts artifact. To visibly confirm, add a non-cash account and check it is excluded from a cash settlement's dropdown.
 
 ### [P1] Settlement payer's balance direction reversed — fixed 2026-07-04
 - Commit: 521ca1f

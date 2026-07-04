@@ -36,6 +36,11 @@ Confirmed against production: the one live settlement was on a split where `crea
 
 **Completed.** #1, #2, and #5 all closed by commit `521ca1f` plus the one-off data repair. See BUGS.md test logs.
 
+### [P1] Account type filtering broken on Pending tab dropdowns — already fixed (verified 2026-07-04)
+**Report.** Pending-tab account dropdown showed all accounts regardless of the settlement's payment method.
+
+**Finding — no bug in current code.** The receiver row (`PendingSettlementRow`) already filters by `methodToAccountType[settlement.method]`, and the payer-side `SettleUpDialog` does the same. The value domains line up (account types `cash`/`bank`/`e-wallet` = mapping targets; methods `cash`/`bank_transfer`/`e-wallet` = mapping keys), and `accountsQuery` returns `type`. The symptom was an artifact of homogeneous data: every account on the profile is `cash` and every settlement is `cash`, so all accounts legitimately pass the cash filter — indistinguishable from "unfiltered." The report predates the filter being implemented. Confirmed already-fixed with the user; no code change. To visibly prove it, add a non-cash account and it will be excluded from a cash settlement's dropdown.
+
 (Finished bugs move here permanently, in the order they were completed. Never delete or shorten an entry — this is your permanent record of how CashFlow was actually built.)
 
 ## Queue
