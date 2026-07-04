@@ -2,16 +2,6 @@
 
 ## Open
 
-### [P1] Split edit corruption bug
-- Scope: TBD — confirm single-user vs multi-user-sync before diagnosing
-- Severity: blocking
-- Users involved: TBD
-- Steps to reproduce: TBD — re-confirm exact steps and corrupted fields before investigating.
-- Expected: Editing a split should update only the intended fields, cleanly.
-- Actual: Split data becomes corrupted after edit (exact symptoms need re-confirmation).
-- Added: 2026-07-04
-- Test Log: (none yet)
-
 ### [P2] Settle Up dialog redesign — remove split checkboxes
 - Scope: ui
 - Severity: major
@@ -93,6 +83,15 @@
 - Test Log: (none yet)
 
 ## Fixed
+
+### [P1] Split edit corruption (individual → "people split", name shown twice) — fixed 2026-07-04
+- Commit: (see git) · Migration: add_update_split_rpc
+- Repro: an individual split, edited by the PAYER (non-creator), turned into a "people" split showing the counterpart's name twice.
+- Root cause: `split_shares` RLS lets ANY authed user INSERT but only the split CREATOR DELETE/UPDATE. The home `EditSplitSheet` regenerated shares via delete-then-insert; for a non-creator payer the delete silently matched 0 rows (RLS) while the insert added a duplicate → `shares.length > 1` → `SplitDirectRow` renders it as a people split with the name doubled, and the debt double-counts. (The person/group edit sheets had the opposite bug — they never updated shares, so amounts went stale.)
+- Fix: new `update_split` SECURITY DEFINER RPC — enforces creator-or-payer, reconciles shares in place by person (preserves share ids so settlements stay linked, no duplicates), and syncs the linked transaction so `trg_account_balance_on_transaction` auto-adjusts the payer's account by the amount delta. Who-paid + account are LOCKED (removed from the edit UI). Merged the three divergent `EditSplitSheet` copies into the single home one; person/group screens now import it.
+- Test Log:
+  1. 2026-07-04 — PASS (DB-level, rolled back) — creator edit: in-place, share_count=1, id preserved; payer edit: permitted, share_count=1 (no duplicate); unrelated user: rejected; total/share/transaction update correctly. Typecheck + vite build clean.
+  2. Pending — live UI verification across individual / people / group edits (creator + payer), confirming balances auto-adjust.
 
 ### [P1] Account type filtering broken on Pending tab dropdowns — already fixed (verified 2026-07-04)
 - Commit: (pre-existing — no change needed)

@@ -41,6 +41,25 @@ Confirmed against production: the one live settlement was on a split where `crea
 
 **Finding — no bug in current code.** The receiver row (`PendingSettlementRow`) already filters by `methodToAccountType[settlement.method]`, and the payer-side `SettleUpDialog` does the same. The value domains line up (account types `cash`/`bank`/`e-wallet` = mapping targets; methods `cash`/`bank_transfer`/`e-wallet` = mapping keys), and `accountsQuery` returns `type`. The symptom was an artifact of homogeneous data: every account on the profile is `cash` and every settlement is `cash`, so all accounts legitimately pass the cash filter — indistinguishable from "unfiltered." The report predates the filter being implemented. Confirmed already-fixed with the user; no code change. To visibly prove it, add a non-cash account and it will be excluded from a cash settlement's dropdown.
 
+### [P1] Split edit corruption — individual split flips to "people split", name shown twice — 2026-07-04
+**Symptom.** Editing an individual split (the user changed only the amount) turned it into a "people" split whose row showed the counterpart's name twice.
+
+**Diagnosis.** Two findings combined:
+1. `SplitDirectRow` decides person-vs-people purely by `shares.length` (`> 1` ⇒ people). So anything that adds a second share row flips the display.
+2. `split_shares` RLS is asymmetric: `split_shares_insert` WITH CHECK `auth.uid() IS NOT NULL` (anyone), but `split_shares_delete`/`_update` restricted to the split's creator. The home `EditSplitSheet` regenerated shares by delete-then-insert. When the **payer** (allowed to edit, but not the creator) saved, the delete silently matched 0 rows and the insert added a fresh share → duplicate shares → people-split display + doubled name + double-counted debt. The person-detail and group-detail edit sheets had the mirror bug: they never wrote shares at all, so amounts went stale after an amount edit. Three divergent `EditSplitSheet` copies, three behaviors.
+
+**Decisions (from the user).** Merge the three edit copies into one; lock "who paid" after creation (delete + recreate if wrong); allow editing even when settlements exist; auto-adjust the payer's account by the amount delta.
+
+**Fix.** New `update_split` SECURITY DEFINER RPC (migration `add_update_split_rpc`), mirroring the existing `delete_split`:
+- Permission: creator OR payer (payer resolved from `paid_by`/`paid_by_person_id` → `linked_user_id`).
+- Reconciles shares **in place by person** — updates existing rows, inserts only genuinely new participants, deletes departed ones. Preserving share ids means settlements that reference `split_share_id` stay linked (critical: the live split already had a settlement on its share). This also structurally prevents the duplicate-on-payer-edit bug, since the definer bypasses the creator-only RLS.
+- Syncs the linked expense transaction's amount/category; `trg_account_balance_on_transaction` reverses the old amount and applies the new, so the payer's account auto-adjusts by the delta with no manual balance math.
+- Who-paid, account, and the pending/account fields are deliberately left untouched (locked).
+
+Client: merged the three `EditSplitSheet`s into the single exported one in `home.tsx` (now RPC-backed, with the "Who paid?" control replaced by a read-only locked indicator and the account selector removed). `split-person.tsx` and `split-group.tsx` deleted their local copies + private pickers and import the shared component.
+
+**Verification (DB-level, transactions rolled back so production was untouched).** Impersonating each role via `request.jwt.claims`: creator edit → in place, `share_count=1`, share id preserved; **payer edit → permitted, `share_count=1` (no duplicate)** — the exact bug, gone; unrelated user → rejected ("Only the creator or payer can edit this split"). Typecheck + `vite build` clean. Live UI verification across all three split types (creator + payer) still to be done on the deployed build.
+
 (Finished bugs move here permanently, in the order they were completed. Never delete or shorten an entry — this is your permanent record of how CashFlow was actually built.)
 
 ## Queue

@@ -784,7 +784,6 @@ function EditMultiPickerSheet({
 export function EditSplitSheet({ split, open, onOpenChange }: { split: any; open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient();
 
-  const { data: accounts = [] } = useQuery(accountsQuery());
   const { data: people = [] } = useQuery(peopleQuery());
   const { data: groups = [] } = useQuery(groupsQuery());
   const { data: cats = [] } = useQuery(categoriesQuery("expense"));
@@ -808,14 +807,6 @@ export function EditSplitSheet({ split, open, onOpenChange }: { split: any; open
   });
   const [multiPickerOpen, setMultiPickerOpen] = useState(false);
   const [groupId, setGroupId] = useState<string>(split.group_id ?? "");
-
-  const [whoPaid, setWhoPaid] = useState<"me" | "other">(split.paid_by === "me" ? "me" : "other");
-  const [otherPayerId, setOtherPayerId] = useState<string>(() => {
-    if (split.paid_by === "me") return "";
-    const matched = (split.split_shares ?? []).find((sh: any) => sh.person_name === split.paid_by);
-    return (matched?.person_id as string) ?? "";
-  });
-  const [accountId, setAccountId] = useState<string>(split.account_id ?? "");
 
   const [splitType, setSplitType] = useState<"equal" | "custom">(
     split.split_type === "custom" ? "custom" : "equal"
@@ -841,13 +832,6 @@ export function EditSplitSheet({ split, open, onOpenChange }: { split: any; open
     supabase.from("transactions").select("note").eq("split_id", split.id).maybeSingle()
       .then(({ data }) => { if (data?.note) setNote(String(data.note).replace(/^Split: /, "")); });
   }, [split.id]);
-
-  // Default to first account if me paid and no account saved
-  useEffect(() => {
-    if (!accountId && whoPaid === "me" && (accounts as any[]).length > 0) {
-      setAccountId((accounts as any[])[0].id as string);
-    }
-  }, [accounts, whoPaid]);
 
   const catDisplay = useMemo(() => {
     const c = (cats as any[]).find((x) => x.id === categoryId);
@@ -875,25 +859,6 @@ export function EditSplitSheet({ split, open, onOpenChange }: { split: any; open
   const total = Number(amount);
   const equalShare = participants.length > 0 ? total / (participants.length + 1) : 0;
 
-  const paidByValue = useMemo(() => {
-    if (whoPaid === "me") return "me";
-    if (target === "person") {
-      const p = (people as any[]).find((x) => x.id === personId);
-      return (p?.name as string) ?? split.paid_by ?? "other";
-    }
-    if (otherPayerId) {
-      const p = participants.find((x) => x.id === otherPayerId);
-      return p?.name ?? "other";
-    }
-    return "other";
-  }, [whoPaid, target, personId, people, otherPayerId, participants, split.paid_by]);
-
-  const paidByPersonId = useMemo((): string | null => {
-    if (whoPaid === "me") return null;
-    if (target === "person") return personId || null;
-    return otherPayerId || null;
-  }, [whoPaid, target, personId, otherPayerId]);
-
   const mutation = useMutation({
     mutationFn: async () => {
       if (!total || total <= 0) throw new Error("Enter a valid amount");
@@ -901,37 +866,37 @@ export function EditSplitSheet({ split, open, onOpenChange }: { split: any; open
       if (target === "group" && !groupId) throw new Error("Select a group");
       if (target !== "group" && participants.length === 0) throw new Error("Select at least one person");
 
-      const { error: e1 } = await supabase.from("splits").update({
-        type: target === "group" ? "group" : "individual",
-        person_id: target === "person" ? personId || null : null,
-        group_id: target === "group" ? groupId || null : null,
-        description: description.trim(),
-        total_amount: total,
-        paid_by: paidByValue,
-        paid_by_person_id: paidByPersonId,
-        split_type: splitType,
-        category_id: categoryId || null,
-        sub_category_id: subCatId || null,
-        account_id: whoPaid === "me" ? accountId || null : null,
-        date, time,
-      }).eq("id", split.id);
-      if (e1) throw e1;
+      const shares = participants.map((p) => ({
+        person_id: p.id || null,
+        person_name: p.name,
+        share_amount: splitType === "custom" ? (customAmounts[p.id] ?? 0) : equalShare,
+      }));
 
-      await supabase.from("split_shares").delete().eq("split_id", split.id);
-      if (participants.length > 0) {
-        const shares = participants.map((p) => ({
-          split_id: split.id,
-          person_name: p.name,
-          person_id: p.id || null,
-          share_amount: splitType === "custom" ? (customAmounts[p.id] ?? 0) : equalShare,
-        }));
-        const { error: e2 } = await supabase.from("split_shares").insert(shares);
-        if (e2) throw e2;
-      }
+      // All writes go through the update_split RPC (SECURITY DEFINER): it enforces
+      // creator-or-payer permission, reconciles shares WITHOUT duplicating on a payer
+      // edit (split_shares RLS lets anyone INSERT but only the creator DELETE), and
+      // syncs the linked expense transaction so the balance trigger auto-adjusts the
+      // payer's account by the amount delta. Who-paid and account are LOCKED server-side.
+      const { error } = await supabase.rpc("update_split", {
+        p_split_id: split.id,
+        p_total_amount: total,
+        p_description: description.trim(),
+        p_type: target === "group" ? "group" : "individual",
+        p_person_id: target === "person" ? personId || null : null,
+        p_group_id: target === "group" ? groupId || null : null,
+        p_split_type: splitType,
+        p_category_id: categoryId || null,
+        p_sub_category_id: subCatId || null,
+        p_date: date,
+        p_time: time,
+        p_shares: shares,
+      });
+      if (error) throw error;
 
-      // Update linked transaction note (best-effort, no-op if no transaction exists)
+      // Best-effort: keep the linked transaction's note in sync. RLS makes this a
+      // silent no-op for a payer editing the creator's transaction.
       await supabase.from("transactions")
-        .update({ note: note.trim() ? `Split: ${note.trim()}` : null, amount: total, category_id: categoryId || null, sub_category_id: subCatId || null, account_id: whoPaid === "me" ? accountId || null : null })
+        .update({ note: note.trim() ? `Split: ${note.trim()}` : null })
         .eq("split_id", split.id);
     },
     onSuccess: () => {
@@ -1009,44 +974,17 @@ export function EditSplitSheet({ split, open, onOpenChange }: { split: any; open
               )}
             </div>
 
-            {/* Who paid */}
+            {/* Who paid — LOCKED after creation (read-only). Change requires delete + recreate. */}
             <div className="space-y-1.5">
               <Label>Who paid?</Label>
-              <div className="flex gap-2 rounded-lg bg-secondary p-1">
-                {(["me", "other"] as const).map((m) => (
-                  <button type="button" key={m} onClick={() => { setWhoPaid(m); setOtherPayerId(""); }}
-                    className={cn("flex-1 rounded-md py-1.5 text-sm", whoPaid === m && "bg-primary text-white")}>
-                    {m === "me" ? "You paid" : "Other paid"}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-secondary/60">
+                <span className="text-sm text-muted-foreground">
+                  {split.paid_by === "me" ? "You paid" : `${split.paid_by ?? "Someone"} paid`}
+                </span>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Locked</span>
               </div>
-              {whoPaid === "other" && target === "person" && personId && (
-                <p className="text-xs text-muted-foreground px-1">
-                  {(people as any[]).find((p) => p.id === personId)?.name ?? "Other person"} paid for this expense
-                </p>
-              )}
-              {whoPaid === "other" && (target === "multi" || target === "group") && participants.length > 0 && (
-                <Select value={otherPayerId} onValueChange={setOtherPayerId}>
-                  <SelectTrigger><SelectValue placeholder="Select who paid" /></SelectTrigger>
-                  <SelectContent>
-                    {participants.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
+              <p className="text-[11px] text-muted-foreground px-1">Who paid can't be changed after creation — delete and recreate if it's wrong.</p>
             </div>
-
-            {/* Account — only when you paid */}
-            {whoPaid === "me" && (
-              <div className="space-y-1.5">
-                <Label>Paid from</Label>
-                <Select value={accountId} onValueChange={setAccountId}>
-                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                  <SelectContent>
-                    {(accounts as any[]).map((a) => <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
 
             {/* Split type */}
             <div className="space-y-1.5">
