@@ -6,15 +6,19 @@ import { format } from "date-fns";
 //   iPaid  → "You → Other"  + "Still owes"   (the viewer is the one who paid / owes)
 //   !iPaid → "Other → You"  + "Still lent"   (the other person paid; the viewer is owed)
 export function SettlementRow({
-  description, iPaid, otherName, amount, remaining, fullySettled, createdAt,
+  description, iPaid, otherName, amount, remaining, fullySettled, createdAt, netAfter,
 }: {
   description?: string | null;
   iPaid: boolean;
   otherName: string;
   amount: number;
-  remaining: number;
-  fullySettled: boolean;
+  remaining?: number;
+  fullySettled?: boolean;
   createdAt?: string;
+  // Optional (person detail): the running NET balance right after this settlement, from the
+  // viewer's perspective (+ = otherName owes you, − = you owe). When passed, line 3 shows the
+  // overall balance at that point (the newest row equals the top card) instead of per-split remaining.
+  netAfter?: number;
 }) {
   const dateStr = createdAt ? format(new Date(createdAt), "MMM dd, yyyy · hh:mm a") : "";
   return (
@@ -29,14 +33,25 @@ export function SettlementRow({
           </p>
           <p className="text-sm font-mono text-[#9CA3AF] shrink-0">{formatMoney(amount)}</p>
         </div>
-        {/* Line 3: viewer-relative status + remaining */}
+        {/* Line 3: balance after this settlement.
+            netAfter present (person detail) → the overall running NET balance;
+            otherwise → the legacy per-split "remaining". */}
         <div className="flex items-center justify-between gap-2 mt-0.5">
-          {fullySettled ? (
+          {netAfter !== undefined ? (
+            Math.abs(netAfter) < 0.005 ? (
+              <p className="text-[12px] font-medium text-[#10B981]">Settled up</p>
+            ) : (
+              <>
+                <p className="text-[12px] text-[#9CA3AF]">{netAfter > 0 ? `${otherName} owes you` : "You owe"}</p>
+                <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">{formatMoney(Math.abs(netAfter))}</p>
+              </>
+            )
+          ) : fullySettled ? (
             <p className="text-[12px] font-medium text-[#10B981]">Fully settled</p>
           ) : (
             <>
               <p className="text-[12px] text-[#9CA3AF]">{iPaid ? "Still owes" : "Still lent"}</p>
-              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">{formatMoney(remaining)} remaining</p>
+              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">{formatMoney(remaining ?? 0)} remaining</p>
             </>
           )}
         </div>

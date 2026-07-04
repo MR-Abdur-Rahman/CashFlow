@@ -163,8 +163,12 @@ export default function PersonDetail() {
   // data; the balance math above already accounts for them (via settledOf), so we do NOT re-add them.
   // Direction comes from which share was settled: if it's mine, I paid the target; else they paid me.
   const filteredSettlements = useMemo(() => {
-    const seen = new Set<string>();
-    const out: any[] = [];
+    // Each settlement row shows the RUNNING NET balance as of that settlement (viewer-relative,
+    // + = target owes me). We start from the base net if there were no settlements (gross bilateral
+    // debts), then walk settlements oldest-first: a debtor's payment moves the net by ±amount. The
+    // newest settlement's net therefore equals the top balance card.
+    let baseNet = 0;
+    const events: { st: any; sign: number; iPaid: boolean; currentUserId: string | null }[] = [];
     for (const s of visibleSplits) {
       const myPersonIds: string[] = s._myPersonIds ?? [];
       const currentUserId: string | null = s._currentUserId ?? null;
@@ -173,34 +177,44 @@ export default function PersonDetail() {
       const shares = (s.split_shares ?? []) as any[];
       const total = Number(s.total_amount);
       const sumShares = shares.reduce((a: number, sh: any) => a + Number(sh.share_amount ?? 0), 0);
-      // Direction comes from who paid the SPLIT, not which share the settlement is attached to
-      // (the debtor may be the creator, who has no explicit share). Viewer is the debtor unless
-      // they paid.
       const payerAuthId = getPayerAuthId(s);
-      const iPaid = !!payerAuthId && payerAuthId !== currentUserId;
-      // The debtor's debt = their explicit share, or the implicit creator share (total - sumShares).
-      const debtorShare = iPaid
-        ? shares.find((sh: any) => myPersonIds.includes(sh.person_id) || sh.person?.linked_user_id === currentUserId)
-        : shares.find((sh: any) => (targetLui && sh.person?.linked_user_id === targetLui) || sh.person_id === targetPid);
-      const debtAmount = debtorShare ? Number(debtorShare.share_amount) : (total - sumShares);
-      // Remaining is computed at the SPLIT level (all settlements on this bilateral split), so it is
-      // correct even when the debt is an implicit creator share with no own split_share row.
-      const splitSettlements = [...(s.settlements ?? [])]
-        .sort((a: any, b: any) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")));
-      for (const st of (s.settlements ?? []) as any[]) {
-        if (seen.has(st.id)) continue;
-        seen.add(st.id);
-        const day = String(st.created_at ?? "").slice(0, 10);
-        if (day < fromStr || day > toStr) continue;
-        const cidx = splitSettlements.findIndex((x: any) => x.id === st.id);
-        const cumulative = splitSettlements.slice(0, cidx + 1).reduce((sum: number, x: any) => sum + Number(x.amount ?? 0), 0);
-        const remaining = Math.max(0, debtAmount - cumulative);
-        out.push({
-          ...st, _itemType: "settlement", _iPaid: iPaid,
-          _remaining: remaining, _fullySettled: debtAmount > 0 && remaining <= 0,
-          _currentUserId: currentUserId,
-        });
+      const creditorIsMe = !!payerAuthId && payerAuthId === currentUserId;             // I paid → target owes me
+      const creditorIsTarget = !!payerAuthId && !!targetLui && payerAuthId === targetLui; // target paid → I owe
+      if (creditorIsMe) {
+        const targetShareEntry = shares.find((ss: any) => (targetLui && ss.person?.linked_user_id === targetLui) || ss.person_id === targetPid);
+        baseNet += targetShareEntry ? Number(targetShareEntry.share_amount) : (targetLui && s.created_by === targetLui ? (total - sumShares) : 0);
+      } else if (creditorIsTarget) {
+        const myShareEntry = shares.find((ss: any) => myPersonIds.includes(ss.person_id) || ss.person?.linked_user_id === currentUserId);
+        baseNet -= myShareEntry ? Number(myShareEntry.share_amount) : (s.created_by === currentUserId ? (total - sumShares) : 0);
       }
+      // A settlement is the debtor paying the creditor. Creditor = me → target paid me down (net −);
+      // creditor = target → I paid them down (net +, and this row is "You → target").
+      const sign = creditorIsMe ? -1 : creditorIsTarget ? 1 : 0;
+      for (const st of (s.settlements ?? []) as any[]) {
+        events.push({ st, sign, iPaid: creditorIsTarget, currentUserId });
+      }
+    }
+    // Running net over ALL settlements oldest-first (independent of the period filter).
+    const netAfterById = new Map<string, number>();
+    let run = baseNet;
+    for (const e of [...events].sort((a, b) => String(a.st.created_at ?? "").localeCompare(String(b.st.created_at ?? "")))) {
+      run += e.sign * Number(e.st.amount ?? 0);
+      netAfterById.set(e.st.id, run);
+    }
+    // Build the display rows (dedupe + period filter).
+    const seen = new Set<string>();
+    const out: any[] = [];
+    for (const e of events) {
+      const st = e.st;
+      if (seen.has(st.id)) continue;
+      seen.add(st.id);
+      const day = String(st.created_at ?? "").slice(0, 10);
+      if (day < fromStr || day > toStr) continue;
+      out.push({
+        ...st, _itemType: "settlement", _iPaid: e.iPaid,
+        _netAfter: netAfterById.get(st.id) ?? 0,
+        _currentUserId: e.currentUserId,
+      });
     }
     return out;
   }, [visibleSplits, fromStr, toStr, personId]);
@@ -304,7 +318,7 @@ export default function PersonDetail() {
                 canEdit={item.created_by === item._currentUserId} canDelete={canDeleteSettlement(item, item._currentUserId)}
                 editDeniedMessage="Only the creator can edit this settlement"
                 deleteDeniedMessage="Only the creator or payer can delete this settlement">
-                <SettlementRow description={item.description} iPaid={item._iPaid} otherName={person.name} amount={Number(item.amount)} remaining={item._remaining} fullySettled={item._fullySettled} createdAt={item.created_at} />
+                <SettlementRow description={item.description} iPaid={item._iPaid} otherName={person.name} amount={Number(item.amount)} netAfter={item._netAfter} createdAt={item.created_at} />
               </SwipeRow>
             ) : (
               <SwipeRow key={item.id} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}
