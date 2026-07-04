@@ -91,6 +91,17 @@ Backfilled `settler_is_creditor = (pending_for_user_id IS NULL)`, which reproduc
 
 **Client.** `SettleUpDialog` gained `personLinkedUserId` + `netBalance` props: it colors the amount red/green from the net direction, computes `settler_is_creditor` per split (creditor = whoever paid), and sets `pending_for_user_id` to the other party in BOTH directions (so the debtor is prompted in the creditor-records case). `PendingSettlementRow` reads `settler_is_creditor` to show the prompted party's true side — an outflow (red "−", "You paid X", "will be deducted from") when they're the debtor, an inflow otherwise. Net balance still reduces immediately for both users; account selection only records where the money moved.
 
+### [P2] Group detail page reworked — person-style split rows + full bilateral member balances — 2026-07-04
+**Goal (from the user).** Make the group detail page's history list identical to the person detail page's split rows (same `SplitDirectRow` style, swipe edit/delete), with NO settlement rows, no "X/3 settled" count, and no per-row Settle up link (settling is done from each member's person page). And change the member-balance summary to show each member's FULL bilateral net with the viewer (all splits, same number as the person page) — not the group-scoped balance.
+
+**Build.**
+- Extracted `bilateralBalance` + `getPayerAuthId` from split.tsx into `src/lib/balance.ts` (shared).
+- Member summary: for each group member (self excluded), `bilateralBalance(allSplits, member, currentUserId, myPersonIds)` over `splitBalancesQuery` (all of the viewer's own+incoming splits) — so a member's number matches exactly what the person page shows. Each row links to `/split/person/:id`, green +/red −.
+- History list: `splitBalancesQuery` splits filtered to `group_id`, enriched locally with `_myPersonId` (viewer's share) and the group name, rendered with `SplitDirectRow` inside `SwipeRow` (creator-or-payer). Added `creator`/`accounts` joins to `splitBalancesQuery` so the rows render fully.
+- Removed the old group-scoped `memberBalances`, the settled-count line, the per-split Settle up link, and the group-page `SettleUpDialog`.
+
+**Behavior note.** The group history now shows only splits the **viewer participates in** (the data source is the viewer's own+incoming splits), not every split ever attached to the group. Consistent with the "your view" framing. Typecheck + build clean.
+
 (Finished bugs move here permanently, in the order they were completed. Never delete or shorten an entry — this is your permanent record of how CashFlow was actually built.)
 
 ## Queue
