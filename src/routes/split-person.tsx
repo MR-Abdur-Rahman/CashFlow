@@ -16,7 +16,7 @@ import { canDeleteSettlement, deleteSettlement as deleteSettlementRpc } from "@/
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState, useMemo, useEffect } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,6 +37,7 @@ import { type Period, PERIODS, getPeriodRange, navigateAnchor, formatAnchorLabel
 
 export default function PersonDetail() {
   const { personId } = useParams<{ personId: string }>();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: person } = useQuery(personQuery(personId!));
   const { data: splits = [] } = useQuery(personSplitsQuery(personId!));
@@ -221,9 +222,9 @@ export default function PersonDetail() {
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-5">
-      <Link to="/split" className="inline-flex items-center text-sm text-muted-foreground">
-        <ArrowLeft className="h-4 w-4 mr-1" /> Split
-      </Link>
+      <button onClick={() => navigate(-1)} className="inline-flex items-center text-sm text-muted-foreground">
+        <ArrowLeft className="h-4 w-4 mr-1" /> Back
+      </button>
 
       <div className="flex items-center gap-3">
         <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-lg">
