@@ -8,6 +8,13 @@ export function useRealtimeSplits() {
   useEffect(() => {
     const invalidateAll = () => {
       qc.invalidateQueries({ queryKey: ["splits"], exact: false });
+      // Settlement-specific views live under their own keys (not under ["splits"]), so a
+      // settlement insert/update/delete must invalidate these too or the Pending tab and
+      // History won't refresh live — the receiver would see the notification but not the row.
+      qc.invalidateQueries({ queryKey: ["settlements"], exact: false });
+      qc.invalidateQueries({ queryKey: ["pending-settlements"] });
+      qc.invalidateQueries({ queryKey: ["history-settlements"] });
+      qc.invalidateQueries({ queryKey: ["pending-splits"] });
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
       qc.invalidateQueries({ queryKey: ["people"] });

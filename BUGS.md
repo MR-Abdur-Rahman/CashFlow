@@ -2,16 +2,6 @@
 
 ## Open
 
-### [P2] Real-time sync for settlements
-- Scope: multi-user-sync
-- Severity: major
-- Users involved: A, B
-- Steps to reproduce: TBD — confirm whether Realtime is enabled on the settlements table and whether the subscription filter is correct.
-- Expected: When one user creates/edits a settlement, the other linked user should see it update live, same as splits already do.
-- Actual: Settlements don't sync in real-time.
-- Added: 2026-07-04
-- Test Log: (none yet)
-
 ### [P3] Auto-settlement (opposing debts cancel automatically)
 - Scope: multi-user-sync
 - Severity: minor
@@ -43,6 +33,13 @@
 - Test Log: (none yet)
 
 ## Fixed
+
+### [P2] Real-time sync for settlements — fixed 2026-07-04
+- Commit: (this change) · File: src/hooks/useRealtimeSplits.ts
+- Investigation: the `settlements` table was ALREADY in the `supabase_realtime` publication (replica identity `full`) and the client already subscribed to it in `useRealtimeSplits` (mounted app-wide in App.tsx). So events were broadcast and received. The gap: the settlements handler called `invalidateAll`, which only invalidated `["splits"]`/`["transactions"]`/`["accounts"]`/`["people"]`. The settlement-specific views use other keys — `["pending-settlements"]` (Pending tab), `["history-settlements"]` (History), `["pending-splits"]`, `["settlements"]` — which were never invalidated. So the person page updated live (nested under `["splits"]`) but the receiver's Pending tab didn't: they got the notification but the pending row didn't appear until a manual refresh.
+- Fix: broadened `invalidateAll` to also invalidate `["settlements"]`, `["pending-settlements"]`, `["history-settlements"]`, `["pending-splits"]`.
+- Test Log:
+  1. 2026-07-04 — PASS (typecheck + vite build). Pending — live 2-user: A records a settlement → B's Pending tab shows the account-selection row without refresh; A deletes → it disappears live.
 
 ### [P2] Group member balance bugs + group split formatting/bilateral balances — fixed 2026-07-04
 - Commit: 3da0762 (group detail rework)
