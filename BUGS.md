@@ -2,26 +2,6 @@
 
 ## Open
 
-### [P2] Group member balance bugs
-- Scope: multi-user-sync
-- Severity: major
-- Users involved: 3+ users in a group (A, B, C minimum)
-- Steps to reproduce: TBD — reproduce with a real group split first to capture exact wrong numbers.
-- Expected: Each member's balance within a group should reflect their true share/debt accurately.
-- Actual: Balances per member are incorrect (specifics TBD).
-- Added: 2026-07-04
-- Test Log: (none yet)
-
-### [P2] Group split formatting and bilateral balances
-- Scope: multi-user-sync
-- Severity: major
-- Users involved: 3+ users in a group
-- Steps to reproduce: TBD
-- Expected: Group split rows should format correctly, and bilateral (person-to-person) balances within a group should calculate correctly even with third-party payers.
-- Actual: Formatting issues present; bilateral calculation skips third-party payers incorrectly.
-- Added: 2026-07-04
-- Test Log: (none yet)
-
 ### [P2] Real-time sync for settlements
 - Scope: multi-user-sync
 - Severity: major
@@ -50,6 +30,7 @@
 - Expected: Additional filters needed on History page (specifics to be defined when picked up).
 - Actual: Current filter set is incomplete.
 - Added: 2026-07-04
+- Partial (2026-07-04): "Daily / Today" period option added to the shared period selector (commit 24c20e1) — applies to History, person, and group pages. Remaining filter additions still TBD.
 - Test Log: (none yet)
 
 ### [P3] Full split edit testing matrix
@@ -58,11 +39,17 @@
 - Users involved: A, B, C, D as needed per scenario
 - Steps to reproduce: N/A — this is a QA task, not a single bug. Run once the split edit corruption bug (above) is fixed.
 - Expected: A systematic pass confirming split editing works correctly across all scenarios (creator edits, payer edits, group vs individual, etc.)
-- Actual: Not yet run.
-- Added: 2026-07-04
+- Actual: Not yet run. UNBLOCKED as of 2026-07-04 — the split-edit corruption bug is fixed (update_split RPC, commit 011479b), so this QA pass can now run.
 - Test Log: (none yet)
 
 ## Fixed
+
+### [P2] Group member balance bugs + group split formatting/bilateral balances — fixed 2026-07-04
+- Commit: 3da0762 (group detail rework)
+- Covers both group P2s (member balances wrong; row formatting + bilateral-with-third-party-payer).
+- Fix: reworked the group detail page. (1) Each member's summary balance is now the FULL bilateral net between the viewer and that member across ALL splits (via shared `bilateralBalance` over `splitBalancesQuery`) — identical to the person page — instead of a group-scoped share sum. Third-party-paid splits are correctly skipped for a bilateral pair. (2) The history list now renders the same `SplitDirectRow` rows as the person page (consistent formatting), swipe edit/delete (creator-or-payer). Extracted `bilateralBalance`/`getPayerAuthId` into `src/lib/balance.ts`.
+- Test Log:
+  1. 2026-07-04 — PASS (typecheck + vite build). Pending — live 3-user verification: create a group with A/B/C, add group splits with different payers, confirm each member row shows the correct bilateral net and rows format like the person page.
 
 ### [P2] Symmetric Settle Up — either party can record, correct account direction + red/green — fixed 2026-07-04
 - Commit: c5a3490 · Migration: settlement_symmetric_direction
@@ -74,7 +61,7 @@
   2. Pending — live: as User B settle a debt A owes → confirm A gets the prompt and A's account goes down when A confirms; check red/green colors both ways.
 
 ### [P2] Settle Up redesign — net-balance-only (removes split checkboxes) + FIFO allocation — fixed 2026-07-04
-- Commit: (see git)
+- Commit: ffd518c (net-balance shown/settled corrected in fb0cac7)
 - Also closes: [P2] FIFO settlement allocation (delivered by the same change).
 - Change: SettleUpDialog no longer shows per-split checkboxes or per-split custom amounts. It shows the total owed and a single "Amount to settle" field (defaults to the full owed, editable for partial, capped at owed). On confirm it allocates the amount across the person's unsettled shares OLDEST-FIRST (FIFO), creating a settlement per share consumed and marking shares settled. Reuses the creditor-direction resolution from the settlement-direction fix, so account direction stays correct.
 - Both callers unchanged: split-person (unsettledItems) and split-group (legacy single share) both funnel through the same net-owed list.
@@ -83,7 +70,7 @@
   1. 2026-07-04 — PASS (typecheck + vite build). Pending — live: settle full and partial amounts; confirm FIFO order, balances, and the receiver's account-selection prompt.
 
 ### [P2] Duplicate transaction-edit sheet (History couldn't edit income source) — fixed 2026-07-04
-- Commit: (see git)
+- Commit: 9700eb88
 - Found while auditing the same "divergent edit copies" problem for normal transactions (income/expense/transfer), after the split-edit merge.
 - Two copies existed: `EditTxSheet` (home.tsx, used by home/reports/account-detail) and a lesser `EditTransactionSheet` (settings-history.tsx). The History copy omitted the income "From" (person/source) control entirely and never wrote `income_source_type`/`income_person_id`/`income_source_text` — so an income transaction's source could not be edited from History (no data corruption; transactions have no share sub-table and are single-user, so the split RLS-delete bug doesn't apply).
 - Fix: deleted the History copy; History now imports the shared `EditTxSheet`. All transaction editing goes through one component. Cache key `["transactions"]` prefix-matches the history list's `["transactions", {}]`, so it still refreshes.
@@ -92,7 +79,7 @@
   2. Pending — live check: edit an income's source from History.
 
 ### [P1] Split edit corruption (individual → "people split", name shown twice) — fixed 2026-07-04
-- Commit: (see git) · Migration: add_update_split_rpc
+- Commit: 011479b · Migration: add_update_split_rpc
 - Repro: an individual split, edited by the PAYER (non-creator), turned into a "people" split showing the counterpart's name twice.
 - Root cause: `split_shares` RLS lets ANY authed user INSERT but only the split CREATOR DELETE/UPDATE. The home `EditSplitSheet` regenerated shares via delete-then-insert; for a non-creator payer the delete silently matched 0 rows (RLS) while the insert added a duplicate → `shares.length > 1` → `SplitDirectRow` renders it as a people split with the name doubled, and the debt double-counts. (The person/group edit sheets had the opposite bug — they never updated shares, so amounts went stale.)
 - Fix: new `update_split` SECURITY DEFINER RPC — enforces creator-or-payer, reconciles shares in place by person (preserves share ids so settlements stay linked, no duplicates), and syncs the linked transaction so `trg_account_balance_on_transaction` auto-adjusts the payer's account by the amount delta. Who-paid + account are LOCKED (removed from the edit UI). Merged the three divergent `EditSplitSheet` copies into the single home one; person/group screens now import it.
