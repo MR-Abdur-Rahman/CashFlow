@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { transactionsQuery, incomingSplitsQuery, splitsQuery } from "@/lib/queries";
-import { SplitDirectRow, EditSplitSheet } from "./home";
+import { SplitDirectRow, EditSplitSheet, EditTxSheet } from "./home";
 import { SettlementRow } from "@/components/SettlementRow";
 import { settlementDirection, shareRemaining } from "@/lib/settlement";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
@@ -15,14 +15,8 @@ import {
 import { SwipeRow } from "@/components/SwipeRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { notifyToast } from "@/lib/notify";
 import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
 import { canDeleteSettlement, deleteSettlement as deleteSettlementRpc } from "@/lib/deleteSettlement";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -255,7 +249,7 @@ export default function HistoryPage() {
       ))}
 
       {editTxn && (
-        <EditTransactionSheet txn={editTxn} open={!!editTxn} onOpenChange={(o) => { if (!o) setEditTxn(null); }} />
+        <EditTxSheet txn={editTxn} open={!!editTxn} onOpenChange={(o) => { if (!o) setEditTxn(null); }} />
       )}
 
       {editSplit && (
@@ -413,166 +407,5 @@ function Row({ t }: { t: any }) {
         <p className="text-[10px] text-muted-foreground font-mono">{t.time?.slice(0, 5)}</p>
       </div>
     </div>
-  );
-}
-
-function EditTransactionSheet({ txn, open, onOpenChange }: { txn: any; open: boolean; onOpenChange: (o: boolean) => void }) {
-  const qc = useQueryClient();
-  const [amount, setAmount] = useState(String(txn.amount));
-  const [note, setNote] = useState(txn.note ?? "");
-  const [date, setDate] = useState(txn.date ?? format(new Date(), "yyyy-MM-dd"));
-  const [time, setTime] = useState(txn.time?.slice(0, 5) ?? format(new Date(), "HH:mm"));
-  const [accountId, setAccountId] = useState(txn.account_id ?? "");
-  const [categoryId, setCategoryId] = useState(txn.category_id ?? "");
-  const [subCatId, setSubCatId] = useState(txn.sub_category_id ?? "");
-  const [toAccountId, setToAccountId] = useState(txn.to_account_id ?? "");
-
-  const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("accounts").select("*").order("created_at");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: cats = [] } = useQuery({
-    queryKey: ["categories", "expense"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("categories").select("*").order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: subs = [] } = useQuery({
-    queryKey: ["sub_categories", categoryId || "none"],
-    queryFn: async () => {
-      if (!categoryId) return [];
-      const { data, error } = await supabase.from("sub_categories").select("*").eq("category_id", categoryId).order("name");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!categoryId,
-  });
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from("transactions").update({
-        amount: Number(amount),
-        account_id: accountId || null,
-        to_account_id: txn.type === "transfer" && toAccountId ? toAccountId : undefined,
-        category_id: categoryId || null,
-        sub_category_id: subCatId || null,
-        note: note || null,
-        date, time,
-      }).eq("id", txn.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Transaction updated");
-      qc.invalidateQueries({ queryKey: ["transactions"] });
-      qc.invalidateQueries({ queryKey: ["accounts"] });
-      onOpenChange(false);
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[80dvh] flex flex-col">
-        <SheetTitle className="sr-only">Edit transaction</SheetTitle>
-        <div className="flex items-center gap-3 px-5 pt-5 pb-3 border-b border-border">
-          <span className="capitalize text-base font-semibold">{txn.is_split ? "Split" : txn.type} — Edit</span>
-        </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          <div className="text-center py-2">
-            <input inputMode="decimal" value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
-              className="w-full bg-transparent text-center text-5xl font-mono font-semibold outline-none text-foreground" />
-            <p className="text-xs text-muted-foreground mt-1 font-mono">LKR</p>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>{txn.type === "transfer" ? "From account" : "Account"}</Label>
-            <Select value={accountId} onValueChange={setAccountId}>
-              <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-              <SelectContent>
-                {accounts.map((a: any) => (
-                  <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {txn.type === "transfer" && (
-            <div className="space-y-1.5">
-              <Label>To account</Label>
-              <Select value={toAccountId} onValueChange={setToAccountId}>
-                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                <SelectContent>
-                  {accounts.map((a: any) => (
-                    <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {(txn.type === "expense" || txn.is_split) && (
-            <>
-              <div className="space-y-1.5">
-                <Label>Category</Label>
-                <Select value={categoryId} onValueChange={(v) => { setCategoryId(v); setSubCatId(""); }}>
-                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                  <SelectContent>
-                    {cats.map((c: any) => (
-                      <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {categoryId && subs.length > 0 && (
-                <div className="space-y-1.5">
-                  <Label>Sub-category</Label>
-                  <Select value={subCatId} onValueChange={setSubCatId}>
-                    <SelectTrigger><SelectValue placeholder="Select sub-category" /></SelectTrigger>
-                    <SelectContent>
-                      {subs.map((s: any) => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Date</Label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground outline-none" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Time</Label>
-              <input type="time" value={time} onChange={(e) => setTime(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground outline-none" />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Note</Label>
-            <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
-          </div>
-        </div>
-
-        <div className="p-4 pt-2 border-t border-border bg-card">
-          <Button className="w-full bg-primary text-white" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-            {mutation.isPending ? "Saving..." : "Save changes"}
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
   );
 }

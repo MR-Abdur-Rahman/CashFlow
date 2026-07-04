@@ -84,6 +84,15 @@
 
 ## Fixed
 
+### [P2] Duplicate transaction-edit sheet (History couldn't edit income source) — fixed 2026-07-04
+- Commit: (see git)
+- Found while auditing the same "divergent edit copies" problem for normal transactions (income/expense/transfer), after the split-edit merge.
+- Two copies existed: `EditTxSheet` (home.tsx, used by home/reports/account-detail) and a lesser `EditTransactionSheet` (settings-history.tsx). The History copy omitted the income "From" (person/source) control entirely and never wrote `income_source_type`/`income_person_id`/`income_source_text` — so an income transaction's source could not be edited from History (no data corruption; transactions have no share sub-table and are single-user, so the split RLS-delete bug doesn't apply).
+- Fix: deleted the History copy; History now imports the shared `EditTxSheet`. All transaction editing goes through one component. Cache key `["transactions"]` prefix-matches the history list's `["transactions", {}]`, so it still refreshes.
+- Test Log:
+  1. 2026-07-04 — PASS (typecheck + vite build) — single shared sheet compiles; income/expense/transfer branches intact.
+  2. Pending — live check: edit an income's source from History.
+
 ### [P1] Split edit corruption (individual → "people split", name shown twice) — fixed 2026-07-04
 - Commit: (see git) · Migration: add_update_split_rpc
 - Repro: an individual split, edited by the PAYER (non-creator), turned into a "people" split showing the counterpart's name twice.

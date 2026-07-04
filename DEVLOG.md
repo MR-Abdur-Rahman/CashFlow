@@ -60,6 +60,13 @@ Client: merged the three `EditSplitSheet`s into the single exported one in `home
 
 **Verification (DB-level, transactions rolled back so production was untouched).** Impersonating each role via `request.jwt.claims`: creator edit → in place, `share_count=1`, share id preserved; **payer edit → permitted, `share_count=1` (no duplicate)** — the exact bug, gone; unrelated user → rejected ("Only the creator or payer can edit this split"). Typecheck + `vite build` clean. Live UI verification across all three split types (creator + payer) still to be done on the deployed build.
 
+### [P2] Divergent transaction-edit copies — History couldn't edit income source — 2026-07-04
+**Why looked at.** After the split-edit merge, the user asked whether the same "Copy A/B/C across pages" problem existed for normal transactions (income / expense / transfer).
+
+**Finding.** Two transaction-edit components: `EditTxSheet` (home.tsx, used by home / reports / account-detail) and a second `EditTransactionSheet` (settings-history.tsx). The History copy was a stale fork missing the income "From" (person/source) UI and never writing `income_source_type` / `income_person_id` / `income_source_text`. Effect: from the History page you could not edit an income transaction's source, though you could everywhere else. No data corruption — unlike splits, transactions have no share sub-table (so no delete-then-insert) and are single-user (so no cross-user RLS asymmetry); the transaction UPDATE balance trigger handles account deltas correctly in both copies.
+
+**Fix.** Deleted the History copy and pointed it at the shared `EditTxSheet` (same merge approach as the split sheets). Removed the now-dead imports. Verified the shared sheet's `["transactions"]` invalidation prefix-matches the history list key `["transactions", {}]`, so the list still refreshes. Typecheck + build clean. All transaction editing now flows through one component.
+
 (Finished bugs move here permanently, in the order they were completed. Never delete or shorten an entry — this is your permanent record of how CashFlow was actually built.)
 
 ## Queue
