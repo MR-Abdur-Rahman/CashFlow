@@ -246,6 +246,9 @@ function PendingSettlementRow({ settlement, accounts }: { settlement: any; accou
   const settlerName = settlement.creator?.full_name ?? "Someone";
   const desc = settlement.splits?.description || "Settlement";
   const methodLabel = String(settlement.method ?? "transfer").replace("_", " ");
+  // When the SETTLER was the creditor, the prompted party (me) is the DEBTOR: the money left
+  // MY account, so record an outflow. Otherwise I'm the creditor recording an inflow.
+  const iPaidOut = settlement.settler_is_creditor === true;
 
   async function confirmSelection() {
     if (!selectedAccount || saving) return;
@@ -277,17 +280,19 @@ function PendingSettlementRow({ settlement, accounts }: { settlement: any; accou
 
   return (
     <div className="rounded-2xl p-4 space-y-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
-      {/* Line 1: description + amount received */}
+      {/* Line 1: description + amount (inflow green / outflow red) */}
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-white">{desc}</p>
-        <span className="text-sm font-mono font-semibold shrink-0" style={{ color: "#10B981" }}>
-          +{formatMoney(Number(settlement.amount))}
+        <span className="text-sm font-mono font-semibold shrink-0" style={{ color: iPaidOut ? "#EF4444" : "#10B981" }}>
+          {iPaidOut ? "−" : "+"}{formatMoney(Number(settlement.amount))}
         </span>
       </div>
 
-      {/* Line 2: who paid + date */}
+      {/* Line 2: direction + date */}
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs" style={{ color: "#9CA3AF" }}>{settlerName} paid you via {methodLabel}</p>
+        <p className="text-xs" style={{ color: "#9CA3AF" }}>
+          {iPaidOut ? `You paid ${settlerName} via ${methodLabel}` : `${settlerName} paid you via ${methodLabel}`}
+        </p>
         <span className="text-xs shrink-0" style={{ color: "#6B7280" }}>{format(new Date(settlement.created_at), "MMM d, yyyy")}</span>
       </div>
 
@@ -322,7 +327,7 @@ function PendingSettlementRow({ settlement, accounts }: { settlement: any; accou
         <DialogContent>
           <DialogTitle>Confirm Account Selection</DialogTitle>
           <DialogDescription>
-            The amount {formatMoney(Number(settlement.amount))} will be added to{" "}
+            The amount {formatMoney(Number(settlement.amount))} will be {iPaidOut ? "deducted from" : "added to"}{" "}
             {selectedAccount ? [selectedAccount.institution, selectedAccount.label].filter(Boolean).join(" · ") : "the selected account"}. This cannot be changed later.
           </DialogDescription>
           <div className="flex justify-end gap-2 mt-2">

@@ -27,6 +27,8 @@ export function SettleUpDialog({
   onOpenChange,
   personId,
   personName,
+  personLinkedUserId,
+  netBalance,
   unsettledItems,
   // Legacy single-share support (group member "Settle up" button)
   share,
@@ -36,10 +38,17 @@ export function SettleUpDialog({
   onOpenChange: (o: boolean) => void;
   personId?: string;
   personName?: string;
+  // The other party's auth user id (when they're a linked CashFlow user). Used so BOTH
+  // directions prompt the other party for their account selection.
+  personLinkedUserId?: string | null;
+  // Viewer-relative net balance: negative = viewer owes (paying out, red), positive =
+  // viewer is owed (receiving, green).
+  netBalance?: number;
   unsettledItems?: UnsettledItem[];
   share?: { id: string; share_amount: number; person_name: string };
   split?: { id: string; description: string };
 }) {
+  const iOwe = netBalance == null ? true : netBalance < 0;
   const qc = useQueryClient();
   const { data: accounts = [] } = useQuery(accountsQuery());
   const [method, setMethod] = useState<"cash" | "bank_transfer" | "e-wallet">("cash");
@@ -123,8 +132,15 @@ export function SettleUpDialog({
           if (splitData.paid_by_person_id) creditorId = (splitData as any).paid_by_person?.linked_user_id ?? null;
           else if (splitData.paid_by === "me") creditorId = splitData.created_by;
         }
-        const receiverId = creditorId && creditorId !== u.user.id ? creditorId : null;
-        const receiverPending = !!receiverId;
+        // Is the SETTLER the creditor (recording a receipt) or the debtor (paying out)?
+        // This drives the balance-trigger sign for the settler's own account.
+        const settlerIsCreditor = !!creditorId && creditorId === u.user.id;
+        // The prompted (other) party is the target person in this bilateral settle — prompted in
+        // BOTH directions so their account is recorded (creditor: +receipt, debtor: -payment).
+        // Prefer the explicit linked id; fall back to the resolved creditor when we're the debtor.
+        const otherUid = (personLinkedUserId && personLinkedUserId !== u.user.id)
+          ? personLinkedUserId
+          : (!settlerIsCreditor && creditorId && creditorId !== u.user.id ? creditorId : null);
 
         const { error } = await supabase.from("settlements").insert({
           split_id: item.splitId,
@@ -135,9 +151,10 @@ export function SettleUpDialog({
           note: note || null,
           description: description.trim() || null,
           created_by: u.user.id,
-          receiver_account_pending: receiverPending,
-          pending_for_user_id: receiverPending ? receiverId : null,
-        });
+          settler_is_creditor: settlerIsCreditor,
+          receiver_account_pending: !!otherUid,
+          pending_for_user_id: otherUid,
+        } as any);
         if (error) throw error;
 
         const totalSettled = item.paidAmount + alloc;
@@ -173,10 +190,10 @@ export function SettleUpDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {/* Net owed summary */}
+          {/* Net owed summary — red when you owe (paying out), green when you're owed (receiving) */}
           <div className="rounded-xl bg-secondary/50 px-4 py-3 flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Total owed</span>
-            <span className="text-lg font-mono font-semibold text-expense">{formatMoney(totalOwed)}</span>
+            <span className="text-sm text-muted-foreground">{iOwe ? "You owe" : "You'll receive"}</span>
+            <span className={`text-lg font-mono font-semibold ${iOwe ? "text-expense" : "text-income"}`}>{formatMoney(totalOwed)}</span>
           </div>
 
           {/* Amount to settle */}
@@ -193,7 +210,7 @@ export function SettleUpDialog({
               <input
                 type="number" inputMode="decimal" value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="flex-1 bg-secondary rounded-md px-3 py-2 text-sm text-right font-mono outline-none border border-border focus:border-primary"
+                className={`flex-1 bg-secondary rounded-md px-3 py-2 text-sm text-right font-mono font-semibold outline-none border border-border focus:border-primary ${iOwe ? "text-expense" : "text-income"}`}
               />
             </div>
             {overpaying ? (

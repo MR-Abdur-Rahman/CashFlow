@@ -348,6 +348,8 @@ export default function PersonDetail() {
           open={settleOpen}
           onOpenChange={setSettleOpen}
           personName={person.name}
+          personLinkedUserId={person.linked_user_id}
+          netBalance={balance}
           unsettledItems={unsettledItems}
         />
       )}
