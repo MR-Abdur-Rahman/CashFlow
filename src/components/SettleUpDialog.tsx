@@ -116,14 +116,26 @@ export function SettleUpDialog({
         const item = items.find((i) => i.shareId === shareId);
         if (!item) continue;
 
-        // The receiver (person being paid) is the split's creator, when they aren't the settler.
+        // The receiver (person being paid) is the split's CREDITOR — whoever PAID the split — not
+        // its creator. A user can create a split that someone else paid, making the creator the
+        // DEBTOR; keying off created_by then flips the balance direction (settlement misread as a
+        // creditor receipt). Resolve the creditor from paid_by/paid_by_person_id instead.
         // Whenever there IS a remote receiver, the settler is the DEBTOR paying out: the payment
         // must go to the receiver's account, so they confirm which of THEIR accounts received it
         // (Split → Pending) for EVERY method. `pending_for_user_id` also flags this settlement as a
         // debtor payment, which the balance trigger uses to DEBIT the settler's account_id.
         const { data: splitData } = await supabase
-          .from("splits").select("created_by").eq("id", item.splitId).maybeSingle();
-        const receiverId = splitData && splitData.created_by !== u.user.id ? splitData.created_by : null;
+          .from("splits")
+          .select("created_by, paid_by, paid_by_person_id, paid_by_person:paid_by_person_id(linked_user_id)")
+          .eq("id", item.splitId).maybeSingle();
+        let creditorId: string | null = null;
+        if (splitData) {
+          if (splitData.paid_by_person_id) creditorId = (splitData as any).paid_by_person?.linked_user_id ?? null;
+          else if (splitData.paid_by === "me") creditorId = splitData.created_by;
+        }
+        // Only a DIFFERENT linked user counts as a remote receiver. When the settler is the
+        // creditor (recording money received), receiverId stays null → trigger CREDITS (+1).
+        const receiverId = creditorId && creditorId !== u.user.id ? creditorId : null;
         const receiverPending = !!receiverId;
 
         const { error } = await supabase.from("settlements").insert({
