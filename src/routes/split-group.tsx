@@ -111,7 +111,7 @@ export default function GroupDetail() {
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-5">
-      <Link to="/split" className="inline-flex items-center text-sm text-muted-foreground">
+      <Link to="/split?tab=groups" className="inline-flex items-center text-sm text-muted-foreground">
         <ArrowLeft className="h-4 w-4 mr-1" /> Split
       </Link>
 

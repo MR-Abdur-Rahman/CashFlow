@@ -33,7 +33,8 @@ export default function SplitPage() {
   const { data: pendingSettlements = [] } = useQuery(pendingSettlementsQuery());
   const pendingCount = (pendingSplits as any[]).length + (pendingSettlements as any[]).length;
   const [searchParams] = useSearchParams();
-  const initialTab = searchParams.get("tab") === "pending" ? "pending" : "people";
+  const tabParam = searchParams.get("tab");
+  const initialTab = tabParam === "pending" ? "pending" : tabParam === "groups" ? "groups" : "people";
   const [tab, setTab] = useState<"people" | "groups" | "pending">(initialTab);
 
   function handleScan(text: string) {
