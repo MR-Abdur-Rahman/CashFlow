@@ -142,6 +142,9 @@ export default function PersonDetail() {
             shareAmount: Number(sh.share_amount),
             paidAmount: paid,
             remaining: Number(sh.share_amount) - paid,
+            // Incoming split → the offered share is the viewer's own (viewer owes); own split →
+            // the target's share (they owe). Lets Settle Up settle only the owed direction.
+            viewerOwes: !!s._isIncoming,
           };
         });
     }).filter((item) => item.remaining > 0.005);

@@ -20,6 +20,9 @@ type UnsettledItem = {
   shareAmount: number;
   paidAmount: number;
   remaining: number;
+  // true = the viewer owes on this share; false = the other party owes. Used to settle only
+  // the direction the viewer actually owes (a bilateral relationship can have both).
+  viewerOwes?: boolean;
 };
 
 export function SettleUpDialog({
@@ -79,23 +82,31 @@ export function SettleUpDialog({
     return [];
   }, [unsettledItems, share, split]);
 
-  // Net-balance model: you settle the overall amount owed, not individual splits.
-  const totalOwed = useMemo(
-    () => items.reduce((s, i) => s + Math.max(0, i.remaining), 0),
-    [items]
+  // Only the shares in the direction the viewer actually owes/is-owed are settleable here.
+  // (A bilateral relationship can hold debts both ways; those net out — you settle the net.)
+  const dirItems = useMemo(
+    () => items.filter((i) => i.viewerOwes === undefined || i.viewerOwes === iOwe),
+    [items, iOwe]
   );
+  const grossOwed = useMemo(
+    () => dirItems.reduce((s, i) => s + Math.max(0, i.remaining), 0),
+    [dirItems]
+  );
+  // The amount you settle is the NET balance (both users agree on it), not the gross of one
+  // side's shares. Fall back to the gross when no net is provided (group legacy caller).
+  const netOwed = netBalance != null ? Math.abs(netBalance) : grossOwed;
 
   // Default the amount to the full net owed each time the sheet opens.
   useEffect(() => {
-    if (open) setAmount(totalOwed > 0 ? totalOwed.toFixed(2) : "");
-  }, [open, totalOwed]);
+    if (open) setAmount(netOwed > 0 ? netOwed.toFixed(2) : "");
+  }, [open, netOwed]);
 
   useEffect(() => {
     setAccountId((filteredAccounts as any[])[0]?.id ?? "");
   }, [filteredAccounts]);
 
   const amountNum = Number(amount) || 0;
-  const overpaying = amountNum > totalOwed + 0.005;
+  const overpaying = amountNum > netOwed + 0.005;
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -107,11 +118,11 @@ export function SettleUpDialog({
       // OLDEST-FIRST (FIFO), creating a settlement per share consumed. The user no longer
       // picks individual splits — they just settle the overall amount owed. (This also
       // implements the FIFO-allocation behaviour.)
-      const sorted = [...items]
+      const sorted = [...dirItems]
         .filter((i) => i.remaining > 0.005)
         .sort((a, b) => String(a.date ?? "").localeCompare(String(b.date ?? "")));
 
-      let remaining = Math.min(amountNum, totalOwed + 0.005);
+      let remaining = Math.min(amountNum, netOwed + 0.005);
       let settledAny = false;
       for (const item of sorted) {
         if (remaining <= 0.005) break;
@@ -190,18 +201,18 @@ export function SettleUpDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {/* Net owed summary — red when you owe (paying out), green when you're owed (receiving) */}
+          {/* Net balance summary — red when you owe (paying out), green when you lent (receiving) */}
           <div className="rounded-xl bg-secondary/50 px-4 py-3 flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">{iOwe ? "You owe" : "You'll receive"}</span>
-            <span className={`text-lg font-mono font-semibold ${iOwe ? "text-expense" : "text-income"}`}>{formatMoney(totalOwed)}</span>
+            <span className="text-sm text-muted-foreground">{iOwe ? "You owe" : "You lent"}</span>
+            <span className={`text-lg font-mono font-semibold ${iOwe ? "text-expense" : "text-income"}`}>{formatMoney(netOwed)}</span>
           </div>
 
           {/* Amount to settle */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <Label>Amount to settle</Label>
-              {totalOwed > 0 && amountNum < totalOwed - 0.005 && (
-                <button type="button" onClick={() => setAmount(totalOwed.toFixed(2))}
+              {netOwed > 0 && amountNum < netOwed - 0.005 && (
+                <button type="button" onClick={() => setAmount(netOwed.toFixed(2))}
                   className="text-[11px] text-primary underline">Full amount</button>
               )}
             </div>
@@ -214,7 +225,7 @@ export function SettleUpDialog({
               />
             </div>
             {overpaying ? (
-              <p className="text-[11px] text-expense">More than owed — will be capped at {formatMoney(totalOwed)}.</p>
+              <p className="text-[11px] text-expense">More than owed — will be capped at {formatMoney(netOwed)}.</p>
             ) : (
               <p className="text-[11px] text-muted-foreground">Oldest debts are settled first.</p>
             )}
@@ -270,8 +281,8 @@ export function SettleUpDialog({
               return;
             }
             mutation.mutate();
-          }} disabled={mutation.isPending || totalOwed <= 0}>
-            {mutation.isPending ? "Settling..." : `Confirm${amountNum > 0 ? " — " + formatMoney(Math.min(amountNum, totalOwed)) : ""}`}
+          }} disabled={mutation.isPending || netOwed <= 0}>
+            {mutation.isPending ? "Settling..." : `Confirm${amountNum > 0 ? " — " + formatMoney(Math.min(amountNum, netOwed)) : ""}`}
           </Button>
         </div>
       </SheetContent>
