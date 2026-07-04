@@ -4,7 +4,11 @@ This file tells the *story* of each bug — the problem, the reasoning, and how 
 
 ## In Progress
 
-### [P1] Settlement payer's balance direction reversed (also fixes [P1] #5 Settlement account direction)
+(none)
+
+## Completed
+
+### [P1] Settlement payer's balance direction reversed (also closed [P1] #5 Settlement account direction + [P1] #2 Pending rows missing) — 2026-07-04
 **Symptom.** When User A settles a debt to User B, A's account balance moves the wrong way — it *increases* instead of decreasing (and reverses the same way on settlement delete).
 
 **Diagnosis.** Account balance for settlements is trigger-driven by `update_account_balance_on_settlement`, which picks the sign from `pending_for_user_id`:
@@ -17,9 +21,20 @@ Confirmed against production: the one live settlement was on a split where `crea
 
 **Fix.** In `SettleUpDialog`, resolve the creditor from the split's payer instead of its creator: read `paid_by`, `paid_by_person_id`, and the payer person's `linked_user_id`; treat it as a remote debtor-payment (`pending_for_user_id = creditor`) only when the creditor is a *different* linked user than the settler; otherwise leave it null (settler is the creditor recording a receipt). Trigger sign then comes out correct in every direction. Typecheck clean; not yet deployed/tested. Legacy caveat: splits with a `paid_by` name but no `paid_by_person_id` still resolve to null (unchanged behavior) — modern splits always set `paid_by_person_id`.
 
-**Outstanding.** (1) The existing production settlement already applied the wrong-direction +500 and never created a receiver-pending row for B, so A's account is off by 1000 from correct — needs a one-off data repair, pending user go-ahead. (2) Not yet committed/pushed (deploy is outward-facing).
+**Deployed.** Committed `521ca1f`, pushed to `main` (Vercel auto-deploy).
 
-## Completed
+**Data repair (done 2026-07-04).** The one pre-existing broken settlement (`f1db5e23`, split `cbbf7168`, User A → User B, LKR 500) was corrected in place:
+- Flipped `receiver_account_pending=true`, `pending_for_user_id=B` on the row. `trg_account_balance_on_settlement` fires on UPDATE (old_sign +1 → new_sign −1), so it removed the erroneous +500 and applied the correct −500: A's **Cash** account 50,500 → **49,500**.
+- `trigger_notify_settlement_account_selection` is INSERT-only, so it did not re-fire; inserted B's `settlement_account_selection` notification manually (mirroring the trigger's message format). B will now be prompted to pick the receiving account; on confirm, `settlement_receiver_balance` credits +500 there.
+
+**Bug #2 (Pending rows missing from receiver's tab) — same root cause.** Separately filed, but it's the receiver-facing half of this bug. Checked the RLS policies on `settlements`: `settlements_select_pending` (USING `pending_for_user_id = auth.uid()`) and `settlements_update_pending` already give the receiver full read + confirm access — so it was never an RLS or query defect. The rows were missing purely because the old code never set `pending_for_user_id`/`receiver_account_pending` when the debtor created the split, so nothing matched `pendingSettlementsQuery`. The creditor-resolution fix populates those flags, so the rows now appear. No separate code change.
+
+**Verification (live build, 2026-07-04).** User exercised the deployed fix with real accounts:
+- New settlement `66f0f232` (LKR 200, A→B) was written with `pending_for_user_id = B` (would have been null under the old code) — #1 fixed.
+- User B's Pending tab rendered both settlement rows and B confirmed the receiving account on each (`receiver_account_id` set) — #2 fixed.
+- Balances reconcile exactly: A's Cash **49,300** (49,500 − 200), B's Cash **48,700** (48,000 + 500 + 200). Money moved A→B by 700 in the correct direction — #1/#5 fixed.
+
+**Completed.** #1, #2, and #5 all closed by commit `521ca1f` plus the one-off data repair. See BUGS.md test logs.
 
 (Finished bugs move here permanently, in the order they were completed. Never delete or shorten an entry — this is your permanent record of how CashFlow was actually built.)
 

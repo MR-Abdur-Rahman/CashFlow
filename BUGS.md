@@ -2,33 +2,6 @@
 
 ## Open
 
-### [P1] Settlement payer's balance direction reversed
-- Scope: multi-user-sync
-- Severity: blocking
-- Users involved: A, B (any settling pair)
-- Steps to reproduce:
-  1. User A owes User B money (existing split debt).
-  2. User A settles up with User B via the Settle Up flow.
-  3. Check both users' balances after settlement.
-- Expected: Payer's (User A's) balance owed should decrease by the settled amount.
-- Actual: Balance direction is reversed — it increases (or moves the wrong way) instead of decreasing. Happens on both settlement creation and settlement deletion.
-- Added: 2026-07-04
-- Root cause (2026-07-04): SettleUpDialog set `pending_for_user_id` from `split.created_by` instead of the split's actual payer (creditor). When the creator is the debtor (created a split someone else paid), the trigger `update_account_balance_on_settlement` misreads the settlement as a creditor receipt (+1) and reverses the account direction. Same root cause as #5 below.
-- Fix (2026-07-04): resolve creditor from `paid_by`/`paid_by_person_id` in SettleUpDialog.tsx. Implemented, typecheck clean — NOT yet deployed/tested. Existing prod settlement needs a one-off balance repair.
-- Test Log: (none yet — awaiting deploy)
-
-### [P1] Settlement pending rows missing from receiver's Pending tab
-- Scope: multi-user-sync
-- Severity: blocking
-- Users involved: A, B (any settling pair)
-- Steps to reproduce:
-  1. User A creates a settlement paying User B.
-  2. User B opens their Pending tab.
-- Expected: The settlement should appear as a pending row for User B to confirm/see.
-- Actual: Nothing appears — the row is missing entirely.
-- Added: 2026-07-04
-- Test Log: (none yet)
-
 ### [P1] Account type filtering broken on Pending tab dropdowns
 - Scope: single-user
 - Severity: major
@@ -50,17 +23,6 @@
 - Actual: Split data becomes corrupted after edit (exact symptoms need re-confirmation).
 - Added: 2026-07-04
 - Test Log: (none yet)
-
-### [P1] Settlement account direction fix
-- Scope: multi-user-sync
-- Severity: blocking
-- Users involved: A, B
-- Steps to reproduce: TBD — likely overlaps with the balance-direction bug above; confirm whether this is the same root cause or a separate account-crediting issue.
-- Expected: The correct account (payer's or receiver's) should be debited/credited appropriately during settlement.
-- Actual: Wrong account direction — needs reproduction to confirm exact mismatch.
-- Added: 2026-07-04
-- Resolution (2026-07-04): CONFIRMED same root cause as #1 (SettleUpDialog keyed direction off `created_by` not the payer). Fixed by the same SettleUpDialog change. Verify alongside #1.
-- Test Log: (none yet — awaiting deploy)
 
 ### [P2] Settle Up dialog redesign — remove split checkboxes
 - Scope: ui
@@ -143,6 +105,27 @@
 - Test Log: (none yet)
 
 ## Fixed
+
+### [P1] Settlement payer's balance direction reversed — fixed 2026-07-04
+- Commit: 521ca1f
+- Root cause: SettleUpDialog set `pending_for_user_id` from `split.created_by` instead of the split's actual payer (creditor). When the creator is the debtor (created a split someone else paid), `update_account_balance_on_settlement` misread the settlement as a creditor receipt (+1) and reversed the account direction on create and delete.
+- Fix: resolve creditor from `paid_by`/`paid_by_person_id` in SettleUpDialog.tsx; only flag a remote debtor-payment when the creditor is a different linked user than the settler.
+- Data repair: existing prod settlement `f1db5e23` corrected (A's Cash 50,500→49,500) + receiver notification issued.
+- Test Log:
+  1. 2026-07-04 — PASS — live build: A→B settlements (500 + 200) moved money correctly — A's Cash 49,300, B's Cash 48,700; balances reconcile exactly.
+
+### [P1] Settlement pending rows missing from receiver's Pending tab — fixed 2026-07-04
+- Commit: 521ca1f (same change as balance-direction bug)
+- Root cause: SAME as the balance-direction bug. Not an RLS/query issue — receiver has read/update access via `settlements_select_pending`. Rows were missing purely because the old code never set `pending_for_user_id`/`receiver_account_pending` when the debtor created the split, so nothing matched `pendingSettlementsQuery`.
+- Fix: the SettleUpDialog creditor-resolution change now populates the pending flags correctly.
+- Test Log:
+  1. 2026-07-04 — PASS — live build: B's Pending tab rendered both settlement rows and B confirmed the receiving account on each (`receiver_account_id` set, +credit applied).
+
+### [P1] Settlement account direction fix — fixed 2026-07-04 (duplicate of balance-direction bug)
+- Commit: 521ca1f
+- Resolution: CONFIRMED same root cause as the balance-direction bug (SettleUpDialog keyed direction off `created_by` not the payer). Closed by the same change; no separate fix.
+- Test Log:
+  1. 2026-07-04 — PASS — verified together with the balance-direction bug (correct debit/credit on both accounts).
 
 ### [P1] Cache invalidation bug (missing accounts join) — fixed 2026-06-XX
 - Commit: (not recorded)
