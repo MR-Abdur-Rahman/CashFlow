@@ -1,3 +1,4 @@
+// test comment
 console.log('URL:', import.meta.env.VITE_SUPABASE_URL)
 import { PrefsApplier } from './components/PrefsApplier'
 import { StrictMode } from 'react'
