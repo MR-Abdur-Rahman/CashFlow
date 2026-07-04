@@ -2,26 +2,6 @@
 
 ## Open
 
-### [P2] Settle Up dialog redesign — remove split checkboxes
-- Scope: ui
-- Severity: major
-- Users involved: A, B
-- Steps to reproduce: N/A — this is a redesign, not a reproduce-and-fix bug.
-- Expected: Settle Up flow should be net-balance-only — you settle the overall amount owed, not individual splits via checkboxes.
-- Actual: Current dialog still shows per-split checkboxes for selection, which is more complex than needed.
-- Added: 2026-07-04
-- Test Log: (none yet)
-
-### [P2] FIFO settlement allocation
-- Scope: multi-user-sync
-- Severity: major
-- Users involved: A, B
-- Steps to reproduce: N/A — new feature, not a bug yet.
-- Expected: When a settlement is applied, it should pay off the oldest unsettled split first, then the next oldest, etc.
-- Actual: No allocation order currently enforced.
-- Added: 2026-07-04
-- Test Log: (none yet)
-
 ### [P2] Group member balance bugs
 - Scope: multi-user-sync
 - Severity: major
@@ -83,6 +63,15 @@
 - Test Log: (none yet)
 
 ## Fixed
+
+### [P2] Settle Up redesign — net-balance-only (removes split checkboxes) + FIFO allocation — fixed 2026-07-04
+- Commit: (see git)
+- Also closes: [P2] FIFO settlement allocation (delivered by the same change).
+- Change: SettleUpDialog no longer shows per-split checkboxes or per-split custom amounts. It shows the total owed and a single "Amount to settle" field (defaults to the full owed, editable for partial, capped at owed). On confirm it allocates the amount across the person's unsettled shares OLDEST-FIRST (FIFO), creating a settlement per share consumed and marking shares settled. Reuses the creditor-direction resolution from the settlement-direction fix, so account direction stays correct.
+- Both callers unchanged: split-person (unsettledItems) and split-group (legacy single share) both funnel through the same net-owed list.
+- Known tradeoff: a net payment spanning multiple splits still creates one settlement row per split consumed (so a debtor-payment can raise one account-selection prompt per distinct split). Acceptable; the notify trigger dedupes per split.
+- Test Log:
+  1. 2026-07-04 — PASS (typecheck + vite build). Pending — live: settle full and partial amounts; confirm FIFO order, balances, and the receiver's account-selection prompt.
 
 ### [P2] Duplicate transaction-edit sheet (History couldn't edit income source) — fixed 2026-07-04
 - Commit: (see git)

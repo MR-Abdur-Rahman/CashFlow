@@ -11,8 +11,6 @@ import { methodToAccountType } from "@/lib/settlement";
 import { toast } from "sonner";
 import { notifyToast } from "@/lib/notify";
 import { formatMoney } from "@/lib/format";
-import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
 
 type UnsettledItem = {
   shareId: string;
@@ -30,7 +28,7 @@ export function SettleUpDialog({
   personId,
   personName,
   unsettledItems,
-  // Legacy single-share support
+  // Legacy single-share support (group member "Settle up" button)
   share,
   split,
 }: {
@@ -48,13 +46,14 @@ export function SettleUpDialog({
   const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
   const [description, setDescription] = useState("");
+  const [amount, setAmount] = useState("");
 
   const filteredAccounts = useMemo(
     () => (accounts as any[]).filter((a) => a.type === methodToAccountType[method]),
     [accounts, method]
   );
 
-  // Build items list — support both multi and legacy single
+  // Normalize both callers (multi unsettledItems + legacy single share) into one list.
   const items: UnsettledItem[] = useMemo(() => {
     if (unsettledItems && unsettledItems.length > 0) return unsettledItems;
     if (share && split) {
@@ -71,59 +70,50 @@ export function SettleUpDialog({
     return [];
   }, [unsettledItems, share, split]);
 
-  // Selected items with custom amounts
-  const [selected, setSelected] = useState<Record<string, string>>({});
+  // Net-balance model: you settle the overall amount owed, not individual splits.
+  const totalOwed = useMemo(
+    () => items.reduce((s, i) => s + Math.max(0, i.remaining), 0),
+    [items]
+  );
 
+  // Default the amount to the full net owed each time the sheet opens.
   useEffect(() => {
-    if (open && items.length > 0) {
-      // Auto-select all with remaining amounts
-      const init: Record<string, string> = {};
-      items.forEach((item) => { init[item.shareId] = String(item.remaining.toFixed(2)); });
-      setSelected(init);
-    }
-  }, [open, items]);
+    if (open) setAmount(totalOwed > 0 ? totalOwed.toFixed(2) : "");
+  }, [open, totalOwed]);
 
   useEffect(() => {
     setAccountId((filteredAccounts as any[])[0]?.id ?? "");
   }, [filteredAccounts]);
 
-  const totalSettling = Object.values(selected)
-    .filter((_, i) => Object.keys(selected)[i] !== undefined)
-    .reduce((s, v) => s + (Number(v) || 0), 0);
-
-  function toggleItem(shareId: string, remaining: number) {
-    setSelected((prev) => {
-      const next = { ...prev };
-      if (next[shareId] !== undefined) {
-        delete next[shareId];
-      } else {
-        next[shareId] = String(remaining.toFixed(2));
-      }
-      return next;
-    });
-  }
+  const amountNum = Number(amount) || 0;
+  const overpaying = amountNum > totalOwed + 0.005;
 
   const mutation = useMutation({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
+      if (amountNum <= 0) throw new Error("Enter an amount greater than 0");
 
-      const entries = Object.entries(selected).filter(([, v]) => Number(v) > 0);
-      if (entries.length === 0) throw new Error("Select at least one split to settle");
+      // Net-balance settle: allocate the entered amount across the unsettled shares
+      // OLDEST-FIRST (FIFO), creating a settlement per share consumed. The user no longer
+      // picks individual splits — they just settle the overall amount owed. (This also
+      // implements the FIFO-allocation behaviour.)
+      const sorted = [...items]
+        .filter((i) => i.remaining > 0.005)
+        .sort((a, b) => String(a.date ?? "").localeCompare(String(b.date ?? "")));
 
-      for (const [shareId, amtStr] of entries) {
-        const amt = Number(amtStr);
-        const item = items.find((i) => i.shareId === shareId);
-        if (!item) continue;
+      let remaining = Math.min(amountNum, totalOwed + 0.005);
+      let settledAny = false;
+      for (const item of sorted) {
+        if (remaining <= 0.005) break;
+        const alloc = Math.min(remaining, item.remaining);
+        if (alloc <= 0.005) continue;
 
-        // The receiver (person being paid) is the split's CREDITOR — whoever PAID the split — not
-        // its creator. A user can create a split that someone else paid, making the creator the
-        // DEBTOR; keying off created_by then flips the balance direction (settlement misread as a
-        // creditor receipt). Resolve the creditor from paid_by/paid_by_person_id instead.
-        // Whenever there IS a remote receiver, the settler is the DEBTOR paying out: the payment
-        // must go to the receiver's account, so they confirm which of THEIR accounts received it
-        // (Split → Pending) for EVERY method. `pending_for_user_id` also flags this settlement as a
-        // debtor payment, which the balance trigger uses to DEBIT the settler's account_id.
+        // Resolve the split's CREDITOR (whoever PAID it) to decide direction. When the settler
+        // is the DEBTOR paying a remote creditor, pending_for_user_id flags it so the balance
+        // trigger debits the payer's account and the creditor confirms which account received it.
+        // Keying off created_by instead of the payer would reverse the direction (see the
+        // settlement-direction fix).
         const { data: splitData } = await supabase
           .from("splits")
           .select("created_by, paid_by, paid_by_person_id, paid_by_person:paid_by_person_id(linked_user_id)")
@@ -133,15 +123,13 @@ export function SettleUpDialog({
           if (splitData.paid_by_person_id) creditorId = (splitData as any).paid_by_person?.linked_user_id ?? null;
           else if (splitData.paid_by === "me") creditorId = splitData.created_by;
         }
-        // Only a DIFFERENT linked user counts as a remote receiver. When the settler is the
-        // creditor (recording money received), receiverId stays null → trigger CREDITS (+1).
         const receiverId = creditorId && creditorId !== u.user.id ? creditorId : null;
         const receiverPending = !!receiverId;
 
         const { error } = await supabase.from("settlements").insert({
           split_id: item.splitId,
-          split_share_id: shareId,
-          amount: amt,
+          split_share_id: item.shareId,
+          amount: alloc,
           method,
           account_id: accountId || null,
           note: note || null,
@@ -152,23 +140,18 @@ export function SettleUpDialog({
         });
         if (error) throw error;
 
-        // No expense transaction: the balance trigger update_account_balance_on_settlement now
-        // debits the debtor's account_id directly (and credits the creditor when they record a
-        // receipt), so a separate expense row would double-count.
+        const totalSettled = item.paidAmount + alloc;
+        const fullySettled = totalSettled >= item.shareAmount - 0.005;
+        await supabase.from("split_shares").update({
+          is_settled: fullySettled,
+          ...(fullySettled ? { settled_at: new Date().toISOString() } : {}),
+        }).eq("id", item.shareId);
 
-        const totalSettled = item.paidAmount + amt;
-        if (totalSettled >= item.shareAmount) {
-          await supabase.from("split_shares").update({
-            is_settled: true,
-            settled_at: new Date().toISOString(),
-          }).eq("id", shareId);
-        } else {
-          await supabase.from("split_shares").update({
-            is_settled: false,
-          }).eq("id", shareId);
-        }
-
+        remaining -= alloc;
+        settledAny = true;
       }
+
+      if (!settledAny) throw new Error("Nothing to settle");
     },
     onSuccess: () => {
       notifyToast("settlement_created", "Settled successfully");
@@ -183,84 +166,42 @@ export function SettleUpDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 h-[80dvh] flex flex-col">
+      <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 max-h-[80dvh] flex flex-col">
         <SheetTitle className="sr-only">Settle Up</SheetTitle>
         <div className="px-5 pt-5 pb-3 border-b border-border">
           <p className="text-base font-semibold">Settle Up{personName ? ` — ${personName}` : ""}</p>
-          {items.length > 1 && (
-            <p className="text-xs text-muted-foreground mt-0.5">Select splits to settle</p>
-          )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {/* Split selection — only show if multiple */}
-          {items.length > 1 && (
-            <div className="space-y-2">
-              <Label>Splits to settle</Label>
-              <div className="rounded-xl overflow-hidden border border-border divide-y divide-border">
-                {items.map((item) => {
-                  const isSelected = selected[item.shareId] !== undefined;
-                  return (
-                    <div key={item.shareId}
-                      onClick={() => toggleItem(item.shareId, item.remaining)}
-                      className="flex items-center gap-3 px-4 py-3 bg-card cursor-pointer active:bg-secondary/40">
-                      <div className={cn("h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
-                        isSelected ? "bg-primary border-primary" : "border-border")}>
-                        {isSelected && <Check className="h-3 w-3 text-white" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{item.description || "Split"}</p>
-                        <p className="text-xs text-muted-foreground">{item.date}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Remaining</p>
-                        <p className="text-sm font-mono font-semibold text-expense">{formatMoney(item.remaining)}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {/* Net owed summary */}
+          <div className="rounded-xl bg-secondary/50 px-4 py-3 flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Total owed</span>
+            <span className="text-lg font-mono font-semibold text-expense">{formatMoney(totalOwed)}</span>
+          </div>
 
-          {/* Custom amounts per selected split */}
-          {Object.keys(selected).length > 0 && (
-            <div className="space-y-2">
-              <Label>Amounts</Label>
-              <div className="space-y-2">
-                {items.filter((item) => selected[item.shareId] !== undefined).map((item) => (
-                  <div key={item.shareId} className="flex items-center gap-3">
-                    {items.length > 1 && (
-                      <span className="text-sm flex-1 truncate text-muted-foreground">{item.description || "Split"}</span>
-                    )}
-                    {items.length === 1 && (
-                      <span className="text-sm flex-1 text-muted-foreground">
-                        {item.description || "Split"} · remaining {formatMoney(item.remaining)}
-                      </span>
-                    )}
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-muted-foreground font-mono">LKR</span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        value={selected[item.shareId] ?? ""}
-                        onChange={(e) => setSelected((prev) => ({ ...prev, [item.shareId]: e.target.value }))}
-                        className="w-28 bg-secondary rounded-md px-2 py-1.5 text-sm text-right font-mono outline-none border border-border focus:border-primary"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {/* Amount to settle */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label>Amount to settle</Label>
+              {totalOwed > 0 && amountNum < totalOwed - 0.005 && (
+                <button type="button" onClick={() => setAmount(totalOwed.toFixed(2))}
+                  className="text-[11px] text-primary underline">Full amount</button>
+              )}
             </div>
-          )}
-
-          {/* Total */}
-          {Object.keys(selected).length > 0 && (
-            <div className="flex justify-between text-sm font-semibold px-1">
-              <span>Total settling</span>
-              <span className="font-mono text-income">{formatMoney(totalSettling)}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-mono">LKR</span>
+              <input
+                type="number" inputMode="decimal" value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="flex-1 bg-secondary rounded-md px-3 py-2 text-sm text-right font-mono outline-none border border-border focus:border-primary"
+              />
             </div>
-          )}
+            {overpaying ? (
+              <p className="text-[11px] text-expense">More than owed — will be capped at {formatMoney(totalOwed)}.</p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">Oldest debts are settled first.</p>
+            )}
+          </div>
 
           {/* Description */}
           <div className="space-y-1.5">
@@ -307,13 +248,13 @@ export function SettleUpDialog({
 
         <div className="p-4 border-t border-border">
           <Button className="w-full bg-primary text-white" onClick={() => {
-            if (!totalSettling || isNaN(totalSettling) || totalSettling <= 0) {
+            if (!amountNum || isNaN(amountNum) || amountNum <= 0) {
               toast.error("Please enter a valid amount greater than 0");
               return;
             }
             mutation.mutate();
-          }} disabled={mutation.isPending || Object.keys(selected).length === 0}>
-            {mutation.isPending ? "Settling..." : `Confirm${totalSettling > 0 ? " — " + formatMoney(totalSettling) : ""}`}
+          }} disabled={mutation.isPending || totalOwed <= 0}>
+            {mutation.isPending ? "Settling..." : `Confirm${amountNum > 0 ? " — " + formatMoney(Math.min(amountNum, totalOwed)) : ""}`}
           </Button>
         </div>
       </SheetContent>

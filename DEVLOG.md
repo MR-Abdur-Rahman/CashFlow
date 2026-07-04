@@ -67,6 +67,17 @@ Client: merged the three `EditSplitSheet`s into the single exported one in `home
 
 **Fix.** Deleted the History copy and pointed it at the shared `EditTxSheet` (same merge approach as the split sheets). Removed the now-dead imports. Verified the shared sheet's `["transactions"]` invalidation prefix-matches the history list key `["transactions", {}]`, so the list still refreshes. Typecheck + build clean. All transaction editing now flows through one component.
 
+### [P2] Settle Up redesign — net-balance-only + FIFO allocation — 2026-07-04
+**Goal.** The Settle Up sheet forced you to tick individual splits and set a per-split amount. The user wanted it net-balance-only: just settle the overall amount owed to a person.
+
+**Design.** Replaced the checkbox list + per-split amount inputs with a single "Amount to settle" field that defaults to the total owed (sum of the person's remaining unsettled shares), is editable for a partial payment, and is capped at the owed total. On confirm the amount is allocated across the unsettled shares **oldest-first (FIFO)** — one settlement row per share consumed, marking each share settled when fully covered. This intentionally also implements the separately-filed FIFO-allocation item.
+
+Kept the per-share settlement model rather than a single detached settlement row: the balance math (`settledOf` by `split_share_id`), `shareRemaining`, the `settlement_*` triggers, and `delete_settlement` all key off `split_share_id`, so a detached model would have been a large ripple. The FIFO loop reuses the creditor-direction resolution from the settlement-direction fix (resolve the payer from `paid_by`/`paid_by_person_id`, set `pending_for_user_id` only for a remote creditor), so account direction stays correct per allocation.
+
+Both entry points are unchanged: split-person passes `unsettledItems` (all the person's unsettled shares), split-group passes a legacy single `share`/`split`; both funnel into the same net-owed list. Typecheck + build clean.
+
+**Known tradeoff.** A net payment spanning several splits still writes one settlement row per split consumed, so a debtor-payment can raise one account-selection prompt per distinct split (the notify trigger dedupes per split). Acceptable for now; a single-row model would need the detached-settlement data change above.
+
 (Finished bugs move here permanently, in the order they were completed. Never delete or shorten an entry — this is your permanent record of how CashFlow was actually built.)
 
 ## Queue
