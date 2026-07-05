@@ -184,6 +184,25 @@ export default function Home() {
 
   const { dateFrom, dateTo } = getDateRange(period);
   const { data: accounts = [] } = useQuery(accountsQuery());
+  // Pagination dots for the account card strip: track which card is snapped to the left edge.
+  const accScrollRef = useRef<HTMLDivElement>(null);
+  const [activeAccount, setActiveAccount] = useState(0);
+  const onAccScroll = () => {
+    const el = accScrollRef.current;
+    if (!el) return;
+    const left = el.getBoundingClientRect().left;
+    const cards = Array.from(el.querySelectorAll<HTMLElement>("[data-account-card]"));
+    let best = 0;
+    let bestDist = Infinity;
+    cards.forEach((c, i) => {
+      const d = Math.abs(c.getBoundingClientRect().left - left);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    setActiveAccount(best);
+  };
   const { data: txns = [] } = useQuery(transactionsQuery({ dateFrom, dateTo }));
   const { data: ownSplits = [] } = useQuery(splitsQuery());
   const { data: incomingSplits = [] } = useQuery(incomingSplitsQuery());
@@ -399,24 +418,29 @@ export default function Home() {
       {/* Accounts */}
       <div>
         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">Accounts</p>
-        <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
+        <div
+          ref={accScrollRef}
+          onScroll={onAccScroll}
+          className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 snap-x snap-mandatory"
+        >
           {accounts.map((a) => (
             <Link
+              data-account-card
               to={`/accounts/${a.id}`}
               key={a.id}
-              className="surface-card border border-border min-w-[180px] p-3 snap-start block active:opacity-80"
+              className="shrink-0 w-40 h-[124px] rounded-xl border border-border bg-card p-3 snap-start flex flex-col active:opacity-80"
             >
               <AccountIcon
                 iconType={a.icon_type}
                 iconName={a.icon_name}
                 iconColor={a.icon_color}
                 iconUrl={a.icon_url}
-                size={36}
+                size={44}
               />
-              <p className="text-xs text-muted-foreground mt-2 truncate">
+              <p className="text-xs text-muted-foreground mt-2.5 truncate">
                 {[a.institution, a.label].filter(Boolean).join(" · ") || a.label}
               </p>
-              <p className="font-mono text-base font-semibold mt-0.5">
+              <p className="font-mono text-base font-semibold text-foreground mt-0.5 truncate">
                 {formatMoney(a.current_balance)}
               </p>
             </Link>
@@ -425,6 +449,18 @@ export default function Home() {
             <p className="text-sm text-muted-foreground py-4">No accounts yet</p>
           )}
         </div>
+        {accounts.length > 1 && (
+          <div className="flex justify-center gap-1.5 mt-2">
+            {accounts.map((a, i) => (
+              <span
+                key={a.id}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === activeAccount ? "w-4 bg-primary" : "w-1.5 bg-muted-foreground/30"
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Transactions Section */}
