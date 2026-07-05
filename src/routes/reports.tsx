@@ -436,13 +436,13 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       if (!u.user) return [];
       const { data, error } = await supabase
         .from("settlements")
-        .select("*, split_shares:split_share_id(person_name, share_amount), accounts:account_id(label,institution)")
+        .select("*, person:person_id(name), split_shares:split_share_id(person_name, share_amount), accounts:account_id(label,institution)")
         .eq("created_by", u.user.id)
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999");
       if (error) throw error;
       return (data ?? []).filter((s: any) =>
-        (s.split_shares as any)?.person_name === drillItem.name,
+        ((s.split_shares as any)?.person_name ?? (s.person as any)?.name) === drillItem.name,
       );
     },
     enabled: isIncomePerson,
@@ -811,7 +811,7 @@ export default function ReportsPage() {
       if (!u.user) return [];
       const { data, error } = await supabase
         .from("settlements")
-        .select("*, split_shares:split_share_id(person_name, share_amount)")
+        .select("*, person:person_id(name), split_shares:split_share_id(person_name, share_amount)")
         .eq("created_by", u.user.id)
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999");
@@ -866,7 +866,7 @@ export default function ReportsPage() {
       map.set(name, { value: (ex?.value ?? 0) + Number(t.amount), drillType: ex?.drillType ?? dt });
     });
     (incomeSettlements as any[]).forEach(s => {
-      const name = (s.split_shares as any)?.person_name ?? "Unknown";
+      const name = (s.split_shares as any)?.person_name ?? (s.person as any)?.name ?? "Unknown";
       const ex = map.get(name);
       // settlement overrides drillType to income-person
       map.set(name, { value: (ex?.value ?? 0) + Number(s.amount), drillType: "income-person" });
