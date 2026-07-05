@@ -38,7 +38,7 @@ export default function HistoryPage() {
       if (!u.user) return [];
       const { data } = await supabase
         .from("settlements")
-        .select("*, person:person_id(name), creator:created_by(full_name), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(description, paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name))")
+        .select("*, person:person_id(name), creator:created_by(full_name), accounts:account_id(label, institution), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(description, paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name))")
         .order("created_at", { ascending: false });
       return (data ?? []).map((s: any) => ({ ...s, _uid: u.user!.id }));
     },
@@ -130,6 +130,9 @@ export default function HistoryPage() {
         s.people?.name,
         s.groups?.name,
         s.paid_by,
+        s.categories?.name,
+        s.accounts?.label,
+        s.accounts?.institution,
         ...(s.split_shares ?? []).map((sh: any) => sh.person_name),
         // person name + phone for each involved contact (own shares, individual person, creator)
         ...(s.split_shares ?? []).map((sh: any) => personSearch.byId.get(sh.person_id)),
@@ -148,6 +151,7 @@ export default function HistoryPage() {
       if (!q) return true;
       const hay = [
         s.description, s.splits?.description, s.person?.name, s.split_shares?.person_name, s.creator?.full_name, s.method,
+        s.accounts?.label, s.accounts?.institution,
         // counterparty name + phone (whether I recorded it or they did)
         personSearch.byId.get(s.person_id),
         personSearch.byUid.get(s.created_by),
@@ -185,7 +189,7 @@ export default function HistoryPage() {
         <ArrowLeft className="h-4 w-4 mr-1" /> Settings
       </Link>
       <h1 className="text-xl font-semibold">History</h1>
-      <Input placeholder="Search by person, phone, category, note..." value={q} onChange={(e) => setQ(e.target.value)} />
+      <Input placeholder="Search by person, phone, account, category, note..." value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="flex gap-2 text-xs flex-wrap">
         {["all", "income", "expense", "transfer", "split", "settlement"].map((t) => (
           <button key={t} onClick={() => setType(t)}

@@ -145,7 +145,7 @@ export const splitsQuery = () =>
       if (!u.user) return [];
       const { data, error } = await supabase
         .from("splits")
-        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name), accounts:account_id(label)")
+        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name), accounts:account_id(label), categories:category_id(name)")
         .eq("created_by", u.user.id)
         .order("date", { ascending: false })
         .order("time", { ascending: false })
@@ -187,7 +187,7 @@ export const incomingSplitsQuery = () =>
       // Step 3: fetch those splits, excluding ones the current user created
       const { data, error: e3 } = await supabase
         .from("splits")
-        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name), accounts:account_id(label)")
+        .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name), accounts:account_id(label), categories:category_id(name)")
         .in("id", splitIds)
         .neq("created_by", u.user.id)
         .order("date", { ascending: false });
