@@ -56,7 +56,9 @@ export function SettlementRow({
             <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
               {iPaid ? `You → ${otherName}` : `${otherName} → You`}
             </p>
-            <p className="text-sm font-mono text-[#9CA3AF] shrink-0">{formatMoney(amount)}</p>
+            <p className={`text-sm font-mono shrink-0 ${iPaid ? "text-expense" : "text-income"}`}>
+              {formatMoney(amount)}
+            </p>
           </div>
           {/* Line 3: balance after this settlement.
             netAfter present (person detail) → the overall running NET balance;
