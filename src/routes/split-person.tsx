@@ -69,42 +69,6 @@ export default function PersonDetail() {
     [allSplits, allSettlements, personId, person, meId, myPids],
   );
 
-  const unsettledItems = useMemo(() => {
-    return (splits as any[]).flatMap((s) => {
-      const targetPersonId = s._isIncoming ? s._myPersonId : personId;
-      if (!targetPersonId) return [];
-      const payerAuthId = getPayerAuthId(s);
-      return (s.split_shares ?? [])
-        .filter((sh: any) => sh.person_id === targetPersonId && !sh.is_settled)
-        .filter((sh: any) => {
-          // Malformed guard: in an INCOMING split the offered share is the viewer's OWN. If the
-          // viewer was the payer, that share isn't a debt — don't offer it (prevents settling your
-          // own share). Own-split proxy shares (used to settle an implicit creator debt) stay allowed.
-          if (!s._isIncoming) return true;
-          const sharePersonUid = sh.person?.linked_user_id;
-          return !(payerAuthId && sharePersonUid && sharePersonUid === payerAuthId);
-        })
-        .map((sh: any) => {
-          const paid = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
-            .reduce((a: number, x: any) => a + Number(x.amount), 0);
-          return {
-            shareId: sh.id,
-            splitId: s.id,
-            description: getSplitLabel(s),
-            date: s.date,
-            time: s.time,
-            createdAt: s.created_at,
-            shareAmount: Number(sh.share_amount),
-            paidAmount: paid,
-            remaining: Number(sh.share_amount) - paid,
-            // Incoming split → the offered share is the viewer's own (viewer owes); own split →
-            // the target's share (they owe). Lets Settle Up settle only the owed direction.
-            viewerOwes: !!s._isIncoming,
-          };
-        });
-    }).filter((item) => item.remaining > 0.005);
-  }, [splits, personId]);
-
   const { from: periodFrom, to: periodTo } = useMemo(
     () => getPeriodRange(period, anchor),
     [period, anchor]
@@ -199,7 +163,7 @@ export default function PersonDetail() {
         <Button variant="outline" className="flex-1" onClick={() => setAddSplitOpen(true)}>
           <Plus className="h-4 w-4 mr-2" /> Add Split
         </Button>
-        {Math.abs(balance) > 0 && unsettledItems.length > 0 && (
+        {Math.abs(balance) > 0.005 && (
           <Button variant="outline" className="flex-1 text-income" onClick={() => setSettleOpen(true)}>
             Settle Up
           </Button>
@@ -282,14 +246,14 @@ export default function PersonDetail() {
 
       <AddTransactionSheet open={addSplitOpen} onOpenChange={setAddSplitOpen} defaultTab="split" />
 
-      {unsettledItems.length > 0 && (
+      {Math.abs(balance) > 0.005 && (
         <SettleUpDialog
           open={settleOpen}
           onOpenChange={setSettleOpen}
+          personId={personId}
           personName={person.name}
           personLinkedUserId={person.linked_user_id}
           netBalance={balance}
-          unsettledItems={unsettledItems}
         />
       )}
 

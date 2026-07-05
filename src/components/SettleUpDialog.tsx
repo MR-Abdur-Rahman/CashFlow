@@ -12,21 +12,8 @@ import { toast } from "sonner";
 import { notifyToast } from "@/lib/notify";
 import { formatMoney } from "@/lib/format";
 
-type UnsettledItem = {
-  shareId: string;
-  splitId: string;
-  description: string;
-  date: string;
-  time?: string;      // split time (minute precision) — FIFO primary order
-  createdAt?: string; // split created_at (has seconds/ms) — FIFO tiebreaker for same-minute debts
-  shareAmount: number;
-  paidAmount: number;
-  remaining: number;
-  // true = the viewer owes on this share; false = the other party owes. Used to settle only
-  // the direction the viewer actually owes (a bilateral relationship can have both).
-  viewerOwes?: boolean;
-};
-
+// Bin model: a settlement is a single person-to-person payment against the NET balance — not an
+// allocation across individual splits. One payment = one settlement row.
 export function SettleUpDialog({
   open,
   onOpenChange,
@@ -34,26 +21,21 @@ export function SettleUpDialog({
   personName,
   personLinkedUserId,
   netBalance,
-  unsettledItems,
-  // Legacy single-share support (group member "Settle up" button)
-  share,
-  split,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
+  // The counterparty's people-record id (stored on the settlement so it belongs to the bin).
   personId?: string;
   personName?: string;
-  // The other party's auth user id (when they're a linked CashFlow user). Used so BOTH
-  // directions prompt the other party for their account selection.
+  // The other party's auth user id (when they're a linked CashFlow user). Set so the other party
+  // is prompted to confirm which account the money moved on.
   personLinkedUserId?: string | null;
-  // Viewer-relative net balance: negative = viewer owes (paying out, red), positive =
-  // viewer is owed (receiving, green).
+  // Viewer-relative net balance: negative = viewer owes (paying out, red), positive = viewer is
+  // owed (receiving, green).
   netBalance?: number;
-  unsettledItems?: UnsettledItem[];
-  share?: { id: string; share_amount: number; person_name: string };
-  split?: { id: string; description: string };
 }) {
   const iOwe = netBalance == null ? true : netBalance < 0;
+  const netOwed = netBalance != null ? Math.abs(netBalance) : 0;
   const qc = useQueryClient();
   const { data: accounts = [] } = useQuery(accountsQuery());
   const [method, setMethod] = useState<"cash" | "bank_transfer" | "e-wallet">("cash");
@@ -66,37 +48,6 @@ export function SettleUpDialog({
     () => (accounts as any[]).filter((a) => a.type === methodToAccountType[method]),
     [accounts, method]
   );
-
-  // Normalize both callers (multi unsettledItems + legacy single share) into one list.
-  const items: UnsettledItem[] = useMemo(() => {
-    if (unsettledItems && unsettledItems.length > 0) return unsettledItems;
-    if (share && split) {
-      return [{
-        shareId: share.id,
-        splitId: split.id,
-        description: split.description || "Split",
-        date: "",
-        shareAmount: Number(share.share_amount),
-        paidAmount: 0,
-        remaining: Number(share.share_amount),
-      }];
-    }
-    return [];
-  }, [unsettledItems, share, split]);
-
-  // Only the shares in the direction the viewer actually owes/is-owed are settleable here.
-  // (A bilateral relationship can hold debts both ways; those net out — you settle the net.)
-  const dirItems = useMemo(
-    () => items.filter((i) => i.viewerOwes === undefined || i.viewerOwes === iOwe),
-    [items, iOwe]
-  );
-  const grossOwed = useMemo(
-    () => dirItems.reduce((s, i) => s + Math.max(0, i.remaining), 0),
-    [dirItems]
-  );
-  // The amount you settle is the NET balance (both users agree on it), not the gross of one
-  // side's shares. Fall back to the gross when no net is provided (group legacy caller).
-  const netOwed = netBalance != null ? Math.abs(netBalance) : grossOwed;
 
   // Default the amount to the full net owed each time the sheet opens.
   useEffect(() => {
@@ -116,76 +67,33 @@ export function SettleUpDialog({
       if (!u.user) throw new Error("Not signed in");
       if (amountNum <= 0) throw new Error("Enter an amount greater than 0");
 
-      // Net-balance settle: allocate the entered amount across the unsettled shares
-      // OLDEST-FIRST (FIFO), creating a settlement per share consumed. The user no longer
-      // picks individual splits — they just settle the overall amount owed. (This also
-      // implements the FIFO-allocation behaviour.)
-      // Order oldest-first by the debt's date+time (minute precision), breaking same-minute ties
-      // with the split's created_at (has seconds/ms) so genuine creation order wins.
-      const key = (i: UnsettledItem) => `${i.date ?? ""}T${i.time ?? "00:00:00"}|${i.createdAt ?? ""}`;
-      const sorted = [...dirItems]
-        .filter((i) => i.remaining > 0.005)
-        .sort((a, b) => key(a).localeCompare(key(b)));
+      // Record ONE settlement against the net. Direction from the net sign: viewer is owed →
+      // creditor recording a receipt (+ own account); viewer owes → debtor paying out (− own
+      // account). The other party (when linked) is prompted to confirm their account.
+      const settleAmount = Math.min(amountNum, netOwed);
+      const settlerIsCreditor = !iOwe;
+      const otherUid = (personLinkedUserId && personLinkedUserId !== u.user.id) ? personLinkedUserId : null;
 
-      let remaining = Math.min(amountNum, netOwed + 0.005);
-      let settledAny = false;
-      for (const item of sorted) {
-        if (remaining <= 0.005) break;
-        const alloc = Math.min(remaining, item.remaining);
-        if (alloc <= 0.005) continue;
-
-        // Resolve the split's CREDITOR (whoever PAID it) to decide direction. When the settler
-        // is the DEBTOR paying a remote creditor, pending_for_user_id flags it so the balance
-        // trigger debits the payer's account and the creditor confirms which account received it.
-        // Keying off created_by instead of the payer would reverse the direction (see the
-        // settlement-direction fix).
-        const { data: splitData } = await supabase
-          .from("splits")
-          .select("created_by, paid_by, paid_by_person_id, paid_by_person:paid_by_person_id(linked_user_id)")
-          .eq("id", item.splitId).maybeSingle();
-        let creditorId: string | null = null;
-        if (splitData) {
-          if (splitData.paid_by_person_id) creditorId = (splitData as any).paid_by_person?.linked_user_id ?? null;
-          else if (splitData.paid_by === "me") creditorId = splitData.created_by;
-        }
-        // Is the SETTLER the creditor (recording a receipt) or the debtor (paying out)?
-        // This drives the balance-trigger sign for the settler's own account.
-        const settlerIsCreditor = !!creditorId && creditorId === u.user.id;
-        // The prompted (other) party is the target person in this bilateral settle — prompted in
-        // BOTH directions so their account is recorded (creditor: +receipt, debtor: -payment).
-        // Prefer the explicit linked id; fall back to the resolved creditor when we're the debtor.
-        const otherUid = (personLinkedUserId && personLinkedUserId !== u.user.id)
-          ? personLinkedUserId
-          : (!settlerIsCreditor && creditorId && creditorId !== u.user.id ? creditorId : null);
-
-        const { error } = await supabase.from("settlements").insert({
-          split_id: item.splitId,
-          split_share_id: item.shareId,
-          amount: alloc,
-          method,
-          account_id: accountId || null,
-          note: note || null,
-          description: description.trim() || null,
-          created_by: u.user.id,
-          settler_is_creditor: settlerIsCreditor,
-          receiver_account_pending: !!otherUid,
-          pending_for_user_id: otherUid,
-        } as any);
-        if (error) throw error;
-
-        // is_settled is maintained by the trg_sync_share_settled trigger (derived from the sum of
-        // settlements on the share). No client-side split_shares update needed (that path also hit
-        // an RLS recursion and failed silently).
-
-        remaining -= alloc;
-        settledAny = true;
-      }
-
-      if (!settledAny) throw new Error("Nothing to settle");
+      const { error } = await supabase.from("settlements").insert({
+        person_id: personId ?? null,
+        split_id: null,
+        split_share_id: null,
+        amount: settleAmount,
+        method,
+        account_id: accountId || null,
+        note: note || null,
+        description: description.trim() || null,
+        created_by: u.user.id,
+        settler_is_creditor: settlerIsCreditor,
+        receiver_account_pending: !!otherUid,
+        pending_for_user_id: otherUid,
+      } as any);
+      if (error) throw error;
     },
     onSuccess: () => {
       notifyToast("settlement_created", "Settled successfully");
       qc.invalidateQueries({ queryKey: ["splits"] });
+      qc.invalidateQueries({ queryKey: ["settlements"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
@@ -227,9 +135,9 @@ export function SettleUpDialog({
               />
             </div>
             {overpaying ? (
-              <p className="text-[11px] text-expense">More than owed — will be capped at {formatMoney(netOwed)}.</p>
+              <p className="text-[11px] text-expense">More than the net — will be capped at {formatMoney(netOwed)}.</p>
             ) : (
-              <p className="text-[11px] text-muted-foreground">Oldest debts are settled first.</p>
+              <p className="text-[11px] text-muted-foreground">Records a payment against your net balance.</p>
             )}
           </div>
 
