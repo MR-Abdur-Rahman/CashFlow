@@ -72,11 +72,11 @@ export default function AuthPage() {
       <div className="w-full max-w-sm">
         {/* Wordmark */}
         <h1 className="text-center text-4xl font-bold tracking-tight text-white">CashFlow</h1>
-        <h2 className="mt-8 text-center text-xl font-semibold text-white">
-          {mode === "signup" ? "Create account" : "Login"}
-        </h2>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-10 space-y-4">
+          <h2 className="mb-1 text-center text-xl font-semibold text-white">
+            {mode === "signup" ? "Create account" : "Login"}
+          </h2>
           {mode === "signup" && (
             <input
               type="text"
