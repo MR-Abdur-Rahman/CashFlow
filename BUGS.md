@@ -22,7 +22,8 @@
 - Known limitation (pre-existing): Reports "settlements received (income)" ignores direction — see DEVLOG.
 - Test Log:
   1. 2026-07-05 — PASS — verified on live data: bin settlements (null split refs), net A owes B 2800, balances reconcile, pending prompt + receiver confirm + delete all fire; account-selection notification auto-clears on confirm/delete; orphan removed.
-  2. Pending live: group-split bilateral settle, and a settlement with a LOCAL (non-linked) person (no account-selection flow) — handled in code, not yet exercised on real data.
+  2. 2026-07-05 — PASS — Reports settlement income = money actually received (creditor side, either direction), attributed to the counterparty (commit 8f6d570).
+  3. 2026-07-05 — PASS (DB sim, rolled back) — LOCAL person settlement moves only the recorder's account, no pending flow / 0 notifications. GROUP split feeds each member's bilateral bin (B & C each owe A 1000) and the full A→B net nets group + individual + settlements to −2200.
 
 ### [P3] Full split edit testing matrix — PASS 2026-07-05
 - QA pass over the split-edit rework (update_split RPC + merged edit sheets). Covered: individual/people/group; creator edits + payer (non-creator) edits; amount / participants / category changes; who-paid locked; settlement linkage preserved; permission block for non-creator-non-payer; same edit from Home / person / group / reports / history.
