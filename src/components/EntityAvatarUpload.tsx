@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Camera, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { UserAvatar } from "./UserAvatar";
+import { ImageCropDialog } from "./ImageCropDialog";
 import { useQueryClient } from "@tanstack/react-query";
 
 // Picture upload/remove for a `people` or `groups` row. Stores into the shared private `avatars`
@@ -27,6 +28,8 @@ export function EntityAvatarUpload({
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
 
   async function signedUrl(path: string) {
     const { data } = await supabase.storage
@@ -35,20 +38,24 @@ export function EntityAvatarUpload({
     return data?.signedUrl ?? null;
   }
 
-  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) return toast.error("Image must be under 5MB");
+    setCropFile(file);
+    setCropOpen(true);
+  }
+
+  async function onCropped(blob: Blob) {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
     setBusy(true);
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-      const path = `${u.user.id}/${folder}/${id}-${Date.now()}.${ext}`;
+      const path = `${u.user.id}/${folder}/${id}-${Date.now()}.jpg`;
       const { error: upErr } = await supabase.storage
         .from("avatars")
-        .upload(path, file, { upsert: true, contentType: file.type });
+        .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
       if (upErr) throw upErr;
       const url = await signedUrl(path);
       const { error } = await (supabase.from(table) as any)
@@ -118,6 +125,12 @@ export function EntityAvatarUpload({
           </Button>
         )}
       </div>
+      <ImageCropDialog
+        file={cropFile}
+        open={cropOpen}
+        onOpenChange={setCropOpen}
+        onCropped={onCropped}
+      />
     </div>
   );
 }

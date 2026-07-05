@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Camera, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { UserAvatar } from "./UserAvatar";
+import { ImageCropDialog } from "./ImageCropDialog";
 import { useQueryClient } from "@tanstack/react-query";
 
 export function AvatarUpload({
@@ -18,6 +19,8 @@ export function AvatarUpload({
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
 
   async function urlForPath(path: string) {
     // Bucket is private — use a signed URL valid for 1 year.
@@ -27,18 +30,23 @@ export function AvatarUpload({
     return data?.signedUrl ?? null;
   }
 
-  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !userId) return;
     if (file.size > 5 * 1024 * 1024) return toast.error("Image must be under 5MB");
+    setCropFile(file);
+    setCropOpen(true);
+  }
+
+  async function onCropped(blob: Blob) {
+    if (!userId) return;
     setBusy(true);
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-      const path = `${userId}/avatar-${Date.now()}.${ext}`;
+      const path = `${userId}/avatar-${Date.now()}.jpg`;
       const { error: upErr } = await supabase.storage
         .from("avatars")
-        .upload(path, file, { upsert: true, contentType: file.type });
+        .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
       if (upErr) throw upErr;
       const signed = await urlForPath(path);
       const { error: profErr } = await supabase
@@ -116,6 +124,12 @@ export function AvatarUpload({
           </Button>
         )}
       </div>
+      <ImageCropDialog
+        file={cropFile}
+        open={cropOpen}
+        onOpenChange={setCropOpen}
+        onCropped={onCropped}
+      />
     </div>
   );
 }
