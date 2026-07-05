@@ -34,7 +34,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
-import { type Period, PERIODS, getPeriodRange, navigateAnchor, formatAnchorLabel } from "@/lib/period";
+import { type Period, PERIODS, periodLabel, getPeriodRange, navigateAnchor, formatAnchorLabel } from "@/lib/period";
 
 export default function PersonDetail() {
   const { personId } = useParams<{ personId: string }>();
@@ -267,14 +267,14 @@ export default function PersonDetail() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-3 py-1.5 rounded-xl capitalize">
-                  {period} <ChevronDown className="h-4 w-4" />
+                  {periodLabel(period)} <ChevronDown className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-36">
                 {PERIODS.map((p) => (
                   <DropdownMenuItem key={p} onClick={() => { setPeriod(p); setAnchor(new Date()); }}
                     className={cn("capitalize py-3 text-base", period === p && "text-primary font-medium")}>
-                    {p}
+                    {periodLabel(p)}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>

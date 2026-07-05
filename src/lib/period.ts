@@ -9,6 +9,11 @@ import {
 export type Period = "daily" | "weekly" | "monthly" | "annually";
 export const PERIODS: Period[] = ["daily", "weekly", "monthly", "annually"];
 
+// Display label for the dropdown/button. "daily" shows as "Today" to match the anchor label.
+export function periodLabel(p: Period): string {
+  return p === "daily" ? "Today" : p.charAt(0).toUpperCase() + p.slice(1);
+}
+
 export function getPeriodRange(period: Period, anchor: Date) {
   if (period === "daily") return { from: startOfDay(anchor), to: endOfDay(anchor) };
   if (period === "weekly") return { from: startOfWeek(anchor, { weekStartsOn: 1 }), to: endOfWeek(anchor, { weekStartsOn: 1 }) };
