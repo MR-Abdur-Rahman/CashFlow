@@ -3,7 +3,16 @@ import { personQuery, personSplitsQuery, splitBalancesQuery } from "@/lib/querie
 import { settlementNetAfter, bilateralBalance } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
 import { UserAvatar } from "@/components/UserAvatar";
-import { ArrowLeft, Bell, Plus, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import {
+  ArrowLeft,
+  Bell,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Pencil,
+} from "lucide-react";
+import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { SendReminderDialog } from "@/components/SendReminderDialog";
@@ -64,6 +73,7 @@ export default function PersonDetail() {
   const [reminderOpen, setReminderOpen] = useState(false);
   const [addSplitOpen, setAddSplitOpen] = useState(false);
   const [settleOpen, setSettleOpen] = useState(false);
+  const [editPerson, setEditPerson] = useState(false);
   const [deleteSplit, setDeleteSplit] = useState<any | null>(null);
   const [editSplit, setEditSplit] = useState<any | null>(null);
   const [editSettlement, setEditSettlement] = useState<any | null>(null);
@@ -166,13 +176,20 @@ export default function PersonDetail() {
 
       <div className="flex items-center gap-3">
         <UserAvatar url={personAvatar} name={personName} size={48} />
-        <div>
-          <h1 className="text-xl font-semibold">{personName}</h1>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-semibold truncate">{personName}</h1>
           <p className="text-xs text-muted-foreground">
             {person.phone_number ?? "no phone"}
             {person.linked_user_id && " · 🔗 linked"}
           </p>
         </div>
+        <button
+          onClick={() => setEditPerson(true)}
+          className="p-2 rounded-full hover:bg-secondary text-muted-foreground shrink-0"
+          aria-label="Edit contact"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Balance card */}
@@ -312,6 +329,8 @@ export default function PersonDetail() {
       )}
 
       <AddTransactionSheet open={addSplitOpen} onOpenChange={setAddSplitOpen} defaultTab="split" />
+
+      <AddPersonDialog open={editPerson} onOpenChange={setEditPerson} edit={person} />
 
       {Math.abs(balance) > 0.005 && (
         <SettleUpDialog

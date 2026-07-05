@@ -103,10 +103,16 @@ export function AddPersonDialog({
               placeholder="Shown only to you"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label>Phone (optional)</Label>
-            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+94..." />
-          </div>
+          {!isLinked && (
+            <div className="space-y-1.5">
+              <Label>Phone (optional)</Label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+94..."
+              />
+            </div>
+          )}
           <Button type="submit" className="w-full" disabled={mutation.isPending}>
             Save
           </Button>
