@@ -23,14 +23,19 @@
 - Partial (2026-07-04): "Daily / Today" period option added to the shared period selector (commit 24c20e1) — applies to History, person, and group pages. Remaining filter additions still TBD.
 - Test Log: (none yet)
 
-### [P3] Full split edit testing matrix
-- Scope: other
-- Severity: minor
-- Users involved: A, B, C, D as needed per scenario
-- Steps to reproduce: N/A — this is a QA task, not a single bug. Run once the split edit corruption bug (above) is fixed.
-- Expected: A systematic pass confirming split editing works correctly across all scenarios (creator edits, payer edits, group vs individual, etc.)
-- Actual: Not yet run. UNBLOCKED as of 2026-07-04 — the split-edit corruption bug is fixed (update_split RPC, commit 011479b), so this QA pass can now run.
-- Test Log: (none yet)
+## Fixed
+
+### [P3] Full split edit testing matrix — PASS 2026-07-05
+- QA pass over the split-edit rework (update_split RPC + merged edit sheets). Covered: individual/people/group; creator edits + payer (non-creator) edits; amount / participants / category changes; who-paid locked; settlement linkage preserved; permission block for non-creator-non-payer; same edit from Home / person / group / reports / history.
+- Test Log:
+  1. 2026-07-05 — PASS — user ran the full matrix (sections 1–8), all pass. No duplicate shares, no individual→people flip, balances auto-adjust by the delta, who-paid locked, settlements stay linked.
+
+### [P2] FIFO settle ordered by date only (same-day debts arbitrary) — fixed 2026-07-05
+- Commit: a5b2f0d · File: src/components/SettleUpDialog.tsx
+- Surfaced during the QA pass: a newer same-day debt (#3 TEST 19:23) got settled before an older same-day debt (the "Test" group split 18:31). The FIFO allocation sorted unsettled shares by `date` only, so same-day splits tied and the order was arbitrary.
+- Fix: sort by `date`+`time` (`${date}T${time}`); carry the split `time` into `unsettledItems`. (Note: FIFO is per-direction — the viewer's payments settle their own oldest debts; the counterparty's payments settle theirs.)
+- Test Log:
+  1. 2026-07-05 — PASS (typecheck + build). Pending — live: settle across two same-day debts and confirm the earlier-time one is consumed first. Existing settlements are historical and won't re-order.
 
 ## Fixed
 
