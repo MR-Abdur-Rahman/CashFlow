@@ -27,6 +27,22 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
+// A settlement counts as the viewer's INCOME only when the viewer is the CREDITOR (received the
+// money). Bin model: the settler is the creditor when settler_is_creditor; the counterparty is the
+// creditor otherwise. Works regardless of who recorded the settlement.
+function settlementReceivedByMe(s: any, myUid: string | undefined): boolean {
+  if (!myUid) return false;
+  const settlerIsMe = s.created_by === myUid;
+  return settlerIsMe ? !!s.settler_is_creditor : !s.settler_is_creditor;
+}
+// The other party's display name, resolved to the viewer's own contact name so the same person
+// isn't split across their profile name vs contact name.
+function settlementCounterpartyName(s: any, myUid: string | undefined, people: any[]): string {
+  const settlerIsMe = s.created_by === myUid;
+  if (settlerIsMe) return s.split_shares?.person_name ?? s.person?.name ?? "Unknown";
+  return people.find((p) => p.linked_user_id === s.created_by)?.name ?? s.creator?.full_name ?? "Unknown";
+}
+
 // ─── Constants ──────────────────────────────────────────────────────────────
 const COLORS = [
   "#EF4444", "#F59E0B", "#10B981", "#3B82F6", "#8B5CF6",
@@ -428,25 +444,32 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
     enabled: isIncome,
   });
 
-  // Settlements for income-person drill
-  const { data: drillSettlements = [] } = useQuery({
-    queryKey: ["drill", "settlements", drillItem.name, dateFrom, dateTo],
+  // Declared here (not lower) so the drill settlement memos below can resolve counterparty names.
+  const { data: people = [] } = useQuery(peopleQuery());
+
+  // Settlements involving me in this period (RLS-scoped); filtered to this person's received income
+  // in drillSettlements below (needs the people list for cross-user name resolution).
+  const { data: drillSettlementsRaw = [] } = useQuery({
+    queryKey: ["drill", "settlements", dateFrom, dateTo],
     queryFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return [];
       const { data, error } = await supabase
         .from("settlements")
-        .select("*, person:person_id(name), split_shares:split_share_id(person_name, share_amount), accounts:account_id(label,institution)")
-        .eq("created_by", u.user.id)
+        .select("*, person:person_id(name), creator:created_by(full_name), split_shares:split_share_id(person_name, share_amount), accounts:account_id(label,institution)")
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999");
       if (error) throw error;
-      return (data ?? []).filter((s: any) =>
-        ((s.split_shares as any)?.person_name ?? (s.person as any)?.name) === drillItem.name,
-      );
+      return (data ?? []).map((s: any) => ({ ...s, _uid: u.user!.id }));
     },
     enabled: isIncomePerson,
   });
+  // Only the money I RECEIVED from THIS drill person (either direction, whoever recorded).
+  const drillSettlements = useMemo(
+    () => (drillSettlementsRaw as any[]).filter((s) =>
+      settlementReceivedByMe(s, s._uid) && settlementCounterpartyName(s, s._uid, people as any[]) === drillItem.name),
+    [drillSettlementsRaw, people, drillItem.name],
+  );
 
   // ─── Chart buckets: X-axis structure driven by drillPeriod ─────────────────
   const chartBuckets = useMemo((): { label: string; key: number | string }[] => {
@@ -803,7 +826,9 @@ export default function ReportsPage() {
     },
   });
 
-  // Settlements received (income) in this period
+  // Every settlement that involves me in this period (RLS-scoped). The income filter (only ones I
+  // RECEIVED, either direction, whoever recorded) + person attribution happen in incomeData, where
+  // the people list is available for cross-user name resolution.
   const { data: incomeSettlements = [] } = useQuery({
     queryKey: ["settlements", "reports-main", dateFrom, dateTo],
     queryFn: async () => {
@@ -811,12 +836,11 @@ export default function ReportsPage() {
       if (!u.user) return [];
       const { data, error } = await supabase
         .from("settlements")
-        .select("*, person:person_id(name), split_shares:split_share_id(person_name, share_amount)")
-        .eq("created_by", u.user.id)
+        .select("*, person:person_id(name), creator:created_by(full_name), split_shares:split_share_id(person_name, share_amount)")
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999");
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).map((s: any) => ({ ...s, _uid: u.user!.id }));
     },
   });
 
@@ -866,7 +890,8 @@ export default function ReportsPage() {
       map.set(name, { value: (ex?.value ?? 0) + Number(t.amount), drillType: ex?.drillType ?? dt });
     });
     (incomeSettlements as any[]).forEach(s => {
-      const name = (s.split_shares as any)?.person_name ?? (s.person as any)?.name ?? "Unknown";
+      if (!settlementReceivedByMe(s, s._uid)) return; // only money I actually received is income
+      const name = settlementCounterpartyName(s, s._uid, people as any[]);
       const ex = map.get(name);
       // settlement overrides drillType to income-person
       map.set(name, { value: (ex?.value ?? 0) + Number(s.amount), drillType: "income-person" });
