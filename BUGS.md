@@ -2,26 +2,22 @@
 
 ## Open
 
-### [P3] History page filter additions
-- Scope: ui
-- Severity: minor
-- Users involved: single-user
-- Steps to reproduce: N/A
-- Expected: Additional filters needed on History page (specifics to be defined when picked up).
-- Actual: Current filter set is incomplete.
-- Added: 2026-07-04
-- Partial (2026-07-04): "Daily / Today" period option added to the shared period selector (commit 24c20e1) — applies to History, person, and group pages.
-- Partial (2026-07-05): added a dedicated "settlement" type chip (settlements previously rendered but couldn't be filtered to; "split" now shows splits only, "settlement" shows settlements only); settlement search now matches bin fields (description / counterparty).
-- Partial (2026-07-05): unified everything into the search box instead of separate dropdowns — it now matches person NAME + MOBILE NUMBER (by contact id + linked user id), plus ACCOUNT and CATEGORY across transactions, splits, and settlements (added categories join to the split queries and an accounts join to the history settlements query). No account/category/person dropdowns needed. Considered DONE unless more filters are requested.
-- Test Log: (none yet)
+(none)
 
 ## Fixed
+
+### [P3] History page filters — DONE 2026-07-05
+- Resolved by folding all filtering into the search box + type chips + period (no separate dropdowns).
+- "Daily / Today" period option added to the shared period selector (commit 24c20e1) — History, person, and group pages.
+- Added a dedicated "settlement" type chip ("split" shows splits only; "settlement" shows settlements only).
+- Search box now matches person NAME + MOBILE NUMBER (by contact id + linked user id), ACCOUNT, and CATEGORY across transactions, splits, and settlements (commits 26b4b4d, c713c91). A short-lived person-filter dropdown was removed per user preference.
+- Test Log:
+  1. 2026-07-05 — build/typecheck clean; live UI test pending user.
 
 ### [Feature] Settlement "bin" model + closes [P3] Auto-settlement — 2026-07-05
 - Settlements are now person-to-person payments against the NET (not per-split; no FIFO). Net = Σ gross split debts − Σ signed settlements. Full story + phase commits in DEVLOG.md.
 - **Closes [P3] Auto-settlement:** opposing debts now offset automatically inside the net (the bin IS the net), so no separate auto-cancel feature is needed.
-- Commits: 8ae9d29 (net math) · 904a731 (settle) · 79e71a8 (direction/delete) · 71a98e7 (cleanup) · 5ca82ab (reports) + DB migrations (person_id, delete_settlement, notification link/cleanup, drop is_settled trigger).
-- Known limitation (pre-existing): Reports "settlements received (income)" ignores direction — see DEVLOG.
+- Commits: 8ae9d29 (net math) · 904a731 (settle) · 79e71a8 (direction/delete) · 71a98e7 (cleanup) · 5ca82ab (reports) · 8f6d570 (reports income direction) + DB migrations (person_id, delete_settlement, notification link/cleanup, drop is_settled trigger).
 - Test Log:
   1. 2026-07-05 — PASS — verified on live data: bin settlements (null split refs), net A owes B 2800, balances reconcile, pending prompt + receiver confirm + delete all fire; account-selection notification auto-clears on confirm/delete; orphan removed.
   2. 2026-07-05 — PASS — Reports settlement income = money actually received (creditor side, either direction), attributed to the counterparty (commit 8f6d570).
