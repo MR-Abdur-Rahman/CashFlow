@@ -143,9 +143,6 @@ export default function SplitPage() {
                           {p.name}
                           {p.linked_user_id && " 🔗"}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          {p.phone_number ?? "no phone"}
-                        </p>
                       </div>
                       {Math.abs(bal) >= 0.005 && (
                         <span

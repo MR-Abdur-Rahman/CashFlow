@@ -17,8 +17,6 @@ import {
 import { settlementNetAfter } from "@/lib/balance";
 import { formatMoney, greeting } from "@/lib/format";
 import { AccountIcon } from "@/components/AccountIcon";
-import { AddTransactionSheet } from "@/components/AddTransactionSheet";
-import { Fab } from "@/components/Fab";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -169,7 +167,6 @@ function timeAgo(dateStr: string): string {
 
 export default function Home() {
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
   const [editTxn, setEditTxn] = useState<any>(null);
   const [deleteTxn, setDeleteTxn] = useState<any>(null);
   const [editSplit, setEditSplit] = useState<any>(null);
@@ -526,9 +523,6 @@ export default function Home() {
           );
         })()}
       </div>
-
-      <Fab onClick={() => setOpen(true)} />
-      <AddTransactionSheet open={open} onOpenChange={setOpen} />
 
       <NotificationSheet
         open={notifOpen}

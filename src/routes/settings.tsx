@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -60,8 +59,6 @@ export default function SettingsPage() {
 
   const [qrOpen, setQrOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState("");
 
   const fullName = profile?.full_name ?? "";
   const phone = profile?.phone_number ?? "";
@@ -135,16 +132,6 @@ export default function SettingsPage() {
   async function signOut() {
     await qc.cancelQueries();
     qc.clear();
-    await supabase.auth.signOut();
-    navigate("/auth");
-  }
-
-  async function deleteAccount() {
-    if (!userId || deleteConfirm !== "DELETE") return;
-    const { data: blocked } = await supabase.rpc("has_unsettled_splits", { _user_id: userId });
-    if (blocked) return toast.error("Settle all splits before deleting your account");
-    const { error } = await supabase.from("profiles").delete().eq("id", userId);
-    if (error) return toast.error(error.message);
     await supabase.auth.signOut();
     navigate("/auth");
   }
@@ -534,12 +521,6 @@ export default function SettingsPage() {
         <Button variant="outline" className="w-full" onClick={signOut}>
           <LogOut className="h-4 w-4 mr-2" /> Sign out
         </Button>
-        <button
-          onClick={() => setDeleteOpen(true)}
-          className="block w-full text-center text-xs text-expense underline-offset-4 hover:underline pt-1"
-        >
-          Delete account
-        </button>
       </div>
 
       {/* Toast preference confirmation dialog */}
@@ -593,39 +574,6 @@ export default function SettingsPage() {
       </Dialog>
 
       <QrScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScannedQr} />
-
-      <Dialog
-        open={deleteOpen}
-        onOpenChange={(v) => {
-          setDeleteOpen(v);
-          if (!v) setDeleteConfirm("");
-        }}
-      >
-        <DialogContent>
-          <DialogTitle>Delete account</DialogTitle>
-          <p className="text-sm text-muted-foreground">
-            This permanently deletes all your data. Type <b>DELETE</b> to confirm.
-          </p>
-          <Input
-            value={deleteConfirm}
-            onChange={(e) => setDeleteConfirm(e.target.value)}
-            placeholder="DELETE"
-            className="mt-2"
-          />
-          <div className="flex justify-end gap-2 mt-2">
-            <Button variant="ghost" onClick={() => setDeleteOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={deleteConfirm !== "DELETE"}
-              onClick={deleteAccount}
-            >
-              Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

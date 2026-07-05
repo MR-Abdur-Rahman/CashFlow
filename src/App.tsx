@@ -1,6 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useRealtimeSplits } from "./hooks/useRealtimeSplits";
+import { Fab } from "./components/Fab";
+import { AddTransactionSheet } from "./components/AddTransactionSheet";
 import "./index.css";
 import Home from "./routes/home";
 import Accounts from "./routes/accounts";
@@ -17,6 +19,22 @@ import SettingsHistory from "./routes/settings-history";
 import SettingsNotifications from "./routes/settings-notifications";
 import { BottomNav } from "./components/BottomNav";
 import { supabase } from "./integrations/supabase/client";
+
+// The add-transaction FAB lives on every main tab (Home / Accounts / Split / Reports / Manage /
+// Settings), not detail pages. Kept here so a single sheet instance is shared across tabs.
+const FAB_TABS = ["/home", "/accounts", "/split", "/reports", "/manage", "/settings"];
+
+function GlobalFab() {
+  const { pathname } = useLocation();
+  const [open, setOpen] = useState(false);
+  if (!FAB_TABS.includes(pathname)) return null;
+  return (
+    <>
+      <Fab onClick={() => setOpen(true)} />
+      <AddTransactionSheet open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
 
 function App() {
   useRealtimeSplits();
@@ -81,6 +99,7 @@ function App() {
             element={session ? <SettingsNotifications /> : <Navigate to="/auth" />}
           />
         </Routes>
+        {session && <GlobalFab />}
         {session && <BottomNav />}
       </div>
     </BrowserRouter>
