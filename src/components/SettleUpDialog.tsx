@@ -173,12 +173,9 @@ export function SettleUpDialog({
         } as any);
         if (error) throw error;
 
-        const totalSettled = item.paidAmount + alloc;
-        const fullySettled = totalSettled >= item.shareAmount - 0.005;
-        await supabase.from("split_shares").update({
-          is_settled: fullySettled,
-          ...(fullySettled ? { settled_at: new Date().toISOString() } : {}),
-        }).eq("id", item.shareId);
+        // is_settled is maintained by the trg_sync_share_settled trigger (derived from the sum of
+        // settlements on the share). No client-side split_shares update needed (that path also hit
+        // an RLS recursion and failed silently).
 
         remaining -= alloc;
         settledAny = true;
