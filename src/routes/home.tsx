@@ -175,7 +175,7 @@ export default function Home() {
   const [deleteHomeSettlement, setDeleteHomeSettlement] = useState<any>(null);
   const [period, setPeriod] = useState<FilterPeriod>("today");
   const [notifOpen, setNotifOpen] = useState(false);
-  const [txnTab, setTxnTab] = useState<"transactions" | "splits">("transactions");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const qc = useQueryClient();
   const [userId, setUserId] = useState<string | undefined>();
   useEffect(() => {
@@ -238,7 +238,17 @@ export default function Home() {
       );
   }, [ownSplits, incomingSplits, dateFrom, dateTo]);
 
-  const splitsTabItems = useMemo(() => {
+  // Unified activity feed (transactions + splits + settlements), narrowed by the History-style
+  // type chip. "income/expense/transfer" → transactions only; "split"/"settlement" → those only.
+  const feedItems = useMemo(() => {
+    const txnItems = (txns as any[])
+      .filter((t) => !t.is_split)
+      .map((t) => ({
+        ...t,
+        _itemType: "txn" as const,
+        _sortKey: (t.created_at ?? `${t.date}T${t.time ?? "00:00"}`) as string,
+      }));
+
     const splitItems = allSplitsForTab.map((s: any) => ({
       ...s,
       _itemType: "split" as const,
@@ -261,8 +271,23 @@ export default function Home() {
       };
     });
 
-    return [...splitItems, ...settlementItems].sort((a, b) => b._sortKey.localeCompare(a._sortKey));
-  }, [allSplitsForTab, homeSettlements, userId, netSplits, netSettlements, netMeId, netMyPids]);
+    let items: any[];
+    if (typeFilter === "split") items = splitItems;
+    else if (typeFilter === "settlement") items = settlementItems;
+    else if (typeFilter === "all") items = [...txnItems, ...splitItems, ...settlementItems];
+    else items = txnItems.filter((t) => t.type === typeFilter); // income / expense / transfer
+    return items.sort((a, b) => b._sortKey.localeCompare(a._sortKey));
+  }, [
+    txns,
+    allSplitsForTab,
+    homeSettlements,
+    userId,
+    netSplits,
+    netSettlements,
+    netMeId,
+    netMyPids,
+    typeFilter,
+  ]);
 
   const { data: profile } = useQuery(profileQuery(userId));
   const { data: notifications = [] } = useQuery(notificationsQuery());
@@ -431,97 +456,77 @@ export default function Home() {
           </DropdownMenu>
         </div>
 
-        {/* Transactions | Splits tab switcher */}
-        <div className="flex rounded-xl bg-secondary p-1 gap-1 mb-3">
-          {(["transactions", "splits"] as const).map((tab) => (
+        {/* History-style type filter */}
+        <div className="flex gap-2 text-xs flex-wrap mb-3">
+          {["all", "income", "expense", "transfer", "split", "settlement"].map((t) => (
             <button
-              key={tab}
+              key={t}
               type="button"
-              onClick={() => setTxnTab(tab)}
+              onClick={() => setTypeFilter(t)}
               className={cn(
-                "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
-                txnTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+                "px-3 py-1.5 rounded-full capitalize",
+                typeFilter === t ? "bg-primary text-white" : "bg-secondary",
               )}
             >
-              {tab === "transactions" ? "Transactions" : "Splits"}
+              {t}
             </button>
           ))}
         </div>
 
-        {(() => {
-          if (txnTab === "splits") {
-            return (
-              <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-                {splitsTabItems.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-10 px-4">
-                    {emptyMessages[period]}
-                  </p>
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+          {feedItems.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-10 px-4">
+              {emptyMessages[period]}
+            </p>
+          ) : (
+            <div className="divide-y divide-border">
+              {feedItems.map((item: any) =>
+                item._itemType === "settlement" ? (
+                  <SwipeRow
+                    key={`set-${item.id}`}
+                    onEdit={() => setEditSettlement(item)}
+                    onDelete={() => setDeleteHomeSettlement(item)}
+                    canEdit={item.created_by === userId}
+                    canDelete={canDeleteSettlement(item, userId)}
+                    editDeniedMessage="Only the creator can edit this settlement"
+                    deleteDeniedMessage="Only the creator or payer can delete this settlement"
+                  >
+                    <SettlementRow
+                      description={item.description}
+                      iPaid={item._iPaid}
+                      otherName={item._otherName}
+                      amount={Number(item.amount)}
+                      remaining={item._remaining}
+                      fullySettled={item._fullySettled}
+                      netAfter={item._netAfter}
+                      createdAt={item.created_at}
+                    />
+                  </SwipeRow>
+                ) : item._itemType === "split" ? (
+                  <SwipeRow
+                    key={item.id}
+                    onEdit={() => setEditSplit(item)}
+                    onDelete={() => setDeleteSplit(item)}
+                    canEdit={canModifySplit(item)}
+                    canDelete={canModifySplit(item)}
+                    editDeniedMessage="Only the creator or payer can edit this split"
+                    deleteDeniedMessage="Only the creator or payer can delete this split"
+                  >
+                    <SplitDirectRow s={item} />
+                  </SwipeRow>
                 ) : (
-                  <div className="divide-y divide-border">
-                    {splitsTabItems.map((item: any) =>
-                      item._itemType === "settlement" ? (
-                        <SwipeRow
-                          key={`set-${item.id}`}
-                          onEdit={() => setEditSettlement(item)}
-                          onDelete={() => setDeleteHomeSettlement(item)}
-                          canEdit={item.created_by === userId}
-                          canDelete={canDeleteSettlement(item, userId)}
-                          editDeniedMessage="Only the creator can edit this settlement"
-                          deleteDeniedMessage="Only the creator or payer can delete this settlement"
-                        >
-                          <SettlementRow
-                            description={item.description}
-                            iPaid={item._iPaid}
-                            otherName={item._otherName}
-                            amount={Number(item.amount)}
-                            remaining={item._remaining}
-                            fullySettled={item._fullySettled}
-                            netAfter={item._netAfter}
-                            createdAt={item.created_at}
-                          />
-                        </SwipeRow>
-                      ) : (
-                        <SwipeRow
-                          key={item.id}
-                          onEdit={() => setEditSplit(item)}
-                          onDelete={() => setDeleteSplit(item)}
-                          canEdit={canModifySplit(item)}
-                          canDelete={canModifySplit(item)}
-                          editDeniedMessage="Only the creator or payer can edit this split"
-                          deleteDeniedMessage="Only the creator or payer can delete this split"
-                        >
-                          <SplitDirectRow s={item} />
-                        </SwipeRow>
-                      ),
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          }
-          const visibleTxns = (txns as any[]).filter((t) => !t.is_split);
-          return (
-            <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-              {visibleTxns.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-10 px-4">
-                  {emptyMessages[period]}
-                </p>
-              ) : (
-                <div className="divide-y divide-border">
-                  {visibleTxns.map((t) => (
-                    <SwipeRow
-                      key={t.id}
-                      onEdit={() => setEditTxn(t)}
-                      onDelete={() => setDeleteTxn(t)}
-                    >
-                      <TxRowInner t={t} />
-                    </SwipeRow>
-                  ))}
-                </div>
+                  <SwipeRow
+                    key={item.id}
+                    onEdit={() => setEditTxn(item)}
+                    onDelete={() => setDeleteTxn(item)}
+                  >
+                    <TxRowInner t={item} />
+                  </SwipeRow>
+                ),
               )}
             </div>
-          );
-        })()}
+          )}
+        </div>
       </div>
 
       <NotificationSheet

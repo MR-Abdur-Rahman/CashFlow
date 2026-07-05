@@ -72,7 +72,7 @@ export default function AccountDetail() {
   const { data: account } = useQuery(accountQuery(accountId!));
   const [period, setPeriod] = useState<Period>("monthly");
   const [anchor, setAnchor] = useState(new Date());
-  const [tab, setTab] = useState<"transactions" | "splits">("transactions");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [edit, setEdit] = useState(false);
   const [editTxn, setEditTxn] = useState<any | null>(null);
   const [deleteTxn, setDeleteTxn] = useState<any | null>(null);
@@ -138,31 +138,53 @@ export default function AccountDetail() {
     enabled: !!accountId,
   });
 
-  const splitsTabItems = useMemo(() => {
-    const items = [
-      ...(splits as any[]).map((s) => ({
+  // Unified activity feed for this account (transactions + splits + settlements), narrowed by the
+  // History-style type chip.
+  const feedItems = useMemo(() => {
+    const txnItems = (txns as any[])
+      .filter((t) => !t.is_split)
+      .map((t) => ({
+        ...t,
+        _itemType: "txn" as const,
+        _sortKey: (t.created_at ?? `${t.date}T${t.time ?? "00:00"}`) as string,
+      }));
+    const splitItems = (splits as any[]).map((s) => ({
+      ...s,
+      _itemType: "split" as const,
+      _sortKey: s.created_at ?? `${s.date}T${s.time ?? "00:00"}`,
+    }));
+    const settlementItems = (settlements as any[]).map((s) => {
+      const { iPaid, otherName } = settlementDirection(s, userId);
+      const { remaining, fullySettled } = shareRemaining(s, settlements as any[]);
+      return {
         ...s,
-        _itemType: "split" as const,
-        _sortKey: s.created_at ?? `${s.date}T${s.time ?? "00:00"}`,
-      })),
-      ...(settlements as any[]).map((s) => {
-        const { iPaid, otherName } = settlementDirection(s, userId);
-        const { remaining, fullySettled } = shareRemaining(s, settlements as any[]);
-        return {
-          ...s,
-          _itemType: "settlement" as const,
-          _sortKey: (s.created_at ?? "") as string,
-          _iPaid: iPaid,
-          _otherName: otherName,
-          _remaining: remaining,
-          _fullySettled: fullySettled,
-          _netAfter:
-            settlementNetAfter(netSplits, netSettlements, s, netMeId, netMyPids) ?? undefined,
-        };
-      }),
-    ];
+        _itemType: "settlement" as const,
+        _sortKey: (s.created_at ?? "") as string,
+        _iPaid: iPaid,
+        _otherName: otherName,
+        _remaining: remaining,
+        _fullySettled: fullySettled,
+        _netAfter:
+          settlementNetAfter(netSplits, netSettlements, s, netMeId, netMyPids) ?? undefined,
+      };
+    });
+    let items: any[];
+    if (typeFilter === "split") items = splitItems;
+    else if (typeFilter === "settlement") items = settlementItems;
+    else if (typeFilter === "all") items = [...txnItems, ...splitItems, ...settlementItems];
+    else items = txnItems.filter((t) => t.type === typeFilter); // income / expense / transfer
     return items.sort((a, b) => b._sortKey.localeCompare(a._sortKey));
-  }, [splits, settlements, userId, netSplits, netSettlements, netMeId, netMyPids]);
+  }, [
+    txns,
+    splits,
+    settlements,
+    userId,
+    netSplits,
+    netSettlements,
+    netMeId,
+    netMyPids,
+    typeFilter,
+  ]);
 
   const delAccount = useMutation({
     mutationFn: async () => {
@@ -178,8 +200,6 @@ export default function AccountDetail() {
   });
 
   if (!account) return <div className="p-6">Account not found.</div>;
-
-  const visibleTxns = (txns as any[]).filter((t) => !t.is_split);
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-4">
@@ -289,82 +309,73 @@ export default function AccountDetail() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex rounded-xl bg-secondary p-1 gap-1">
-        {(["transactions", "splits"] as const).map((t) => (
+      {/* History-style type filter */}
+      <div className="flex gap-2 text-xs flex-wrap">
+        {["all", "income", "expense", "transfer", "split", "settlement"].map((t) => (
           <button
             key={t}
             type="button"
-            onClick={() => setTab(t)}
+            onClick={() => setTypeFilter(t)}
             className={cn(
-              "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
-              tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+              "px-3 py-1.5 rounded-full capitalize",
+              typeFilter === t ? "bg-primary text-white" : "bg-secondary",
             )}
           >
-            {t === "transactions" ? "Transactions" : "Splits"}
+            {t}
           </button>
         ))}
       </div>
 
-      {/* Tab content */}
-      {tab === "transactions" ? (
-        <div className="rounded-xl overflow-hidden border border-border divide-y divide-border">
-          {visibleTxns.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No transactions</p>
-          ) : (
-            visibleTxns.map((t: any) => (
-              <SwipeRow key={t.id} onEdit={() => setEditTxn(t)} onDelete={() => setDeleteTxn(t)}>
-                <TxRow t={t} />
+      <div className="rounded-xl overflow-hidden border border-border divide-y divide-border">
+        {feedItems.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">Nothing this period</p>
+        ) : (
+          feedItems.map((item: any) =>
+            item._itemType === "settlement" ? (
+              <SwipeRow
+                key={`set-${item.id}`}
+                onEdit={() => setEditSettlement(item)}
+                onDelete={() => setDeleteSettlement(item)}
+                canEdit={item.created_by === userId}
+                canDelete={canDeleteSettlement(item, userId)}
+                editDeniedMessage="Only the creator can edit this settlement"
+                deleteDeniedMessage="Only the creator or payer can delete this settlement"
+              >
+                <SettlementRow
+                  description={item.description}
+                  iPaid={item._iPaid}
+                  otherName={item._otherName}
+                  amount={Number(item.amount)}
+                  remaining={item._remaining}
+                  fullySettled={item._fullySettled}
+                  netAfter={item._netAfter}
+                  createdAt={item.created_at}
+                />
               </SwipeRow>
-            ))
-          )}
-        </div>
-      ) : (
-        <div className="rounded-xl overflow-hidden border border-border divide-y divide-border">
-          {splitsTabItems.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              No splits or settlements
-            </p>
-          ) : (
-            splitsTabItems.map((item: any) =>
-              item._itemType === "settlement" ? (
-                <SwipeRow
-                  key={`set-${item.id}`}
-                  onEdit={() => setEditSettlement(item)}
-                  onDelete={() => setDeleteSettlement(item)}
-                  canEdit={item.created_by === userId}
-                  canDelete={canDeleteSettlement(item, userId)}
-                  editDeniedMessage="Only the creator can edit this settlement"
-                  deleteDeniedMessage="Only the creator or payer can delete this settlement"
-                >
-                  <SettlementRow
-                    description={item.description}
-                    iPaid={item._iPaid}
-                    otherName={item._otherName}
-                    amount={Number(item.amount)}
-                    remaining={item._remaining}
-                    fullySettled={item._fullySettled}
-                    netAfter={item._netAfter}
-                    createdAt={item.created_at}
-                  />
-                </SwipeRow>
-              ) : (
-                <SwipeRow
-                  key={`sp-${item.id}`}
-                  onEdit={() => setEditSplit(item)}
-                  onDelete={() => setDeleteSplitItem(item)}
-                  canEdit={canModifySplit(item)}
-                  canDelete={canModifySplit(item)}
-                  editDeniedMessage="Only the creator or payer can edit this split"
-                  deleteDeniedMessage="Only the creator or payer can delete this split"
-                >
-                  <SplitRow s={item} />
-                </SwipeRow>
-              ),
-            )
-          )}
-        </div>
-      )}
+            ) : item._itemType === "split" ? (
+              <SwipeRow
+                key={`sp-${item.id}`}
+                onEdit={() => setEditSplit(item)}
+                onDelete={() => setDeleteSplitItem(item)}
+                canEdit={canModifySplit(item)}
+                canDelete={canModifySplit(item)}
+                editDeniedMessage="Only the creator or payer can edit this split"
+                deleteDeniedMessage="Only the creator or payer can delete this split"
+              >
+                <SplitRow s={item} />
+              </SwipeRow>
+            ) : (
+              <SwipeRow
+                key={item.id}
+                onEdit={() => setEditTxn(item)}
+                onDelete={() => setDeleteTxn(item)}
+              >
+                <TxRow t={item} />
+              </SwipeRow>
+            ),
+          )
+        )}
+      </div>
 
       <AddAccountSheet open={edit} onOpenChange={setEdit} edit={account} />
 
