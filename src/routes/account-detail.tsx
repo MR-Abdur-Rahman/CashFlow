@@ -41,23 +41,15 @@ import { EditSplitSheet, EditTxSheet } from "@/routes/home";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import { SettlementRow } from "@/components/SettlementRow";
 import { settlementDirection, shareRemaining } from "@/lib/settlement";
+import { format } from "date-fns";
 import {
-  format,
-  startOfWeek,
-  endOfWeek,
-  startOfMonth,
-  endOfMonth,
-  startOfYear,
-  endOfYear,
-  subDays,
-  addDays,
-  subWeeks,
-  addWeeks,
-  subMonths,
-  addMonths,
-  subYears,
-  addYears,
-} from "date-fns";
+  type Period,
+  PERIODS,
+  periodLabel,
+  getPeriodRange,
+  navigateAnchor,
+  formatAnchorLabel,
+} from "@/lib/period";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,54 +57,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-
-type Period = "today" | "weekly" | "monthly" | "annually";
-
-const PERIOD_OPTIONS: { key: Period; label: string }[] = [
-  { key: "today", label: "Today" },
-  { key: "weekly", label: "Weekly" },
-  { key: "monthly", label: "Monthly" },
-  { key: "annually", label: "This Year" },
-];
-
-function getPeriodRange(period: Period, anchor: Date): { dateFrom: string; dateTo: string } {
-  if (period === "today") {
-    const d = format(anchor, "yyyy-MM-dd");
-    return { dateFrom: d, dateTo: d };
-  }
-  if (period === "weekly")
-    return {
-      dateFrom: format(startOfWeek(anchor, { weekStartsOn: 1 }), "yyyy-MM-dd"),
-      dateTo: format(endOfWeek(anchor, { weekStartsOn: 1 }), "yyyy-MM-dd"),
-    };
-  if (period === "monthly")
-    return {
-      dateFrom: format(startOfMonth(anchor), "yyyy-MM-dd"),
-      dateTo: format(endOfMonth(anchor), "yyyy-MM-dd"),
-    };
-  return {
-    dateFrom: format(startOfYear(anchor), "yyyy-MM-dd"),
-    dateTo: format(endOfYear(anchor), "yyyy-MM-dd"),
-  };
-}
-
-function navigateAnchor(period: Period, anchor: Date, dir: -1 | 1): Date {
-  if (period === "today") return dir === -1 ? subDays(anchor, 1) : addDays(anchor, 1);
-  if (period === "weekly") return dir === -1 ? subWeeks(anchor, 1) : addWeeks(anchor, 1);
-  if (period === "monthly") return dir === -1 ? subMonths(anchor, 1) : addMonths(anchor, 1);
-  return dir === -1 ? subYears(anchor, 1) : addYears(anchor, 1);
-}
-
-function formatAnchorLabel(period: Period, anchor: Date): string {
-  if (period === "today") return format(anchor, "MMM d, yyyy");
-  if (period === "weekly") {
-    const s = startOfWeek(anchor, { weekStartsOn: 1 });
-    const e = endOfWeek(anchor, { weekStartsOn: 1 });
-    return `${format(s, "MMM d")} – ${format(e, "MMM d, yyyy")}`;
-  }
-  if (period === "monthly") return format(anchor, "MMM yyyy");
-  return format(anchor, "yyyy");
-}
 
 function formatDateTime(date?: string, time?: string): string {
   if (!date) return "";
@@ -141,7 +85,10 @@ export default function AccountDetail() {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
   }, []);
 
-  const { dateFrom, dateTo } = useMemo(() => getPeriodRange(period, anchor), [period, anchor]);
+  const { dateFrom, dateTo } = useMemo(() => {
+    const { from, to } = getPeriodRange(period, anchor);
+    return { dateFrom: format(from, "yyyy-MM-dd"), dateTo: format(to, "yyyy-MM-dd") };
+  }, [period, anchor]);
 
   const { data: txns = [] } = useQuery(transactionsQuery({ accountId, dateFrom, dateTo }));
   // Full split set (shared cache) for each settlement row's running net.
@@ -316,22 +263,25 @@ export default function AccountDetail() {
         <div className="ml-auto">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-3 py-1.5 rounded-xl">
-                {PERIOD_OPTIONS.find((p) => p.key === period)?.label ?? "Monthly"}
+              <button className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-3 py-1.5 rounded-xl capitalize">
+                {periodLabel(period)}
                 <ChevronDown className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-36">
-              {PERIOD_OPTIONS.map((p) => (
+              {PERIODS.map((p) => (
                 <DropdownMenuItem
-                  key={p.key}
+                  key={p}
                   onClick={() => {
-                    setPeriod(p.key);
+                    setPeriod(p);
                     setAnchor(new Date());
                   }}
-                  className={`py-3 text-base ${period === p.key ? "text-primary font-medium" : ""}`}
+                  className={cn(
+                    "capitalize py-3 text-base",
+                    period === p && "text-primary font-medium",
+                  )}
                 >
-                  {p.label}
+                  {periodLabel(p)}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

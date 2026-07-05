@@ -14,23 +14,15 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import { startOfWeek, format, addDays } from "date-fns";
 import {
-  startOfWeek,
-  endOfWeek,
-  startOfMonth,
-  endOfMonth,
-  startOfYear,
-  endOfYear,
-  format,
-  subMonths,
-  addMonths,
-  subWeeks,
-  addWeeks,
-  subYears,
-  addYears,
-  subDays,
-  addDays,
-} from "date-fns";
+  type Period,
+  PERIODS,
+  periodLabel,
+  getPeriodRange,
+  navigateAnchor,
+  formatAnchorLabel,
+} from "@/lib/period";
 import { ChevronLeft, ChevronRight, ChevronDown, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -88,7 +80,6 @@ const COLORS = [
   "#84CC16",
 ];
 
-type Period = "today" | "weekly" | "monthly" | "annually";
 type DrillType = "expense-category" | "expense-person" | "income-source" | "income-person";
 
 interface DrillItem {
@@ -97,51 +88,10 @@ interface DrillItem {
   drillType: DrillType;
 }
 
-const PERIOD_OPTIONS: { key: Period; label: string }[] = [
-  { key: "today", label: "Today" },
-  { key: "weekly", label: "Weekly" },
-  { key: "monthly", label: "Monthly" },
-  { key: "annually", label: "Annually" },
-];
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function getPeriodRange(period: Period, anchor: Date): { dateFrom: string; dateTo: string } {
-  if (period === "today") {
-    const d = format(anchor, "yyyy-MM-dd");
-    return { dateFrom: d, dateTo: d };
-  }
-  if (period === "weekly")
-    return {
-      dateFrom: format(startOfWeek(anchor, { weekStartsOn: 1 }), "yyyy-MM-dd"),
-      dateTo: format(endOfWeek(anchor, { weekStartsOn: 1 }), "yyyy-MM-dd"),
-    };
-  if (period === "monthly")
-    return {
-      dateFrom: format(startOfMonth(anchor), "yyyy-MM-dd"),
-      dateTo: format(endOfMonth(anchor), "yyyy-MM-dd"),
-    };
-  return {
-    dateFrom: format(startOfYear(anchor), "yyyy-MM-dd"),
-    dateTo: format(endOfYear(anchor), "yyyy-MM-dd"),
-  };
-}
-
-function navigateAnchor(period: Period, anchor: Date, dir: -1 | 1): Date {
-  if (period === "today") return dir === -1 ? subDays(anchor, 1) : addDays(anchor, 1);
-  if (period === "weekly") return dir === -1 ? subWeeks(anchor, 1) : addWeeks(anchor, 1);
-  if (period === "monthly") return dir === -1 ? subMonths(anchor, 1) : addMonths(anchor, 1);
-  return dir === -1 ? subYears(anchor, 1) : addYears(anchor, 1);
-}
-
-function formatAnchorLabel(period: Period, anchor: Date): string {
-  if (period === "today") return format(anchor, "MMM d, yyyy");
-  if (period === "weekly") {
-    const s = startOfWeek(anchor, { weekStartsOn: 1 });
-    const e = endOfWeek(anchor, { weekStartsOn: 1 });
-    return `${format(s, "MMM d")} – ${format(e, "MMM d, yyyy")}`;
-  }
-  if (period === "monthly") return format(anchor, "MMM yyyy");
-  return format(anchor, "yyyy");
+function periodRangeStrings(period: Period, anchor: Date): { dateFrom: string; dateTo: string } {
+  const { from, to } = getPeriodRange(period, anchor);
+  return { dateFrom: format(from, "yyyy-MM-dd"), dateTo: format(to, "yyyy-MM-dd") };
 }
 
 function fmtDT(date?: string, time?: string): string {
@@ -350,19 +300,22 @@ function PeriodNav({
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className={compact ? dropCls : `${dropCls} ml-auto`}>
-            {PERIOD_OPTIONS.find((p) => p.key === period)?.label}
+          <button className={cn(compact ? dropCls : `${dropCls} ml-auto`, "capitalize")}>
+            {periodLabel(period)}
             <ChevronDown className={compact ? "h-3 w-3" : "h-4 w-4"} />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-36">
-          {PERIOD_OPTIONS.map((p) => (
+          {PERIODS.map((p) => (
             <DropdownMenuItem
-              key={p.key}
-              onClick={() => onChangePeriod(p.key)}
-              className={cn("py-3 text-base", period === p.key && "text-primary font-medium")}
+              key={p}
+              onClick={() => onChangePeriod(p)}
+              className={cn(
+                "capitalize py-3 text-base",
+                period === p && "text-primary font-medium",
+              )}
             >
-              {p.label}
+              {periodLabel(p)}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -381,7 +334,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
   const qc = useQueryClient();
 
   const { dateFrom, dateTo } = useMemo(
-    () => getPeriodRange(drillPeriod, drillAnchor),
+    () => periodRangeStrings(drillPeriod, drillAnchor),
     [drillPeriod, drillAnchor],
   );
 
@@ -537,7 +490,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
 
   // ─── Chart buckets: X-axis structure driven by drillPeriod ─────────────────
   const chartBuckets = useMemo((): { label: string; key: number | string }[] => {
-    if (drillPeriod === "today") {
+    if (drillPeriod === "daily") {
       return Array.from({ length: 24 }, (_, h) => ({
         label: h === 0 ? "12AM" : h < 12 ? `${h}AM` : h === 12 ? "12PM" : `${h - 12}PM`,
         key: h,
@@ -563,7 +516,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
 
   const trendData = useMemo(() => {
     function txnKey(dateStr: string, timeStr?: string | null): number | string {
-      if (drillPeriod === "today") return parseInt((timeStr ?? "00:00").split(":")[0], 10);
+      if (drillPeriod === "daily") return parseInt((timeStr ?? "00:00").split(":")[0], 10);
       if (drillPeriod === "weekly") return dateStr;
       if (drillPeriod === "monthly")
         return Math.min(Math.ceil(parseInt(dateStr.split("-")[2], 10) / 7), 5);
@@ -571,7 +524,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
     }
     function caKey(createdAt: string): number | string {
       const d = new Date(createdAt);
-      if (drillPeriod === "today") return d.getHours();
+      if (drillPeriod === "daily") return d.getHours();
       if (drillPeriod === "weekly") return format(d, "yyyy-MM-dd");
       if (drillPeriod === "monthly") return Math.min(Math.ceil(d.getDate() / 7), 5);
       return d.getMonth() + 1;
@@ -996,7 +949,7 @@ export default function ReportsPage() {
     color: string;
   } | null>(null);
 
-  const { dateFrom, dateTo } = useMemo(() => getPeriodRange(period, anchor), [period, anchor]);
+  const { dateFrom, dateTo } = useMemo(() => periodRangeStrings(period, anchor), [period, anchor]);
 
   const { data: txns = [] } = useQuery(transactionsQuery({ dateFrom, dateTo }));
   const { data: people = [] } = useQuery(peopleQuery());
