@@ -49,11 +49,16 @@ export default function AccountsPage() {
                         className="flex items-center gap-3 py-1.5 active:bg-secondary/40 rounded-md -mx-1 px-1"
                       >
                         <AccountIcon
-                          iconType={a.icon_type} iconName={a.icon_name}
-                          iconColor={a.icon_color} iconUrl={a.icon_url} size={32}
+                          iconType={a.icon_type}
+                          iconName={a.icon_name}
+                          iconColor={a.icon_color}
+                          iconUrl={a.icon_url}
+                          size={32}
                         />
                         <span className="flex-1 text-sm">{a.label}</span>
-                        <span className="font-mono text-sm font-semibold">{formatMoney(a.current_balance)}</span>
+                        <span className="font-mono text-sm font-semibold">
+                          {formatMoney(a.current_balance)}
+                        </span>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </Link>
                     </li>

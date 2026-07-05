@@ -52,8 +52,11 @@ export function SendReminderDialog({
       await log("in_app");
       toast.success("Reminder logged");
       onOpenChange(false);
-    } catch (e: any) { toast.error(e.message); }
-    finally { setBusy(false); }
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function sendWhatsApp() {
@@ -64,8 +67,11 @@ export function SendReminderDialog({
       const phone = person.phone_number.replace(/[^\d]/g, "");
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
       onOpenChange(false);
-    } catch (e: any) { toast.error(e.message); }
-    finally { setBusy(false); }
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -81,12 +87,18 @@ export function SendReminderDialog({
             <Button variant="secondary" disabled={busy} onClick={sendInApp}>
               <Bell className="h-4 w-4 mr-2" /> Log only
             </Button>
-            <Button disabled={busy || !person.phone_number} onClick={sendWhatsApp} className="bg-[oklch(0.55_0.15_145)]">
+            <Button
+              disabled={busy || !person.phone_number}
+              onClick={sendWhatsApp}
+              className="bg-[oklch(0.55_0.15_145)]"
+            >
               <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp
             </Button>
           </div>
           {!person.phone_number && (
-            <p className="text-xs text-muted-foreground">Add a phone number to this person to send via WhatsApp.</p>
+            <p className="text-xs text-muted-foreground">
+              Add a phone number to this person to send via WhatsApp.
+            </p>
           )}
         </div>
       </DialogContent>

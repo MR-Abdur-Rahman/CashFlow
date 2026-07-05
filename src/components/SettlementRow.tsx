@@ -6,7 +6,14 @@ import { format } from "date-fns";
 //   iPaid  → "You → Other"  + "Still owes"   (the viewer is the one who paid / owes)
 //   !iPaid → "Other → You"  + "Still lent"   (the other person paid; the viewer is owed)
 export function SettlementRow({
-  description, iPaid, otherName, amount, remaining, fullySettled, createdAt, netAfter,
+  description,
+  iPaid,
+  otherName,
+  amount,
+  remaining,
+  fullySettled,
+  createdAt,
+  netAfter,
 }: {
   description?: string | null;
   iPaid: boolean;
@@ -25,7 +32,9 @@ export function SettlementRow({
     <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
       <div className="px-4 py-3">
         {/* Line 1: description (defaults to "Settlement") */}
-        <p className="text-sm font-medium text-foreground truncate">{description?.trim() || "Settlement"}</p>
+        <p className="text-sm font-medium text-foreground truncate">
+          {description?.trim() || "Settlement"}
+        </p>
         {/* Line 2: payer → receiver + amount */}
         <div className="flex items-start justify-between gap-2 mt-0.5">
           <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
@@ -42,8 +51,12 @@ export function SettlementRow({
               <p className="text-[12px] font-medium text-[#10B981]">Fully settled</p>
             ) : (
               <>
-                <p className="text-[12px] text-[#9CA3AF]">{netAfter > 0 ? "Still lent" : "Still owes"}</p>
-                <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">{formatMoney(Math.abs(netAfter))}</p>
+                <p className="text-[12px] text-[#9CA3AF]">
+                  {netAfter > 0 ? "Still lent" : "Still owes"}
+                </p>
+                <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+                  {formatMoney(Math.abs(netAfter))}
+                </p>
               </>
             )
           ) : fullySettled ? (
@@ -51,7 +64,9 @@ export function SettlementRow({
           ) : (
             <>
               <p className="text-[12px] text-[#9CA3AF]">{iPaid ? "Still owes" : "Still lent"}</p>
-              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">{formatMoney(remaining ?? 0)} remaining</p>
+              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+                {formatMoney(remaining ?? 0)} remaining
+              </p>
             </>
           )}
         </div>

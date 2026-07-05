@@ -56,7 +56,13 @@ export function AddPersonDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogTitle>{edit ? "Edit person" : "Add person"}</DialogTitle>
-        <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            mutation.mutate();
+          }}
+          className="space-y-4"
+        >
           <div className="space-y-1.5">
             <Label>Name</Label>
             <Input required value={name} onChange={(e) => setName(e.target.value)} />
@@ -65,7 +71,9 @@ export function AddPersonDialog({
             <Label>Phone (optional)</Label>
             <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+94..." />
           </div>
-          <Button type="submit" className="w-full" disabled={mutation.isPending}>Save</Button>
+          <Button type="submit" className="w-full" disabled={mutation.isPending}>
+            Save
+          </Button>
         </form>
       </DialogContent>
     </Dialog>

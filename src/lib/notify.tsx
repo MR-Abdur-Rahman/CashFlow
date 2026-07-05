@@ -13,13 +13,20 @@ const toastStyles: Record<string, { background: string; border: string }> = {
 function getToastIcon(type: string) {
   const props = { size: 18, color: "#FFFFFF" };
   switch (type) {
-    case "split_added": return <Users {...props} />;
-    case "split_deleted": return <Trash2 {...props} />;
-    case "settlement_created": return <Check {...props} />;
-    case "delete_attempt": return <ShieldAlert {...props} />;
-    case "account_selection": return <Wallet {...props} />;
-    case "settlement_account_selection": return <Wallet {...props} />;
-    default: return <Bell {...props} />;
+    case "split_added":
+      return <Users {...props} />;
+    case "split_deleted":
+      return <Trash2 {...props} />;
+    case "settlement_created":
+      return <Check {...props} />;
+    case "delete_attempt":
+      return <ShieldAlert {...props} />;
+    case "account_selection":
+      return <Wallet {...props} />;
+    case "settlement_account_selection":
+      return <Wallet {...props} />;
+    default:
+      return <Bell {...props} />;
   }
 }
 
@@ -46,21 +53,25 @@ export function notifyToast(type: string, message: string, description?: string)
           boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
         }}
       >
-        <div style={{ flexShrink: 0, marginTop: "2px" }}>
-          {getToastIcon(type)}
-        </div>
+        <div style={{ flexShrink: 0, marginTop: "2px" }}>{getToastIcon(type)}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: "14px", lineHeight: "20px" }}>
-            {message}
-          </div>
+          <div style={{ fontWeight: 600, fontSize: "14px", lineHeight: "20px" }}>{message}</div>
           {description && (
-            <div style={{ fontSize: "13px", lineHeight: "18px", opacity: 0.9, marginTop: "2px", wordBreak: "break-word" }}>
+            <div
+              style={{
+                fontSize: "13px",
+                lineHeight: "18px",
+                opacity: 0.9,
+                marginTop: "2px",
+                wordBreak: "break-word",
+              }}
+            >
               {description}
             </div>
           )}
         </div>
       </div>
     ),
-    { duration: 4000 }
+    { duration: 4000 },
   );
 }

@@ -8,8 +8,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ChevronLeft, Camera, Image as ImageIcon, Trash2, Loader2 } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 
 export default function ProfileEditPage() {
@@ -43,10 +58,16 @@ export default function ProfileEditPage() {
   const save = useMutation({
     mutationFn: async () => {
       if (!userId) throw new Error("Not signed in");
-      const { error } = await supabase.from("profiles").update({ full_name: fullName, phone_number: phone || null }).eq("id", userId);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ full_name: fullName, phone_number: phone || null })
+        .eq("id", userId);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Saved"); qc.invalidateQueries({ queryKey: ["profile"] }); },
+    onSuccess: () => {
+      toast.success("Saved");
+      qc.invalidateQueries({ queryKey: ["profile"] });
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -57,15 +78,25 @@ export default function ProfileEditPage() {
     try {
       const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
       const path = `${userId}/avatar-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, contentType: file.type });
+      const { error: upErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true, contentType: file.type });
       if (upErr) throw upErr;
-      const { data } = await supabase.storage.from("avatars").createSignedUrl(path, 60 * 60 * 24 * 365);
-      const { error } = await supabase.from("profiles").update({ avatar_url: data?.signedUrl ?? null }).eq("id", userId);
+      const { data } = await supabase.storage
+        .from("avatars")
+        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar_url: data?.signedUrl ?? null })
+        .eq("id", userId);
       if (error) throw error;
       toast.success("Photo updated");
       qc.invalidateQueries({ queryKey: ["profile"] });
-    } catch (err: any) { toast.error(err.message); }
-    finally { setBusy(false); }
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function removePhoto() {
@@ -73,13 +104,20 @@ export default function ProfileEditPage() {
     setBusy(true);
     try {
       const { data: files } = await supabase.storage.from("avatars").list(userId);
-      if (files?.length) await supabase.storage.from("avatars").remove(files.map((f) => `${userId}/${f.name}`));
-      const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", userId);
+      if (files?.length)
+        await supabase.storage.from("avatars").remove(files.map((f) => `${userId}/${f.name}`));
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar_url: null })
+        .eq("id", userId);
       if (error) throw error;
       toast.success("Photo removed");
       qc.invalidateQueries({ queryKey: ["profile"] });
-    } catch (err: any) { toast.error(err.message); }
-    finally { setBusy(false); }
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function deleteAccount() {
@@ -95,7 +133,10 @@ export default function ProfileEditPage() {
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-6">
-      <button onClick={() => navigate("/settings")} className="inline-flex items-center gap-1 text-sm text-muted-foreground -ml-1">
+      <button
+        onClick={() => navigate("/settings")}
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground -ml-1"
+      >
         <ChevronLeft className="h-4 w-4" /> Back
       </button>
 
@@ -123,8 +164,29 @@ export default function ProfileEditPage() {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <input ref={cameraRef} type="file" accept="image/*" capture="user" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadPhoto(f); }} />
-        <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadPhoto(f); }} />
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="user"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) uploadPhoto(f);
+          }}
+        />
+        <input
+          ref={galleryRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) uploadPhoto(f);
+          }}
+        />
         <p className="text-xs text-muted-foreground">Tap to edit photo</p>
       </div>
 
@@ -135,13 +197,21 @@ export default function ProfileEditPage() {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="phone">Phone number</Label>
-          <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+94..." />
+          <Input
+            id="phone"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+94..."
+          />
         </div>
         <div className="space-y-1.5">
           <Label>Google account</Label>
           <p className="text-sm text-muted-foreground">{profile?.google_email ?? email ?? "—"}</p>
         </div>
-        <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>Save changes</Button>
+        <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>
+          Save changes
+        </Button>
       </div>
 
       <AlertDialog>
@@ -153,12 +223,20 @@ export default function ProfileEditPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-            <AlertDialogDescription>This permanently deletes all your data. Type DELETE to confirm.</AlertDialogDescription>
+            <AlertDialogDescription>
+              This permanently deletes all your data. Type DELETE to confirm.
+            </AlertDialogDescription>
           </AlertDialogHeader>
-          <Input value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder="DELETE" />
+          <Input
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+            placeholder="DELETE"
+          />
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDeleteConfirm("")}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={deleteAccount} disabled={deleteConfirm !== "DELETE"}>Delete</AlertDialogAction>
+            <AlertDialogAction onClick={deleteAccount} disabled={deleteConfirm !== "DELETE"}>
+              Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

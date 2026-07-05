@@ -30,7 +30,13 @@ export async function deleteSplit(splitId: string, qc: QueryClient): Promise<boo
     return false;
   }
   notifyToast("split_deleted", "Split deleted");
-  for (const key of [["splits"], ["accounts"], ["pending-splits"], ["transactions"], ["notifications"]]) {
+  for (const key of [
+    ["splits"],
+    ["accounts"],
+    ["pending-splits"],
+    ["transactions"],
+    ["notifications"],
+  ]) {
     qc.invalidateQueries({ queryKey: key, exact: false });
   }
   return true;

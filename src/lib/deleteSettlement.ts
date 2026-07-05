@@ -32,8 +32,14 @@ export async function deleteSettlement(settlementId: string, qc: QueryClient): P
   }
   notifyToast("settlement_created", "Settlement deleted");
   for (const key of [
-    ["splits"], ["accounts"], ["settlements"], ["history-settlements"],
-    ["pending-splits"], ["pending-settlements"], ["transactions"], ["notifications"],
+    ["splits"],
+    ["accounts"],
+    ["settlements"],
+    ["history-settlements"],
+    ["pending-splits"],
+    ["pending-settlements"],
+    ["transactions"],
+    ["notifications"],
   ]) {
     qc.invalidateQueries({ queryKey: key, exact: false });
   }

@@ -1,10 +1,25 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { peopleQuery, groupsQuery, splitBalancesQuery, pendingSplitsQuery, pendingSettlementsQuery, accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
+import {
+  peopleQuery,
+  groupsQuery,
+  splitBalancesQuery,
+  pendingSplitsQuery,
+  pendingSettlementsQuery,
+  accountsQuery,
+  categoriesQuery,
+  subCategoriesQuery,
+} from "@/lib/queries";
 import { bilateralBalance } from "@/lib/balance";
 import { Users, Plus, ChevronRight, Archive, QrCode, History, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { AccountIcon } from "@/components/AccountIcon";
@@ -35,12 +50,17 @@ export default function SplitPage() {
   const pendingCount = (pendingSplits as any[]).length + (pendingSettlements as any[]).length;
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const initialTab = tabParam === "pending" ? "pending" : tabParam === "groups" ? "groups" : "people";
+  const initialTab =
+    tabParam === "pending" ? "pending" : tabParam === "groups" ? "groups" : "people";
   const [tab, setTab] = useState<"people" | "groups" | "pending">(initialTab);
 
   function handleScan(text: string) {
     let obj: any;
-    try { obj = JSON.parse(text); } catch { return toast.error("Not a valid QR code"); }
+    try {
+      obj = JSON.parse(text);
+    } catch {
+      return toast.error("Not a valid QR code");
+    }
     if (obj?.app !== "cashflow") return toast.error("That doesn't look like a CashFlow QR");
     const name = typeof obj.name === "string" ? obj.name.trim().slice(0, 80) : "";
     const phoneRaw = typeof obj.phone === "string" ? obj.phone.trim() : "";
@@ -60,7 +80,10 @@ export default function SplitPage() {
       {/* Header: title + history only */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Split</h1>
-        <Link to="/settings/history?filter=split" className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground">
+        <Link
+          to="/settings/history?filter=split"
+          className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground"
+        >
           <History className="h-5 w-5" />
         </Link>
       </div>
@@ -72,7 +95,10 @@ export default function SplitPage() {
           <TabsTrigger value="pending">
             Pending
             {pendingCount > 0 && (
-              <span className="ml-1.5 inline-flex items-center justify-center rounded-full text-[10px] font-bold text-white px-1.5 min-w-[18px] h-[18px] leading-none" style={{ background: "#EF4444" }}>
+              <span
+                className="ml-1.5 inline-flex items-center justify-center rounded-full text-[10px] font-bold text-white px-1.5 min-w-[18px] h-[18px] leading-none"
+                style={{ background: "#EF4444" }}
+              >
                 {pendingCount}
               </span>
             )}
@@ -82,28 +108,52 @@ export default function SplitPage() {
         {/* People */}
         <TabsContent value="people" className="space-y-3">
           <div className="flex justify-end gap-2">
-            <button onClick={() => setScanOpen(true)} className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground">
+            <button
+              onClick={() => setScanOpen(true)}
+              className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground"
+            >
               <QrCode className="h-5 w-5" />
             </button>
-            <button onClick={() => { setScanned(undefined); setAddPerson(true); }} className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground">
+            <button
+              onClick={() => {
+                setScanned(undefined);
+                setAddPerson(true);
+              }}
+              className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground"
+            >
               <Plus className="h-5 w-5" />
             </button>
           </div>
           <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-            {people.length === 0 ? <Empty text="No people yet" /> : (
+            {people.length === 0 ? (
+              <Empty text="No people yet" />
+            ) : (
               <div className="divide-y divide-border">
                 {(people as any[]).map((p) => {
                   const bal = personBalance(p);
                   return (
-                    <Link key={p.id} to={`/split/person/${p.id}`} className="flex items-center gap-3 p-4 active:bg-secondary/40">
+                    <Link
+                      key={p.id}
+                      to={`/split/person/${p.id}`}
+                      className="flex items-center gap-3 p-4 active:bg-secondary/40"
+                    >
                       <Avatar name={p.name} />
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{p.name}{p.linked_user_id && " 🔗"}</p>
-                        <p className="text-xs text-muted-foreground">{p.phone_number ?? "no phone"}</p>
+                        <p className="text-sm font-medium">
+                          {p.name}
+                          {p.linked_user_id && " 🔗"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {p.phone_number ?? "no phone"}
+                        </p>
                       </div>
                       {Math.abs(bal) >= 0.005 && (
-                        <span className="text-sm font-mono font-semibold" style={{ color: bal > 0 ? "#22C55E" : "#EF4444" }}>
-                          {bal > 0 ? "+" : "-"}{formatMoney(Math.abs(bal))}
+                        <span
+                          className="text-sm font-mono font-semibold"
+                          style={{ color: bal > 0 ? "#22C55E" : "#EF4444" }}
+                        >
+                          {bal > 0 ? "+" : "-"}
+                          {formatMoney(Math.abs(bal))}
                         </span>
                       )}
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -118,23 +168,35 @@ export default function SplitPage() {
         {/* Groups */}
         <TabsContent value="groups" className="space-y-3">
           <div className="flex justify-end">
-            <button onClick={() => setAddGroup(true)} className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground">
+            <button
+              onClick={() => setAddGroup(true)}
+              className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground"
+            >
               <Plus className="h-5 w-5" />
             </button>
           </div>
           <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-            {groups.length === 0 ? <Empty text="No groups yet" /> : (
+            {groups.length === 0 ? (
+              <Empty text="No groups yet" />
+            ) : (
               <div className="divide-y divide-border">
                 {(groups as any[]).map((g) => (
-                  <Link key={g.id} to={`/split/group/${g.id}`} className="flex items-center gap-3 p-4 active:bg-secondary/40">
+                  <Link
+                    key={g.id}
+                    to={`/split/group/${g.id}`}
+                    className="flex items-center gap-3 p-4 active:bg-secondary/40"
+                  >
                     <div className="h-10 w-10 rounded-full bg-split/20 flex items-center justify-center text-split">
                       <Users className="h-5 w-5" />
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium flex items-center gap-2">
-                        {g.name} {g.is_archived && <Archive className="h-3 w-3 text-muted-foreground" />}
+                        {g.name}{" "}
+                        {g.is_archived && <Archive className="h-3 w-3 text-muted-foreground" />}
                       </p>
-                      <p className="text-xs text-muted-foreground">{g.group_members?.length ?? 0} members</p>
+                      <p className="text-xs text-muted-foreground">
+                        {g.group_members?.length ?? 0} members
+                      </p>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </Link>
@@ -146,7 +208,10 @@ export default function SplitPage() {
 
         {/* Pending — account selection for splits where I paid */}
         <TabsContent value="pending">
-          <PendingTab pendingSplits={pendingSplits as any[]} pendingSettlements={pendingSettlements as any[]} />
+          <PendingTab
+            pendingSplits={pendingSplits as any[]}
+            pendingSettlements={pendingSettlements as any[]}
+          />
         </TabsContent>
       </Tabs>
 
@@ -157,15 +222,25 @@ export default function SplitPage() {
   );
 }
 
-
-function PendingTab({ pendingSplits, pendingSettlements }: { pendingSplits: any[]; pendingSettlements: any[] }) {
+function PendingTab({
+  pendingSplits,
+  pendingSettlements,
+}: {
+  pendingSplits: any[];
+  pendingSettlements: any[];
+}) {
   const { data: accounts = [] } = useQuery(accountsQuery());
 
   if (pendingSplits.length === 0 && pendingSettlements.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center text-center" style={{ padding: "60px 16px", gap: 12 }}>
+      <div
+        className="flex flex-col items-center justify-center text-center"
+        style={{ padding: "60px 16px", gap: 12 }}
+      >
         <CheckCircle style={{ width: 48, height: 48, color: "#6B7280" }} />
-        <p className="text-sm" style={{ color: "#9CA3AF" }}>No pending payments</p>
+        <p className="text-sm" style={{ color: "#9CA3AF" }}>
+          No pending payments
+        </p>
       </div>
     );
   }
@@ -229,21 +304,32 @@ function PendingSettlementRow({ settlement, accounts }: { settlement: any; accou
   }
 
   return (
-    <div className="rounded-2xl p-4 space-y-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
+    <div
+      className="rounded-2xl p-4 space-y-3"
+      style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}
+    >
       {/* Line 1: description + amount (inflow green / outflow red) */}
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-white">{desc}</p>
-        <span className="text-sm font-mono font-semibold shrink-0" style={{ color: iPaidOut ? "#EF4444" : "#10B981" }}>
-          {iPaidOut ? "−" : "+"}{formatMoney(Number(settlement.amount))}
+        <span
+          className="text-sm font-mono font-semibold shrink-0"
+          style={{ color: iPaidOut ? "#EF4444" : "#10B981" }}
+        >
+          {iPaidOut ? "−" : "+"}
+          {formatMoney(Number(settlement.amount))}
         </span>
       </div>
 
       {/* Line 2: direction + date */}
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs" style={{ color: "#9CA3AF" }}>
-          {iPaidOut ? `You paid ${settlerName} via ${methodLabel}` : `${settlerName} paid you via ${methodLabel}`}
+          {iPaidOut
+            ? `You paid ${settlerName} via ${methodLabel}`
+            : `${settlerName} paid you via ${methodLabel}`}
         </p>
-        <span className="text-xs shrink-0" style={{ color: "#6B7280" }}>{format(new Date(settlement.created_at), "MMM d, yyyy")}</span>
+        <span className="text-xs shrink-0" style={{ color: "#6B7280" }}>
+          {format(new Date(settlement.created_at), "MMM d, yyyy")}
+        </span>
       </div>
 
       {/* Line 3: receiving account dropdown + confirm */}
@@ -254,20 +340,36 @@ function PendingSettlementRow({ settlement, accounts }: { settlement: any; accou
       ) : (
         <div className="flex items-center gap-2">
           <Select value={accountId} onValueChange={setAccountId}>
-            <SelectTrigger className="flex-1"><SelectValue placeholder="Select account" /></SelectTrigger>
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder="Select account" />
+            </SelectTrigger>
             <SelectContent>
               {filteredAccounts.map((a) => (
                 <SelectItem key={a.id} value={a.id}>
                   <span className="flex items-center gap-2">
-                    <AccountIcon iconType={a.icon_type} iconName={a.icon_name} iconColor={a.icon_color} iconUrl={a.icon_url} size={20} rounded="rounded-md" />
+                    <AccountIcon
+                      iconType={a.icon_type}
+                      iconName={a.icon_name}
+                      iconColor={a.icon_color}
+                      iconUrl={a.icon_url}
+                      size={20}
+                      rounded="rounded-md"
+                    />
                     <span>{[a.institution, a.label].filter(Boolean).join(" · ")}</span>
-                    <span className="text-muted-foreground">{formatMoney(Number(a.current_balance))}</span>
+                    <span className="text-muted-foreground">
+                      {formatMoney(Number(a.current_balance))}
+                    </span>
                   </span>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Button disabled={!accountId} onClick={() => setConfirmOpen(true)} className="text-white shrink-0" style={{ background: "#064E3B" }}>
+          <Button
+            disabled={!accountId}
+            onClick={() => setConfirmOpen(true)}
+            className="text-white shrink-0"
+            style={{ background: "#064E3B" }}
+          >
             Confirm
           </Button>
         </div>
@@ -277,12 +379,23 @@ function PendingSettlementRow({ settlement, accounts }: { settlement: any; accou
         <DialogContent>
           <DialogTitle>Confirm Account Selection</DialogTitle>
           <DialogDescription>
-            The amount {formatMoney(Number(settlement.amount))} will be {iPaidOut ? "deducted from" : "added to"}{" "}
-            {selectedAccount ? [selectedAccount.institution, selectedAccount.label].filter(Boolean).join(" · ") : "the selected account"}. This cannot be changed later.
+            The amount {formatMoney(Number(settlement.amount))} will be{" "}
+            {iPaidOut ? "deducted from" : "added to"}{" "}
+            {selectedAccount
+              ? [selectedAccount.institution, selectedAccount.label].filter(Boolean).join(" · ")
+              : "the selected account"}
+            . This cannot be changed later.
           </DialogDescription>
           <div className="flex justify-end gap-2 mt-2">
-            <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={saving}>Cancel</Button>
-            <Button onClick={confirmSelection} disabled={saving} className="text-white" style={{ background: "#064E3B" }}>
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmSelection}
+              disabled={saving}
+              className="text-white"
+              style={{ background: "#064E3B" }}
+            >
               {saving ? "Confirming…" : "Confirm"}
             </Button>
           </div>
@@ -327,7 +440,9 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
 
       const { error: e2 } = await supabase
         .from("accounts")
-        .update({ current_balance: Number(selectedAccount.current_balance) - Number(split.total_amount) })
+        .update({
+          current_balance: Number(selectedAccount.current_balance) - Number(split.total_amount),
+        })
         .eq("id", selectedAccount.id);
       if (e2) throw e2;
 
@@ -344,7 +459,10 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
   }
 
   return (
-    <div className="rounded-2xl p-4 space-y-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
+    <div
+      className="rounded-2xl p-4 space-y-3"
+      style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}
+    >
       {/* Line 1: description + amount */}
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-white">{split.description || "Untitled"}</p>
@@ -355,26 +473,45 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
 
       {/* Line 2: creator + date */}
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs" style={{ color: "#9CA3AF" }}>{creatorName} added this split</p>
-        <span className="text-xs shrink-0" style={{ color: "#6B7280" }}>{format(new Date(split.created_at), "MMM d, yyyy")}</span>
+        <p className="text-xs" style={{ color: "#9CA3AF" }}>
+          {creatorName} added this split
+        </p>
+        <span className="text-xs shrink-0" style={{ color: "#6B7280" }}>
+          {format(new Date(split.created_at), "MMM d, yyyy")}
+        </span>
       </div>
 
       {/* Line 3: category + sub-category (sub appears after a category is chosen) */}
       <div className="space-y-2">
-        <Select value={categoryId} onValueChange={(v) => { setCategoryId(v); setSubCatId(""); }}>
-          <SelectTrigger className="w-full" style={ddStyle}><SelectValue placeholder="Select category" /></SelectTrigger>
+        <Select
+          value={categoryId}
+          onValueChange={(v) => {
+            setCategoryId(v);
+            setSubCatId("");
+          }}
+        >
+          <SelectTrigger className="w-full" style={ddStyle}>
+            <SelectValue placeholder="Select category" />
+          </SelectTrigger>
           <SelectContent>
             {(categories as any[]).map((c) => (
-              <SelectItem key={c.id} value={c.id}>{c.icon ? `${c.icon} ` : ""}{c.name}</SelectItem>
+              <SelectItem key={c.id} value={c.id}>
+                {c.icon ? `${c.icon} ` : ""}
+                {c.name}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
         {categoryId && (
           <Select value={subCatId} onValueChange={setSubCatId}>
-            <SelectTrigger className="w-full" style={ddStyle}><SelectValue placeholder="Sub-category (optional)" /></SelectTrigger>
+            <SelectTrigger className="w-full" style={ddStyle}>
+              <SelectValue placeholder="Sub-category (optional)" />
+            </SelectTrigger>
             <SelectContent>
               {(subCategories as any[]).map((sc) => (
-                <SelectItem key={sc.id} value={sc.id}>{sc.name}</SelectItem>
+                <SelectItem key={sc.id} value={sc.id}>
+                  {sc.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -384,14 +521,25 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
       {/* Line 4: account dropdown + confirm */}
       <div className="flex items-center gap-2">
         <Select value={accountId} onValueChange={setAccountId}>
-          <SelectTrigger className="flex-1" style={ddStyle}><SelectValue placeholder="Select account" /></SelectTrigger>
+          <SelectTrigger className="flex-1" style={ddStyle}>
+            <SelectValue placeholder="Select account" />
+          </SelectTrigger>
           <SelectContent>
             {accounts.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 <span className="flex items-center gap-2">
-                  <AccountIcon iconType={a.icon_type} iconName={a.icon_name} iconColor={a.icon_color} iconUrl={a.icon_url} size={20} rounded="rounded-md" />
+                  <AccountIcon
+                    iconType={a.icon_type}
+                    iconName={a.icon_name}
+                    iconColor={a.icon_color}
+                    iconUrl={a.icon_url}
+                    size={20}
+                    rounded="rounded-md"
+                  />
                   <span>{[a.institution, a.label].filter(Boolean).join(" · ")}</span>
-                  <span className="text-muted-foreground">{formatMoney(Number(a.current_balance))}</span>
+                  <span className="text-muted-foreground">
+                    {formatMoney(Number(a.current_balance))}
+                  </span>
                 </span>
               </SelectItem>
             ))}
@@ -412,12 +560,22 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
           <DialogTitle>Confirm Account Selection</DialogTitle>
           <DialogDescription>
             The amount {formatMoney(Number(split.total_amount))} will be deducted from{" "}
-            {selectedAccount ? [selectedAccount.institution, selectedAccount.label].filter(Boolean).join(" · ") : "the selected account"}
-            {selectedCategory ? ` under ${selectedCategory.name}` : ""}. This cannot be changed later.
+            {selectedAccount
+              ? [selectedAccount.institution, selectedAccount.label].filter(Boolean).join(" · ")
+              : "the selected account"}
+            {selectedCategory ? ` under ${selectedCategory.name}` : ""}. This cannot be changed
+            later.
           </DialogDescription>
           <div className="flex justify-end gap-2 mt-2">
-            <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={saving}>Cancel</Button>
-            <Button onClick={confirmSelection} disabled={saving} className="text-white" style={{ background: "#78350F" }}>
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmSelection}
+              disabled={saving}
+              className="text-white"
+              style={{ background: "#78350F" }}
+            >
               {saving ? "Confirming…" : "Confirm"}
             </Button>
           </div>
@@ -438,4 +596,3 @@ function Avatar({ name }: { name: string }) {
 function Empty({ text }: { text: string }) {
   return <p className="text-sm text-muted-foreground text-center py-8">{text}</p>;
 }
-

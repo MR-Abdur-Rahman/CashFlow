@@ -74,30 +74,55 @@ export function SwipeRow({
     <div className={cn("relative overflow-hidden", className)}>
       <div className="absolute inset-y-0 right-0 flex">
         {onEdit && (
-          <button type="button"
-            onClick={() => { setX(0); setOpenId(null); if (canEdit) onEdit(); else toast.error(editDeniedMessage); }}
-            className={cn("w-[72px] flex flex-col items-center justify-center text-xs", canEdit && "bg-transfer text-white")}
-            style={canEdit ? undefined : { background: "#374151", color: "#6B7280" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setX(0);
+              setOpenId(null);
+              if (canEdit) onEdit();
+              else toast.error(editDeniedMessage);
+            }}
+            className={cn(
+              "w-[72px] flex flex-col items-center justify-center text-xs",
+              canEdit && "bg-transfer text-white",
+            )}
+            style={canEdit ? undefined : { background: "#374151", color: "#6B7280" }}
+          >
             <Pencil className="h-4 w-4 mb-0.5" /> Edit
           </button>
         )}
         {onDelete && (
-          <button type="button"
-            onClick={() => { setX(0); setOpenId(null); if (canDelete) onDelete(); else toast.error(deleteDeniedMessage); }}
-            className={cn("w-[72px] flex flex-col items-center justify-center text-xs", canDelete && "bg-expense text-white")}
-            style={canDelete ? undefined : { background: "#374151", color: "#6B7280" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setX(0);
+              setOpenId(null);
+              if (canDelete) onDelete();
+              else toast.error(deleteDeniedMessage);
+            }}
+            className={cn(
+              "w-[72px] flex flex-col items-center justify-center text-xs",
+              canDelete && "bg-expense text-white",
+            )}
+            style={canDelete ? undefined : { background: "#374151", color: "#6B7280" }}
+          >
             <Trash2 className="h-4 w-4 mb-0.5" /> Delete
           </button>
         )}
       </div>
       <div
         className="relative bg-card transition-transform"
-        style={{ transform: `translateX(${x}px)`, transitionDuration: startX.current === null ? "180ms" : "0ms" }}
+        style={{
+          transform: `translateX(${x}px)`,
+          transitionDuration: startX.current === null ? "180ms" : "0ms",
+        }}
         onTouchStart={(e) => begin(e.touches[0].clientX)}
         onTouchMove={(e) => move(e.touches[0].clientX)}
         onTouchEnd={end}
         onMouseDown={(e) => begin(e.clientX)}
-        onMouseMove={(e) => { if (startX.current !== null) move(e.clientX); }}
+        onMouseMove={(e) => {
+          if (startX.current !== null) move(e.clientX);
+        }}
         onMouseUp={end}
         onMouseLeave={end}
       >
@@ -110,9 +135,5 @@ export function SwipeRow({
 // ─── Provider — wrap your app or page with this ────────────────────────────
 export function SwipeProvider({ children }: { children: ReactNode }) {
   const [openId, setOpenId] = useState<string | null>(null);
-  return (
-    <SwipeContext.Provider value={{ openId, setOpenId }}>
-      {children}
-    </SwipeContext.Provider>
-  );
+  return <SwipeContext.Provider value={{ openId, setOpenId }}>{children}</SwipeContext.Provider>;
 }

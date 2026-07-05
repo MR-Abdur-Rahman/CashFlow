@@ -1,5 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { categoriesQuery, subCategoriesQuery, peopleQuery, groupsQuery, splitBalancesQuery } from "@/lib/queries";
+import {
+  categoriesQuery,
+  subCategoriesQuery,
+  peopleQuery,
+  groupsQuery,
+  splitBalancesQuery,
+} from "@/lib/queries";
 import { bilateralBalance } from "@/lib/balance";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -7,7 +13,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
@@ -35,16 +47,26 @@ export default function ManagePage() {
           <TabsTrigger value="people">People</TabsTrigger>
           <TabsTrigger value="groups">Groups</TabsTrigger>
         </TabsList>
-        <TabsContent value="categories"><Categories onSelectCat={setCatDrill} /></TabsContent>
-        <TabsContent value="people"><People /></TabsContent>
-        <TabsContent value="groups"><Groups /></TabsContent>
+        <TabsContent value="categories">
+          <Categories onSelectCat={setCatDrill} />
+        </TabsContent>
+        <TabsContent value="people">
+          <People />
+        </TabsContent>
+        <TabsContent value="groups">
+          <Groups />
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
 
 // ─── Categories List ───────────────────────────────────────────────────────
-function Categories({ onSelectCat }: { onSelectCat: (cat: { id: string; name: string; icon: string }) => void }) {
+function Categories({
+  onSelectCat,
+}: {
+  onSelectCat: (cat: { id: string; name: string; icon: string }) => void;
+}) {
   const { data: cats = [] } = useQuery(categoriesQuery());
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -55,7 +77,10 @@ function Categories({ onSelectCat }: { onSelectCat: (cat: { id: string; name: st
       const { error } = await supabase.from("categories").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["categories"] }); toast.success("Deleted"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["categories"] });
+      toast.success("Deleted");
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -65,7 +90,14 @@ function Categories({ onSelectCat }: { onSelectCat: (cat: { id: string; name: st
 
   return (
     <div className="space-y-4 mt-4">
-      <Button className="w-full" variant="outline" onClick={() => { setEdit(null); setOpen(true); }}>
+      <Button
+        className="w-full"
+        variant="outline"
+        onClick={() => {
+          setEdit(null);
+          setOpen(true);
+        }}
+      >
         <Plus className="h-4 w-4 mr-2" /> New category
       </Button>
 
@@ -73,11 +105,23 @@ function Categories({ onSelectCat }: { onSelectCat: (cat: { id: string; name: st
       <div>
         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">Expense</p>
         <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
-          {expenseCats.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">No expense categories</p>}
+          {expenseCats.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-6">No expense categories</p>
+          )}
           {expenseCats.map((c: any) => (
-            <SwipeRow key={c.id} onEdit={() => { setEdit(c); setOpen(true); }} onDelete={() => del.mutate(c.id)}>
-              <button type="button" onClick={() => onSelectCat({ id: c.id, name: c.name, icon: c.icon ?? "📦" })}
-                className="w-full flex items-center gap-3 p-3 bg-card active:bg-secondary/40 text-left">
+            <SwipeRow
+              key={c.id}
+              onEdit={() => {
+                setEdit(c);
+                setOpen(true);
+              }}
+              onDelete={() => del.mutate(c.id)}
+            >
+              <button
+                type="button"
+                onClick={() => onSelectCat({ id: c.id, name: c.name, icon: c.icon ?? "📦" })}
+                className="w-full flex items-center gap-3 p-3 bg-card active:bg-secondary/40 text-left"
+              >
                 <span className="text-lg w-7 text-center">{c.icon ?? "📦"}</span>
                 <span className="flex-1 text-sm truncate">{c.name}</span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -91,11 +135,23 @@ function Categories({ onSelectCat }: { onSelectCat: (cat: { id: string; name: st
       <div>
         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">Income</p>
         <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
-          {incomeCats.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">No income categories</p>}
+          {incomeCats.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-6">No income categories</p>
+          )}
           {incomeCats.map((c: any) => (
-            <SwipeRow key={c.id} onEdit={() => { setEdit(c); setOpen(true); }} onDelete={() => del.mutate(c.id)}>
-              <button type="button" onClick={() => onSelectCat({ id: c.id, name: c.name, icon: c.icon ?? "📦" })}
-                className="w-full flex items-center gap-3 p-3 bg-card active:bg-secondary/40 text-left">
+            <SwipeRow
+              key={c.id}
+              onEdit={() => {
+                setEdit(c);
+                setOpen(true);
+              }}
+              onDelete={() => del.mutate(c.id)}
+            >
+              <button
+                type="button"
+                onClick={() => onSelectCat({ id: c.id, name: c.name, icon: c.icon ?? "📦" })}
+                className="w-full flex items-center gap-3 p-3 bg-card active:bg-secondary/40 text-left"
+              >
                 <span className="text-lg w-7 text-center">{c.icon ?? "📦"}</span>
                 <span className="flex-1 text-sm truncate">{c.name}</span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -111,7 +167,13 @@ function Categories({ onSelectCat }: { onSelectCat: (cat: { id: string; name: st
 }
 
 // ─── Sub-category Page (drill-down) ───────────────────────────────────────
-function SubCategoryPage({ cat, onBack }: { cat: { id: string; name: string; icon: string }; onBack: () => void }) {
+function SubCategoryPage({
+  cat,
+  onBack,
+}: {
+  cat: { id: string; name: string; icon: string };
+  onBack: () => void;
+}) {
   const { data: subs = [] } = useQuery(subCategoriesQuery(cat.id));
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
@@ -132,7 +194,11 @@ function SubCategoryPage({ cat, onBack }: { cat: { id: string; name: string; ico
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-5">
-      <button type="button" onClick={onBack} className="inline-flex items-center text-sm text-muted-foreground">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center text-sm text-muted-foreground"
+      >
         <ArrowLeft className="h-4 w-4 mr-1" /> Categories
       </button>
 
@@ -141,7 +207,14 @@ function SubCategoryPage({ cat, onBack }: { cat: { id: string; name: string; ico
         <h1 className="text-xl font-semibold">{cat.name}</h1>
       </div>
 
-      <Button className="w-full" variant="outline" onClick={() => { setEditSub(null); setAddOpen(true); }}>
+      <Button
+        className="w-full"
+        variant="outline"
+        onClick={() => {
+          setEditSub(null);
+          setAddOpen(true);
+        }}
+      >
         <Plus className="h-4 w-4 mr-2" /> Add sub-category
       </Button>
 
@@ -150,9 +223,14 @@ function SubCategoryPage({ cat, onBack }: { cat: { id: string; name: string; ico
           <p className="text-sm text-muted-foreground text-center py-8">No sub-categories yet</p>
         )}
         {(subs as any[]).map((s) => (
-          <SwipeRow key={s.id}
-            onEdit={() => { setEditSub(s); setAddOpen(true); }}
-            onDelete={() => del.mutate(s.id)}>
+          <SwipeRow
+            key={s.id}
+            onEdit={() => {
+              setEditSub(s);
+              setAddOpen(true);
+            }}
+            onDelete={() => del.mutate(s.id)}
+          >
             <div className="flex items-center gap-3 p-3 bg-card">
               <span className="flex-1 text-sm">{s.name}</span>
             </div>
@@ -171,8 +249,16 @@ function SubCategoryPage({ cat, onBack }: { cat: { id: string; name: string; ico
 }
 
 // ─── Sub-category Dialog ───────────────────────────────────────────────────
-function SubCategoryDialog({ open, onOpenChange, categoryId, edit }: {
-  open: boolean; onOpenChange: (o: boolean) => void; categoryId: string; edit?: any;
+function SubCategoryDialog({
+  open,
+  onOpenChange,
+  categoryId,
+  edit,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  categoryId: string;
+  edit?: any;
 }) {
   const qc = useQueryClient();
   const [name, setName] = useState(edit?.name ?? "");
@@ -185,7 +271,9 @@ function SubCategoryDialog({ open, onOpenChange, categoryId, edit }: {
         const { error } = await supabase.from("sub_categories").update({ name }).eq("id", edit.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("sub_categories").insert({ name, category_id: categoryId, user_id: u.user.id, is_default: false });
+        const { error } = await supabase
+          .from("sub_categories")
+          .insert({ name, category_id: categoryId, user_id: u.user.id, is_default: false });
         if (error) throw error;
       }
     },
@@ -200,15 +288,35 @@ function SubCategoryDialog({ open, onOpenChange, categoryId, edit }: {
   });
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) setName(edit?.name ?? ""); onOpenChange(o); }} key={edit?.id ?? "new"}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) setName(edit?.name ?? "");
+        onOpenChange(o);
+      }}
+      key={edit?.id ?? "new"}
+    >
       <DialogContent>
         <DialogTitle>{edit ? "Edit sub-category" : "Add sub-category"}</DialogTitle>
-        <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }} className="space-y-3">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            m.mutate();
+          }}
+          className="space-y-3"
+        >
           <div className="space-y-1.5">
             <Label>Name</Label>
-            <Input required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Breakfast" />
+            <Input
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Breakfast"
+            />
           </div>
-          <Button type="submit" className="w-full" disabled={m.isPending}>Save</Button>
+          <Button type="submit" className="w-full" disabled={m.isPending}>
+            Save
+          </Button>
         </form>
       </DialogContent>
     </Dialog>
@@ -216,7 +324,15 @@ function SubCategoryDialog({ open, onOpenChange, categoryId, edit }: {
 }
 
 // ─── Category Dialog ───────────────────────────────────────────────────────
-function CategoryDialog({ open, onOpenChange, edit }: { open: boolean; onOpenChange: (o: boolean) => void; edit?: any }) {
+function CategoryDialog({
+  open,
+  onOpenChange,
+  edit,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  edit?: any;
+}) {
   const qc = useQueryClient();
   const [name, setName] = useState(edit?.name ?? "");
   const [icon, setIcon] = useState(edit?.icon ?? "📦");
@@ -231,7 +347,9 @@ function CategoryDialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
         const { error } = await supabase.from("categories").update(payload).eq("id", edit.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("categories").insert({ ...payload, user_id: u.user.id, is_default: false });
+        const { error } = await supabase
+          .from("categories")
+          .insert({ ...payload, user_id: u.user.id, is_default: false });
         if (error) throw error;
       }
     },
@@ -247,11 +365,22 @@ function CategoryDialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
     <Dialog open={open} onOpenChange={onOpenChange} key={edit?.id ?? "new"}>
       <DialogContent>
         <DialogTitle>{edit ? "Edit category" : "New category"}</DialogTitle>
-        <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }} className="space-y-3">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            m.mutate();
+          }}
+          className="space-y-3"
+        >
           <div className="flex gap-2">
             <div className="space-y-1.5 w-20">
               <Label>Icon</Label>
-              <Input value={icon} onChange={(e) => setIcon(e.target.value)} maxLength={4} className="text-center text-lg" />
+              <Input
+                value={icon}
+                onChange={(e) => setIcon(e.target.value)}
+                maxLength={4}
+                className="text-center text-lg"
+              />
             </div>
             <div className="space-y-1.5 flex-1">
               <Label>Name</Label>
@@ -261,7 +390,9 @@ function CategoryDialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
           <div className="space-y-1.5">
             <Label>Type</Label>
             <Select value={type} onValueChange={setType}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="expense">Expense</SelectItem>
                 <SelectItem value="income">Income</SelectItem>
@@ -269,7 +400,9 @@ function CategoryDialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" className="w-full" disabled={m.isPending}>Save</Button>
+          <Button type="submit" className="w-full" disabled={m.isPending}>
+            Save
+          </Button>
         </form>
       </DialogContent>
     </Dialog>
@@ -288,40 +421,67 @@ function People() {
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<any>(null);
 
-
   const del = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("people").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["people"] }); toast.success("Deleted"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["people"] });
+      toast.success("Deleted");
+    },
     onError: (e) => toast.error(e.message),
   });
 
   return (
     <div className="space-y-3 mt-4">
-      <Button className="w-full" variant="outline" onClick={() => { setEdit(null); setOpen(true); }}>
+      <Button
+        className="w-full"
+        variant="outline"
+        onClick={() => {
+          setEdit(null);
+          setOpen(true);
+        }}
+      >
         <Plus className="h-4 w-4 mr-2" /> Add person
       </Button>
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
-        {people.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No people yet</p>}
+        {people.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-8">No people yet</p>
+        )}
         {(people as any[]).map((p) => {
           const bal = bilateralBalance(allSplits, allSettlements, p, meId, myPids);
           return (
-            <SwipeRow key={p.id}
-              onEdit={() => { setEdit(p); setOpen(true); }}
-              onDelete={() => { if (confirm("Delete person?")) del.mutate(p.id); }}>
-              <Link to={`/split/person/${p.id}`} className="flex items-center gap-3 p-3 bg-card active:bg-secondary/40">
+            <SwipeRow
+              key={p.id}
+              onEdit={() => {
+                setEdit(p);
+                setOpen(true);
+              }}
+              onDelete={() => {
+                if (confirm("Delete person?")) del.mutate(p.id);
+              }}
+            >
+              <Link
+                to={`/split/person/${p.id}`}
+                className="flex items-center gap-3 p-3 bg-card active:bg-secondary/40"
+              >
                 <div className="h-9 w-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm">
                   {p.name[0]?.toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{p.name}{p.linked_user_id && " 🔗"}</p>
+                  <p className="text-sm font-medium truncate">
+                    {p.name}
+                    {p.linked_user_id && " 🔗"}
+                  </p>
                   <p className="text-xs text-muted-foreground">{p.phone_number ?? "no phone"}</p>
                 </div>
                 {bal !== 0 && (
-                  <span className={`text-xs font-mono font-semibold ${bal > 0 ? "text-income" : "text-expense"}`}>
-                    {bal > 0 ? "+" : ""}{formatMoney(bal)}
+                  <span
+                    className={`text-xs font-mono font-semibold ${bal > 0 ? "text-income" : "text-expense"}`}
+                  >
+                    {bal > 0 ? "+" : ""}
+                    {formatMoney(bal)}
                   </span>
                 )}
                 <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -345,10 +505,16 @@ function Groups() {
   const archive = useMutation({
     mutationFn: async (id: string) => {
       const g = groups.find((x: any) => x.id === id) as any;
-      const { error } = await supabase.from("groups").update({ is_archived: !g?.is_archived }).eq("id", id);
+      const { error } = await supabase
+        .from("groups")
+        .update({ is_archived: !g?.is_archived })
+        .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["groups"] }); toast.success("Updated"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["groups"] });
+      toast.success("Updated");
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -357,7 +523,10 @@ function Groups() {
       const { error } = await supabase.from("groups").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["groups"] }); toast.success("Deleted"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["groups"] });
+      toast.success("Deleted");
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -366,21 +535,40 @@ function Groups() {
 
   return (
     <div className="space-y-3 mt-4">
-      <Button className="w-full" variant="outline" onClick={() => { setEdit(null); setOpen(true); }}>
+      <Button
+        className="w-full"
+        variant="outline"
+        onClick={() => {
+          setEdit(null);
+          setOpen(true);
+        }}
+      >
         <Plus className="h-4 w-4 mr-2" /> Create group
       </Button>
 
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
-        {activeGroups.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No groups yet</p>}
+        {activeGroups.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-8">No groups yet</p>
+        )}
         {activeGroups.map((g: any) => (
-          <SwipeRow key={g.id}
-            onEdit={() => { setEdit(g); setOpen(true); }}
-            onDelete={() => archive.mutate(g.id)}>
-            <Link to={`/split/group/${g.id}`} className="flex items-center gap-3 p-3 bg-card active:bg-secondary/40">
+          <SwipeRow
+            key={g.id}
+            onEdit={() => {
+              setEdit(g);
+              setOpen(true);
+            }}
+            onDelete={() => archive.mutate(g.id)}
+          >
+            <Link
+              to={`/split/group/${g.id}`}
+              className="flex items-center gap-3 p-3 bg-card active:bg-secondary/40"
+            >
               <span className="text-lg w-7 text-center">👥</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{g.name}</p>
-                <p className="text-xs text-muted-foreground">{g.group_members?.length ?? 0} members</p>
+                <p className="text-xs text-muted-foreground">
+                  {g.group_members?.length ?? 0} members
+                </p>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
             </Link>
@@ -395,9 +583,13 @@ function Groups() {
           </p>
           <div className="surface-card divide-y divide-border overflow-hidden rounded-xl opacity-60">
             {archivedGroups.map((g: any) => (
-              <SwipeRow key={g.id}
+              <SwipeRow
+                key={g.id}
                 onEdit={() => archive.mutate(g.id)}
-                onDelete={() => { if (confirm("Delete group?")) del.mutate(g.id); }}>
+                onDelete={() => {
+                  if (confirm("Delete group?")) del.mutate(g.id);
+                }}
+              >
                 <div className="flex items-center gap-3 p-3 bg-card">
                   <span className="text-lg w-7 text-center">👥</span>
                   <p className="text-sm truncate flex-1">{g.name}</p>

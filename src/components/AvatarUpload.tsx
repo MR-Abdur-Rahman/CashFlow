@@ -21,7 +21,9 @@ export function AvatarUpload({
 
   async function urlForPath(path: string) {
     // Bucket is private — use a signed URL valid for 1 year.
-    const { data } = await supabase.storage.from("avatars").createSignedUrl(path, 60 * 60 * 24 * 365);
+    const { data } = await supabase.storage
+      .from("avatars")
+      .createSignedUrl(path, 60 * 60 * 24 * 365);
     return data?.signedUrl ?? null;
   }
 
@@ -62,7 +64,10 @@ export function AvatarUpload({
       if (files?.length) {
         await supabase.storage.from("avatars").remove(files.map((f) => `${userId}/${f.name}`));
       }
-      const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", userId);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar_url: null })
+        .eq("id", userId);
       if (error) throw error;
       toast.success("Profile photo removed");
       qc.invalidateQueries({ queryKey: ["profile"] });
@@ -77,13 +82,36 @@ export function AvatarUpload({
     <div className="flex items-center gap-4">
       <UserAvatar url={currentUrl} name={name} size={72} />
       <div className="flex flex-col gap-2">
-        <input ref={fileRef} type="file" accept="image/*,image/heic,image/heif" className="hidden" onChange={onPick} />
-        <Button type="button" size="sm" variant="secondary" disabled={busy} onClick={() => fileRef.current?.click()}>
-          {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Camera className="h-4 w-4 mr-2" />}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,image/heic,image/heif"
+          className="hidden"
+          onChange={onPick}
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busy}
+          onClick={() => fileRef.current?.click()}
+        >
+          {busy ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Camera className="h-4 w-4 mr-2" />
+          )}
           {currentUrl ? "Change photo" : "Upload photo"}
         </Button>
         {currentUrl && (
-          <Button type="button" size="sm" variant="ghost" className="text-expense" disabled={busy} onClick={onRemove}>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="text-expense"
+            disabled={busy}
+            onClick={onRemove}
+          >
             <Trash2 className="h-4 w-4 mr-2" /> Remove
           </Button>
         )}

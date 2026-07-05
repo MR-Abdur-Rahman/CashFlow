@@ -28,15 +28,25 @@ export function useRealtimeSplits() {
     const channel = supabase
       .channel("split-updates")
       .on("postgres_changes", { event: "*", schema: "public", table: "splits" }, invalidateAll)
-      .on("postgres_changes", { event: "*", schema: "public", table: "split_shares" }, invalidateAll)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "split_shares" },
+        invalidateAll,
+      )
       .on("postgres_changes", { event: "*", schema: "public", table: "settlements" }, invalidateAll)
       .on("postgres_changes", { event: "*", schema: "public", table: "people" }, invalidateAll)
-      .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, invalidateTxns)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "transactions" },
+        invalidateTxns,
+      )
       .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => {
         qc.invalidateQueries({ queryKey: ["notifications"] });
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [qc]);
 }

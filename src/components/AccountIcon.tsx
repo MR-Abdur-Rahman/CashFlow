@@ -1,4 +1,13 @@
-import { Wallet, Landmark, CreditCard, Coins, PiggyBank, Smartphone, Star, Banknote } from "lucide-react";
+import {
+  Wallet,
+  Landmark,
+  CreditCard,
+  Coins,
+  PiggyBank,
+  Smartphone,
+  Star,
+  Banknote,
+} from "lucide-react";
 
 const PRESETS: Record<string, React.ComponentType<{ className?: string }>> = {
   wallet: Wallet,
@@ -12,7 +21,16 @@ const PRESETS: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 export const PRESET_ICONS = Object.keys(PRESETS);
-export const ICON_COLORS = ["#166534", "#1E3A5F", "#7C3AED", "#7F1D1D", "#78350F", "#0F766E", "#9333EA", "#B45309"];
+export const ICON_COLORS = [
+  "#166534",
+  "#1E3A5F",
+  "#7C3AED",
+  "#7F1D1D",
+  "#78350F",
+  "#0F766E",
+  "#9333EA",
+  "#B45309",
+];
 
 export function AccountIcon({
   iconType,
@@ -32,7 +50,14 @@ export function AccountIcon({
   rounded?: string;
 }) {
   if (iconType === "upload" && iconUrl) {
-    return <img src={iconUrl} alt="" style={{ width: size, height: size }} className={`${rounded} object-cover`} />;
+    return (
+      <img
+        src={iconUrl}
+        alt=""
+        style={{ width: size, height: size }}
+        className={`${rounded} object-cover`}
+      />
+    );
   }
   const Icon = PRESETS[iconName ?? "wallet"] ?? Wallet;
   const bg = iconColor ?? "#7C3AED";

@@ -16,7 +16,7 @@ function Switch({ className, ...props }: React.ComponentProps<typeof SwitchPrimi
         )}
       />
     </SwitchPrimitives.Root>
-  )
+  );
 }
 
-export { Switch }
+export { Switch };

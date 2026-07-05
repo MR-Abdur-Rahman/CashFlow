@@ -12,7 +12,9 @@ export function PrefsApplier() {
   const [userId, setUserId] = useState<string | undefined>();
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setUserId(session?.user?.id));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) =>
+      setUserId(session?.user?.id),
+    );
     return () => sub.subscription.unsubscribe();
   }, []);
   const { data: profile } = useQuery(profileQuery(userId));

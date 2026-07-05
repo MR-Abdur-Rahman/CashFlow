@@ -18,7 +18,10 @@ function applySeparator(intPart: string, sep: string): string {
   return intPart.replace(/\B(?=(\d{3})+(?!\d))/g, sep);
 }
 
-export function formatMoney(amount: number | string | null | undefined, currencyOverride?: string): string {
+export function formatMoney(
+  amount: number | string | null | undefined,
+  currencyOverride?: string,
+): string {
   const n = typeof amount === "string" ? Number(amount) : (amount ?? 0);
   const abs = Math.abs(n);
   const fixed = abs.toFixed(cfg.decimalPlaces);
@@ -45,7 +48,12 @@ export function greeting(): string {
   return "Good evening";
 }
 
-export const CURRENCY_PRESETS: Array<{ code: string; symbol: string; sep: "," | "." | " "; decimals: number }> = [
+export const CURRENCY_PRESETS: Array<{
+  code: string;
+  symbol: string;
+  sep: "," | "." | " ";
+  decimals: number;
+}> = [
   { code: "LKR", symbol: "LKR", sep: ",", decimals: 2 },
   { code: "USD", symbol: "$", sep: ",", decimals: 2 },
   { code: "EUR", symbol: "€", sep: ".", decimals: 2 },

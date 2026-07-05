@@ -68,7 +68,10 @@ export function QrScannerDialog({
 
         // Make sure element exists
         const el = document.getElementById(elId);
-        if (!el) { setError("Scanner element not found. Please try again."); return; }
+        if (!el) {
+          setError("Scanner element not found. Please try again.");
+          return;
+        }
 
         const scanner = new Html5Qrcode(elId, { verbose: false });
         scannerRef.current = scanner;
@@ -100,10 +103,13 @@ export function QrScannerDialog({
   }, [open]);
 
   return (
-    <Dialog open={open} onOpenChange={async (o) => {
-      if (!o) await stopScanner();
-      onOpenChange(o);
-    }}>
+    <Dialog
+      open={open}
+      onOpenChange={async (o) => {
+        if (!o) await stopScanner();
+        onOpenChange(o);
+      }}
+    >
       <DialogContent className="max-w-sm">
         <DialogTitle>Scan QR code</DialogTitle>
         <div
@@ -122,7 +128,9 @@ export function QrScannerDialog({
         ) : hasPermission === null ? (
           <p className="text-xs text-muted-foreground text-center">Requesting camera access...</p>
         ) : (
-          <p className="text-xs text-muted-foreground text-center">Point the camera at a CashFlow QR code</p>
+          <p className="text-xs text-muted-foreground text-center">
+            Point the camera at a CashFlow QR code
+          </p>
         )}
       </DialogContent>
     </Dialog>

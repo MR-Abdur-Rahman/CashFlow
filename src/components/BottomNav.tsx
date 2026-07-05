@@ -34,9 +34,7 @@ export function BottomNav() {
             >
               <Icon className="h-5 w-5" />
               <span>{t.label}</span>
-              {active && (
-                <span className="absolute -bottom-px h-0.5 w-8 rounded-full bg-primary" />
-              )}
+              {active && <span className="absolute -bottom-px h-0.5 w-8 rounded-full bg-primary" />}
             </Link>
           );
         })}

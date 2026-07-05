@@ -3,7 +3,13 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,7 +45,7 @@ export function SettlementEditSheet({
       setDate(
         settlement.created_at
           ? settlement.created_at.split("T")[0]
-          : format(new Date(), "yyyy-MM-dd")
+          : format(new Date(), "yyyy-MM-dd"),
       );
     }
   }, [open, settlement]);

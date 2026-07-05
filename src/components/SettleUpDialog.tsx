@@ -3,7 +3,13 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { accountsQuery } from "@/lib/queries";
@@ -46,7 +52,7 @@ export function SettleUpDialog({
 
   const filteredAccounts = useMemo(
     () => (accounts as any[]).filter((a) => a.type === methodToAccountType[method]),
-    [accounts, method]
+    [accounts, method],
   );
 
   // Default the amount to the full net owed each time the sheet opens.
@@ -72,7 +78,8 @@ export function SettleUpDialog({
       // account). The other party (when linked) is prompted to confirm their account.
       const settleAmount = Math.min(amountNum, netOwed);
       const settlerIsCreditor = !iOwe;
-      const otherUid = (personLinkedUserId && personLinkedUserId !== u.user.id) ? personLinkedUserId : null;
+      const otherUid =
+        personLinkedUserId && personLinkedUserId !== u.user.id ? personLinkedUserId : null;
 
       const { error } = await supabase.from("settlements").insert({
         person_id: personId ?? null,
@@ -104,7 +111,10 @@ export function SettleUpDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="bg-card border-border rounded-t-3xl p-0 max-h-[80dvh] flex flex-col">
+      <SheetContent
+        side="bottom"
+        className="bg-card border-border rounded-t-3xl p-0 max-h-[80dvh] flex flex-col"
+      >
         <SheetTitle className="sr-only">Settle Up</SheetTitle>
         <div className="px-5 pt-5 pb-3 border-b border-border">
           <p className="text-base font-semibold">Settle Up{personName ? ` — ${personName}` : ""}</p>
@@ -114,7 +124,11 @@ export function SettleUpDialog({
           {/* Net balance summary — red when you owe (paying out), green when you lent (receiving) */}
           <div className="rounded-xl bg-secondary/50 px-4 py-3 flex items-center justify-between">
             <span className="text-sm text-muted-foreground">{iOwe ? "You owe" : "You lent"}</span>
-            <span className={`text-lg font-mono font-semibold ${iOwe ? "text-expense" : "text-income"}`}>{formatMoney(netOwed)}</span>
+            <span
+              className={`text-lg font-mono font-semibold ${iOwe ? "text-expense" : "text-income"}`}
+            >
+              {formatMoney(netOwed)}
+            </span>
           </div>
 
           {/* Amount to settle */}
@@ -122,36 +136,53 @@ export function SettleUpDialog({
             <div className="flex items-center justify-between">
               <Label>Amount to settle</Label>
               {netOwed > 0 && amountNum < netOwed - 0.005 && (
-                <button type="button" onClick={() => setAmount(netOwed.toFixed(2))}
-                  className="text-[11px] text-primary underline">Full amount</button>
+                <button
+                  type="button"
+                  onClick={() => setAmount(netOwed.toFixed(2))}
+                  className="text-[11px] text-primary underline"
+                >
+                  Full amount
+                </button>
               )}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground font-mono">LKR</span>
               <input
-                type="number" inputMode="decimal" value={amount}
+                type="number"
+                inputMode="decimal"
+                value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 className={`flex-1 bg-secondary rounded-md px-3 py-2 text-sm text-right font-mono font-semibold outline-none border border-border focus:border-primary ${iOwe ? "text-expense" : "text-income"}`}
               />
             </div>
             {overpaying ? (
-              <p className="text-[11px] text-expense">More than the net — will be capped at {formatMoney(netOwed)}.</p>
+              <p className="text-[11px] text-expense">
+                More than the net — will be capped at {formatMoney(netOwed)}.
+              </p>
             ) : (
-              <p className="text-[11px] text-muted-foreground">Records a payment against your net balance.</p>
+              <p className="text-[11px] text-muted-foreground">
+                Records a payment against your net balance.
+              </p>
             )}
           </div>
 
           {/* Description */}
           <div className="space-y-1.5">
             <Label>Description</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Paid via bank, Coffee money" />
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. Paid via bank, Coffee money"
+            />
           </div>
 
           {/* Method */}
           <div className="space-y-1.5">
             <Label>Method</Label>
             <Select value={method} onValueChange={(v) => setMethod(v as any)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="cash">Cash</SelectItem>
                 <SelectItem value="bank_transfer">Bank transfer</SelectItem>
@@ -168,10 +199,14 @@ export function SettleUpDialog({
               </p>
             ) : (
               <Select value={accountId} onValueChange={setAccountId}>
-                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
                 <SelectContent>
                   {(filteredAccounts as any[]).map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{[a.institution, a.label].filter(Boolean).join(" · ")}</SelectItem>
+                    <SelectItem key={a.id} value={a.id}>
+                      {[a.institution, a.label].filter(Boolean).join(" · ")}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -180,19 +215,29 @@ export function SettleUpDialog({
 
           <div className="space-y-1.5">
             <Label>Note (optional)</Label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Paid via bank" />
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Paid via bank"
+            />
           </div>
         </div>
 
         <div className="p-4 border-t border-border">
-          <Button className="w-full bg-primary text-white" onClick={() => {
-            if (!amountNum || isNaN(amountNum) || amountNum <= 0) {
-              toast.error("Please enter a valid amount greater than 0");
-              return;
-            }
-            mutation.mutate();
-          }} disabled={mutation.isPending || netOwed <= 0}>
-            {mutation.isPending ? "Settling..." : `Confirm${amountNum > 0 ? " — " + formatMoney(Math.min(amountNum, netOwed)) : ""}`}
+          <Button
+            className="w-full bg-primary text-white"
+            onClick={() => {
+              if (!amountNum || isNaN(amountNum) || amountNum <= 0) {
+                toast.error("Please enter a valid amount greater than 0");
+                return;
+              }
+              mutation.mutate();
+            }}
+            disabled={mutation.isPending || netOwed <= 0}
+          >
+            {mutation.isPending
+              ? "Settling..."
+              : `Confirm${amountNum > 0 ? " — " + formatMoney(Math.min(amountNum, netOwed)) : ""}`}
           </Button>
         </div>
       </SheetContent>

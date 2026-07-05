@@ -1,7 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { personQuery, personSplitsQuery, peopleQuery, groupsQuery, accountsQuery, categoriesQuery, subCategoriesQuery, splitBalancesQuery } from "@/lib/queries";
+import {
+  personQuery,
+  personSplitsQuery,
+  peopleQuery,
+  groupsQuery,
+  accountsQuery,
+  categoriesQuery,
+  subCategoriesQuery,
+  splitBalancesQuery,
+} from "@/lib/queries";
 import { settlementNetAfter, bilateralBalance } from "@/lib/balance";
-import { ArrowLeft, Bell, Plus, ChevronLeft, ChevronRight, ChevronDown, QrCode, X, Check } from "lucide-react";
+import {
+  ArrowLeft,
+  Bell,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  QrCode,
+  X,
+  Check,
+} from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { SendReminderDialog } from "@/components/SendReminderDialog";
@@ -13,28 +32,53 @@ import { SettlementRow } from "@/components/SettlementRow";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import { notifyToast } from "@/lib/notify";
 import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
-import { canDeleteSettlement, deleteSettlement as deleteSettlementRpc } from "@/lib/deleteSettlement";
+import {
+  canDeleteSettlement,
+  deleteSettlement as deleteSettlementRpc,
+} from "@/lib/deleteSettlement";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { QrScannerDialog } from "@/components/QrScannerDialog";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
-import { type Period, PERIODS, periodLabel, getPeriodRange, navigateAnchor, formatAnchorLabel } from "@/lib/period";
+import {
+  type Period,
+  PERIODS,
+  periodLabel,
+  getPeriodRange,
+  navigateAnchor,
+  formatAnchorLabel,
+} from "@/lib/period";
 
 export default function PersonDetail() {
   const { personId } = useParams<{ personId: string }>();
@@ -61,36 +105,40 @@ export default function PersonDetail() {
   // Bilateral net "bin" balance between current user and target person (shared bin formula:
   // gross split debts − signed settlements). Positive = target owes me; negative = I owe target.
   const balance = useMemo(
-    () => bilateralBalance(
-      allSplits, allSettlements,
-      { id: personId!, linked_user_id: person?.linked_user_id ?? null },
-      meId, myPids,
-    ),
+    () =>
+      bilateralBalance(
+        allSplits,
+        allSettlements,
+        { id: personId!, linked_user_id: person?.linked_user_id ?? null },
+        meId,
+        myPids,
+      ),
     [allSplits, allSettlements, personId, person, meId, myPids],
   );
 
   const { from: periodFrom, to: periodTo } = useMemo(
     () => getPeriodRange(period, anchor),
-    [period, anchor]
+    [period, anchor],
   );
   const fromStr = useMemo(() => format(periodFrom, "yyyy-MM-dd"), [periodFrom]);
   const toStr = useMemo(() => format(periodTo, "yyyy-MM-dd"), [periodTo]);
 
   // Only show rows where the PAYER is one of the two people being viewed (current user or target).
   // Third-party-paid splits are hidden from the list (balance already skips them internally).
-  const visibleSplits = useMemo(() =>
-    (splits as any[]).filter((s) => {
-      const payerAuthId = getPayerAuthId(s);
-      if (!payerAuthId) return true; // can't determine payer → show
-      const targetLui = s._targetLinkedUserId;
-      return payerAuthId === s._currentUserId || (!!targetLui && payerAuthId === targetLui);
-    }),
-    [splits]
+  const visibleSplits = useMemo(
+    () =>
+      (splits as any[]).filter((s) => {
+        const payerAuthId = getPayerAuthId(s);
+        if (!payerAuthId) return true; // can't determine payer → show
+        const targetLui = s._targetLinkedUserId;
+        return payerAuthId === s._currentUserId || (!!targetLui && payerAuthId === targetLui);
+      }),
+    [splits],
   );
 
-  const filteredSplits = useMemo(() =>
-    visibleSplits.filter((s) => s.date >= fromStr && s.date <= toStr),
-    [visibleSplits, fromStr, toStr]
+  const filteredSplits = useMemo(
+    () => visibleSplits.filter((s) => s.date >= fromStr && s.date <= toStr),
+    [visibleSplits, fromStr, toStr],
   );
 
   // Settlement rows between the two users (bin model: settlements are person-to-person, matched by
@@ -104,15 +152,17 @@ export default function PersonDetail() {
       const cpUid = st.person?.linked_user_id ?? null;
       const settlerIsMe = settler === meId;
       const betweenUs = settlerIsMe
-        ? (st.person_id === personId || (!!targetLui && cpUid === targetLui))
-        : (!!targetLui && settler === targetLui && cpUid === meId);
+        ? st.person_id === personId || (!!targetLui && cpUid === targetLui)
+        : !!targetLui && settler === targetLui && cpUid === meId;
       if (!betweenUs) continue;
       const day = String(st.created_at ?? "").slice(0, 10);
       if (day < fromStr || day > toStr) continue;
       // "You → target": I paid the target when I'm the debtor (the target is the creditor).
       const iPaid = settlerIsMe ? !st.settler_is_creditor : !!st.settler_is_creditor;
       out.push({
-        ...st, _itemType: "settlement", _iPaid: iPaid,
+        ...st,
+        _itemType: "settlement",
+        _iPaid: iPaid,
         _netAfter: settlementNetAfter(allSplits, allSettlements, st, meId, myPids) ?? 0,
         _currentUserId: meId,
       });
@@ -127,9 +177,10 @@ export default function PersonDetail() {
     ];
     // Sort all items (splits + settlements) by numeric timestamp DESC. String compare mixed local
     // split date+time with UTC settlement created_at; getTime() normalizes both to epoch ms.
-    const getTime = (x: any) => x._itemType === "settlement"
-      ? new Date(x.created_at).getTime()
-      : new Date(`${x.date || "1970-01-01"}T${x.time || "00:00:00"}`).getTime();
+    const getTime = (x: any) =>
+      x._itemType === "settlement"
+        ? new Date(x.created_at).getTime()
+        : new Date(`${x.date || "1970-01-01"}T${x.time || "00:00:00"}`).getTime();
     return items.sort((a, b) => getTime(b) - getTime(a));
   }, [filteredSplits, filteredSettlements]);
 
@@ -137,7 +188,10 @@ export default function PersonDetail() {
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-5">
-      <button onClick={() => navigate(-1)} className="inline-flex items-center text-sm text-muted-foreground">
+      <button
+        onClick={() => navigate(-1)}
+        className="inline-flex items-center text-sm text-muted-foreground"
+      >
         <ArrowLeft className="h-4 w-4 mr-1" /> Back
       </button>
 
@@ -147,15 +201,23 @@ export default function PersonDetail() {
         </div>
         <div>
           <h1 className="text-xl font-semibold">{person.name}</h1>
-          <p className="text-xs text-muted-foreground">{person.phone_number ?? "no phone"}{person.linked_user_id && " · 🔗 linked"}</p>
+          <p className="text-xs text-muted-foreground">
+            {person.phone_number ?? "no phone"}
+            {person.linked_user_id && " · 🔗 linked"}
+          </p>
         </div>
       </div>
 
       {/* Balance card */}
       <div className="balance-gradient rounded-2xl p-5">
         <p className="text-xs font-mono text-white/70 uppercase">Net balance</p>
-        <p className="text-3xl font-mono font-bold text-white mt-1">{balance >= 0 ? "+" : ""}{formatMoney(balance)}</p>
-        <p className="text-xs font-mono text-white/70 mt-1">{balance > 0 ? "owes you" : balance < 0 ? "you owe" : "settled"}</p>
+        <p className="text-3xl font-mono font-bold text-white mt-1">
+          {balance >= 0 ? "+" : ""}
+          {formatMoney(balance)}
+        </p>
+        <p className="text-xs font-mono text-white/70 mt-1">
+          {balance > 0 ? "owes you" : balance < 0 ? "you owe" : "settled"}
+        </p>
       </div>
 
       {/* Action buttons */}
@@ -164,7 +226,11 @@ export default function PersonDetail() {
           <Plus className="h-4 w-4 mr-2" /> Add Split
         </Button>
         {Math.abs(balance) > 0.005 && (
-          <Button variant="outline" className="flex-1 text-income" onClick={() => setSettleOpen(true)}>
+          <Button
+            variant="outline"
+            className="flex-1 text-income"
+            onClick={() => setSettleOpen(true)}
+          >
             Settle Up
           </Button>
         )}
@@ -182,11 +248,17 @@ export default function PersonDetail() {
 
         {/* Period filter bar */}
         <div className="flex items-center gap-2 mb-3">
-          <button onClick={() => setAnchor((a) => navigateAnchor(period, a, -1))} className="p-1 rounded-md hover:bg-secondary">
+          <button
+            onClick={() => setAnchor((a) => navigateAnchor(period, a, -1))}
+            className="p-1 rounded-md hover:bg-secondary"
+          >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <span className="text-sm font-semibold">{formatAnchorLabel(period, anchor)}</span>
-          <button onClick={() => setAnchor((a) => navigateAnchor(period, a, 1))} className="p-1 rounded-md hover:bg-secondary">
+          <button
+            onClick={() => setAnchor((a) => navigateAnchor(period, a, 1))}
+            className="p-1 rounded-md hover:bg-secondary"
+          >
             <ChevronRight className="h-4 w-4" />
           </button>
           <div className="ml-auto">
@@ -198,8 +270,17 @@ export default function PersonDetail() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-36">
                 {PERIODS.map((p) => (
-                  <DropdownMenuItem key={p} onClick={() => { setPeriod(p); setAnchor(new Date()); }}
-                    className={cn("capitalize py-3 text-base", period === p && "text-primary font-medium")}>
+                  <DropdownMenuItem
+                    key={p}
+                    onClick={() => {
+                      setPeriod(p);
+                      setAnchor(new Date());
+                    }}
+                    className={cn(
+                      "capitalize py-3 text-base",
+                      period === p && "text-primary font-medium",
+                    )}
+                  >
                     {periodLabel(p)}
                   </DropdownMenuItem>
                 ))}
@@ -214,21 +295,40 @@ export default function PersonDetail() {
           </div>
         ) : (
           <div className="rounded-2xl overflow-hidden border border-border divide-y divide-border">
-            {combinedItems.map((item: any) => item._itemType === "settlement" ? (
-              <SwipeRow key={`set-${item.id}`} onEdit={() => setEditSettlement(item)} onDelete={() => setDeleteSettlement(item)}
-                canEdit={item.created_by === item._currentUserId} canDelete={canDeleteSettlement(item, item._currentUserId)}
-                editDeniedMessage="Only the creator can edit this settlement"
-                deleteDeniedMessage="Only the creator or payer can delete this settlement">
-                <SettlementRow description={item.description} iPaid={item._iPaid} otherName={person.name} amount={Number(item.amount)} netAfter={item._netAfter} createdAt={item.created_at} />
-              </SwipeRow>
-            ) : (
-              <SwipeRow key={item.id} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}
-                canEdit={canModifySplit(item)} canDelete={canModifySplit(item)}
-                editDeniedMessage="Only the creator or payer can edit this split"
-                deleteDeniedMessage="Only the creator or payer can delete this split">
-                <SplitDirectRow s={item} lentOweOverride={bilateralRowAmount(item)} />
-              </SwipeRow>
-            ))}
+            {combinedItems.map((item: any) =>
+              item._itemType === "settlement" ? (
+                <SwipeRow
+                  key={`set-${item.id}`}
+                  onEdit={() => setEditSettlement(item)}
+                  onDelete={() => setDeleteSettlement(item)}
+                  canEdit={item.created_by === item._currentUserId}
+                  canDelete={canDeleteSettlement(item, item._currentUserId)}
+                  editDeniedMessage="Only the creator can edit this settlement"
+                  deleteDeniedMessage="Only the creator or payer can delete this settlement"
+                >
+                  <SettlementRow
+                    description={item.description}
+                    iPaid={item._iPaid}
+                    otherName={person.name}
+                    amount={Number(item.amount)}
+                    netAfter={item._netAfter}
+                    createdAt={item.created_at}
+                  />
+                </SwipeRow>
+              ) : (
+                <SwipeRow
+                  key={item.id}
+                  onEdit={() => setEditSplit(item)}
+                  onDelete={() => setDeleteSplit(item)}
+                  canEdit={canModifySplit(item)}
+                  canDelete={canModifySplit(item)}
+                  editDeniedMessage="Only the creator or payer can edit this split"
+                  deleteDeniedMessage="Only the creator or payer can delete this split"
+                >
+                  <SplitDirectRow s={item} lentOweOverride={bilateralRowAmount(item)} />
+                </SwipeRow>
+              ),
+            )}
           </div>
         )}
       </div>
@@ -257,22 +357,34 @@ export default function PersonDetail() {
         />
       )}
 
-      <AlertDialog open={!!deleteSplit} onOpenChange={(o) => { if (!o) setDeleteSplit(null); }}>
+      <AlertDialog
+        open={!!deleteSplit}
+        onOpenChange={(o) => {
+          if (!o) setDeleteSplit(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete split?</AlertDialogTitle>
-            <AlertDialogDescription>This will delete the split and all its shares. Cannot be undone.</AlertDialogDescription>
+            <AlertDialogDescription>
+              This will delete the split and all its shares. Cannot be undone.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
-              if (!deleteSplit) return;
-              // The delete_split RPC enforces creator-or-payer permission, blocks
-              // deletion when settlements exist, restores balance, and notifies
-              // all other participants — all server-side.
-              await runSplitDelete(deleteSplit.id, qc);
-              setDeleteSplit(null);
-            }}>Delete</AlertDialogAction>
+            <AlertDialogAction
+              className="bg-destructive text-white"
+              onClick={async () => {
+                if (!deleteSplit) return;
+                // The delete_split RPC enforces creator-or-payer permission, blocks
+                // deletion when settlements exist, restores balance, and notifies
+                // all other participants — all server-side.
+                await runSplitDelete(deleteSplit.id, qc);
+                setDeleteSplit(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -281,23 +393,37 @@ export default function PersonDetail() {
         <SettlementEditSheet
           settlement={editSettlement}
           open={!!editSettlement}
-          onOpenChange={(o) => { if (!o) setEditSettlement(null); }}
+          onOpenChange={(o) => {
+            if (!o) setEditSettlement(null);
+          }}
         />
       )}
 
-      <AlertDialog open={!!deleteSettlement} onOpenChange={(o) => { if (!o) setDeleteSettlement(null); }}>
+      <AlertDialog
+        open={!!deleteSettlement}
+        onOpenChange={(o) => {
+          if (!o) setDeleteSettlement(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete settlement?</AlertDialogTitle>
-            <AlertDialogDescription>This re-opens the debt between you two. Cannot be undone.</AlertDialogDescription>
+            <AlertDialogDescription>
+              This re-opens the debt between you two. Cannot be undone.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
-              if (!deleteSettlement) return;
-              await deleteSettlementRpc(deleteSettlement.id, qc);
-              setDeleteSettlement(null);
-            }}>Delete</AlertDialogAction>
+            <AlertDialogAction
+              className="bg-destructive text-white"
+              onClick={async () => {
+                if (!deleteSettlement) return;
+                await deleteSettlementRpc(deleteSettlement.id, qc);
+                setDeleteSettlement(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -306,7 +432,9 @@ export default function PersonDetail() {
         <EditSplitSheet
           split={editSplit}
           open={!!editSplit}
-          onOpenChange={(o) => { if (!o) setEditSplit(null); }}
+          onOpenChange={(o) => {
+            if (!o) setEditSplit(null);
+          }}
         />
       )}
     </div>
@@ -316,12 +444,16 @@ export default function PersonDetail() {
 // ─── Helper: resolve a split's payer to an auth user id ───────────────────
 function getPayerAuthId(split: any): string | null {
   if (split.paid_by_person_id) {
-    const ps = (split.split_shares ?? []).find((ss: any) => ss.person_id === split.paid_by_person_id);
+    const ps = (split.split_shares ?? []).find(
+      (ss: any) => ss.person_id === split.paid_by_person_id,
+    );
     if (ps?.person?.linked_user_id) return ps.person.linked_user_id;
   }
   if (split.paid_by === "me") return split.created_by; // "me" always means the creator
   if (split.paid_by) {
-    const m = (split.split_shares ?? []).find((ss: any) => ss.person?.name === split.paid_by || ss.person_name === split.paid_by);
+    const m = (split.split_shares ?? []).find(
+      (ss: any) => ss.person?.name === split.paid_by || ss.person_name === split.paid_by,
+    );
     if (m?.person?.linked_user_id) return m.person.linked_user_id;
   }
   return null;
@@ -344,10 +476,13 @@ function bilateralRowAmount(s: any): number | undefined {
   const myPersonIds: string[] = s._myPersonIds ?? [];
   const payer = getPayerAuthId(s);
 
-  const targetShareEntry = shares.find((ss: any) =>
-    (targetLui && ss.person?.linked_user_id === targetLui) || ss.person_id === targetPid);
-  const myShareEntry = shares.find((ss: any) =>
-    myPersonIds.includes(ss.person_id) || ss.person?.linked_user_id === currentUserId);
+  const targetShareEntry = shares.find(
+    (ss: any) =>
+      (targetLui && ss.person?.linked_user_id === targetLui) || ss.person_id === targetPid,
+  );
+  const myShareEntry = shares.find(
+    (ss: any) => myPersonIds.includes(ss.person_id) || ss.person?.linked_user_id === currentUserId,
+  );
 
   if (payer && payer === currentUserId) {
     if (targetShareEntry) return Number(targetShareEntry.share_amount);

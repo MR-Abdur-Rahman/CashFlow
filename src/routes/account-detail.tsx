@@ -8,21 +8,44 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { notifyToast } from "@/lib/notify";
 import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
-import { canDeleteSettlement, deleteSettlement as deleteSettlementRpc } from "@/lib/deleteSettlement";
+import {
+  canDeleteSettlement,
+  deleteSettlement as deleteSettlementRpc,
+} from "@/lib/deleteSettlement";
 import { useState, useMemo, useEffect } from "react";
 import { AddAccountSheet } from "@/components/AddAccountSheet";
 import { SwipeRow } from "@/components/SwipeRow";
 import {
-  ArrowLeft, Pencil, Trash2, ArrowDownLeft, ArrowUpRight, ArrowLeftRight,
-  ChevronLeft, ChevronRight, ChevronDown,
+  ArrowLeft,
+  Pencil,
+  Trash2,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ArrowLeftRight,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { EditSplitSheet, EditTxSheet } from "@/routes/home";
@@ -30,12 +53,27 @@ import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import { SettlementRow } from "@/components/SettlementRow";
 import { settlementDirection, shareRemaining } from "@/lib/settlement";
 import {
-  format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
-  startOfYear, endOfYear, subDays, addDays, subWeeks, addWeeks,
-  subMonths, addMonths, subYears, addYears,
+  format,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  startOfYear,
+  endOfYear,
+  subDays,
+  addDays,
+  subWeeks,
+  addWeeks,
+  subMonths,
+  addMonths,
+  subYears,
+  addYears,
 } from "date-fns";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
@@ -53,14 +91,16 @@ function getPeriodRange(period: Period, anchor: Date): { dateFrom: string; dateT
     const d = format(anchor, "yyyy-MM-dd");
     return { dateFrom: d, dateTo: d };
   }
-  if (period === "weekly") return {
-    dateFrom: format(startOfWeek(anchor, { weekStartsOn: 1 }), "yyyy-MM-dd"),
-    dateTo: format(endOfWeek(anchor, { weekStartsOn: 1 }), "yyyy-MM-dd"),
-  };
-  if (period === "monthly") return {
-    dateFrom: format(startOfMonth(anchor), "yyyy-MM-dd"),
-    dateTo: format(endOfMonth(anchor), "yyyy-MM-dd"),
-  };
+  if (period === "weekly")
+    return {
+      dateFrom: format(startOfWeek(anchor, { weekStartsOn: 1 }), "yyyy-MM-dd"),
+      dateTo: format(endOfWeek(anchor, { weekStartsOn: 1 }), "yyyy-MM-dd"),
+    };
+  if (period === "monthly")
+    return {
+      dateFrom: format(startOfMonth(anchor), "yyyy-MM-dd"),
+      dateTo: format(endOfMonth(anchor), "yyyy-MM-dd"),
+    };
   return {
     dateFrom: format(startOfYear(anchor), "yyyy-MM-dd"),
     dateTo: format(endOfYear(anchor), "yyyy-MM-dd"),
@@ -108,7 +148,9 @@ export default function AccountDetail() {
   const [deleteSettlement, setDeleteSettlement] = useState<any | null>(null);
   const [editSettlement, setEditSettlement] = useState<any | null>(null);
   const [userId, setUserId] = useState<string | undefined>();
-  useEffect(() => { supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id)); }, []);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
+  }, []);
 
   const { dateFrom, dateTo } = useMemo(() => getPeriodRange(period, anchor), [period, anchor]);
 
@@ -147,7 +189,9 @@ export default function AccountDetail() {
       if (!accountId) return [];
       const { data, error } = await supabase
         .from("settlements")
-        .select("*, person:person_id(name), creator:created_by(full_name), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name)), accounts:account_id(label, institution)")
+        .select(
+          "*, person:person_id(name), creator:created_by(full_name), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name)), accounts:account_id(label, institution)",
+        )
         .or(`account_id.eq.${accountId},receiver_account_id.eq.${accountId}`)
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999")
@@ -176,7 +220,8 @@ export default function AccountDetail() {
           _otherName: otherName,
           _remaining: remaining,
           _fullySettled: fullySettled,
-          _netAfter: settlementNetAfter(netSplits, netSettlements, s, netMeId, netMyPids) ?? undefined,
+          _netAfter:
+            settlementNetAfter(netSplits, netSettlements, s, netMeId, netMyPids) ?? undefined,
         };
       }),
     ];
@@ -210,12 +255,16 @@ export default function AccountDetail() {
       {/* Account info */}
       <div className="flex items-center gap-4">
         <AccountIcon
-          iconType={account.icon_type} iconName={account.icon_name}
-          iconColor={account.icon_color} iconUrl={account.icon_url} size={56}
+          iconType={account.icon_type}
+          iconName={account.icon_name}
+          iconColor={account.icon_color}
+          iconUrl={account.icon_url}
+          size={56}
         />
         <div className="flex-1">
           <p className="text-xs uppercase text-muted-foreground">
-            {account.type}{account.institution && ` · ${account.institution}`}
+            {account.type}
+            {account.institution && ` · ${account.institution}`}
           </p>
           <h1 className="text-lg font-semibold">{account.label}</h1>
         </div>
@@ -225,7 +274,9 @@ export default function AccountDetail() {
       <div className="rounded-2xl bg-card border border-border p-4">
         <p className="text-xs text-muted-foreground">Current balance</p>
         <p className="text-3xl font-mono font-bold mt-1">{formatMoney(account.current_balance)}</p>
-        <p className="text-xs text-muted-foreground mt-1">Opening: {formatMoney(account.opening_balance)}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Opening: {formatMoney(account.opening_balance)}
+        </p>
       </div>
 
       {/* Edit / Delete */}
@@ -285,7 +336,10 @@ export default function AccountDetail() {
               {PERIOD_OPTIONS.map((p) => (
                 <DropdownMenuItem
                   key={p.key}
-                  onClick={() => { setPeriod(p.key); setAnchor(new Date()); }}
+                  onClick={() => {
+                    setPeriod(p.key);
+                    setAnchor(new Date());
+                  }}
                   className={`py-3 text-base ${period === p.key ? "text-primary font-medium" : ""}`}
                 >
                   {p.label}
@@ -303,8 +357,10 @@ export default function AccountDetail() {
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className={cn("flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
-              tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}
+            className={cn(
+              "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
+              tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+            )}
           >
             {t === "transactions" ? "Transactions" : "Splits"}
           </button>
@@ -327,24 +383,45 @@ export default function AccountDetail() {
       ) : (
         <div className="rounded-xl overflow-hidden border border-border divide-y divide-border">
           {splitsTabItems.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No splits or settlements</p>
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No splits or settlements
+            </p>
           ) : (
             splitsTabItems.map((item: any) =>
               item._itemType === "settlement" ? (
-                <SwipeRow key={`set-${item.id}`} onEdit={() => setEditSettlement(item)} onDelete={() => setDeleteSettlement(item)}
-                  canEdit={item.created_by === userId} canDelete={canDeleteSettlement(item, userId)}
+                <SwipeRow
+                  key={`set-${item.id}`}
+                  onEdit={() => setEditSettlement(item)}
+                  onDelete={() => setDeleteSettlement(item)}
+                  canEdit={item.created_by === userId}
+                  canDelete={canDeleteSettlement(item, userId)}
                   editDeniedMessage="Only the creator can edit this settlement"
-                  deleteDeniedMessage="Only the creator or payer can delete this settlement">
-                  <SettlementRow description={item.description} iPaid={item._iPaid} otherName={item._otherName} amount={Number(item.amount)} remaining={item._remaining} fullySettled={item._fullySettled} netAfter={item._netAfter} createdAt={item.created_at} />
+                  deleteDeniedMessage="Only the creator or payer can delete this settlement"
+                >
+                  <SettlementRow
+                    description={item.description}
+                    iPaid={item._iPaid}
+                    otherName={item._otherName}
+                    amount={Number(item.amount)}
+                    remaining={item._remaining}
+                    fullySettled={item._fullySettled}
+                    netAfter={item._netAfter}
+                    createdAt={item.created_at}
+                  />
                 </SwipeRow>
               ) : (
-                <SwipeRow key={`sp-${item.id}`} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplitItem(item)}
-                  canEdit={canModifySplit(item)} canDelete={canModifySplit(item)}
+                <SwipeRow
+                  key={`sp-${item.id}`}
+                  onEdit={() => setEditSplit(item)}
+                  onDelete={() => setDeleteSplitItem(item)}
+                  canEdit={canModifySplit(item)}
+                  canDelete={canModifySplit(item)}
                   editDeniedMessage="Only the creator or payer can edit this split"
-                  deleteDeniedMessage="Only the creator or payer can delete this split">
+                  deleteDeniedMessage="Only the creator or payer can delete this split"
+                >
                   <SplitRow s={item} />
                 </SwipeRow>
-              )
+              ),
             )
           )}
         </div>
@@ -353,18 +430,31 @@ export default function AccountDetail() {
       <AddAccountSheet open={edit} onOpenChange={setEdit} edit={account} />
 
       {editSplit && (
-        <EditSplitSheet split={editSplit} open={!!editSplit} onOpenChange={(o) => { if (!o) setEditSplit(null); }} />
+        <EditSplitSheet
+          split={editSplit}
+          open={!!editSplit}
+          onOpenChange={(o) => {
+            if (!o) setEditSplit(null);
+          }}
+        />
       )}
 
       {editSettlement && (
         <SettlementEditSheet
           settlement={editSettlement}
           open={!!editSettlement}
-          onOpenChange={(o) => { if (!o) setEditSettlement(null); }}
+          onOpenChange={(o) => {
+            if (!o) setEditSettlement(null);
+          }}
         />
       )}
 
-      <AlertDialog open={!!deleteSplitItem} onOpenChange={(o) => { if (!o) setDeleteSplitItem(null); }}>
+      <AlertDialog
+        open={!!deleteSplitItem}
+        onOpenChange={(o) => {
+          if (!o) setDeleteSplitItem(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -386,7 +476,12 @@ export default function AccountDetail() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={!!deleteSettlement} onOpenChange={(o) => { if (!o) setDeleteSettlement(null); }}>
+      <AlertDialog
+        open={!!deleteSettlement}
+        onOpenChange={(o) => {
+          if (!o) setDeleteSettlement(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -409,10 +504,21 @@ export default function AccountDetail() {
       </AlertDialog>
 
       {editTxn && (
-        <EditTxSheet txn={editTxn} open={!!editTxn} onOpenChange={(o) => { if (!o) setEditTxn(null); }} />
+        <EditTxSheet
+          txn={editTxn}
+          open={!!editTxn}
+          onOpenChange={(o) => {
+            if (!o) setEditTxn(null);
+          }}
+        />
       )}
 
-      <AlertDialog open={!!deleteTxn} onOpenChange={(o) => { if (!o) setDeleteTxn(null); }}>
+      <AlertDialog
+        open={!!deleteTxn}
+        onOpenChange={(o) => {
+          if (!o) setDeleteTxn(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -426,7 +532,11 @@ export default function AccountDetail() {
                 if (!deleteTxn) return;
                 const txn = deleteTxn;
                 const { error } = await supabase.from("transactions").delete().eq("id", txn.id);
-                if (error) { toast.error(error.message); setDeleteTxn(null); return; }
+                if (error) {
+                  toast.error(error.message);
+                  setDeleteTxn(null);
+                  return;
+                }
                 toast.success("Transaction deleted");
                 qc.invalidateQueries({ queryKey: ["transactions"] });
                 qc.invalidateQueries({ queryKey: ["accounts"] });
@@ -447,32 +557,40 @@ function TxRow({ t, accountId }: { t: any; accountId: string }) {
   const isIncome = t.type === "income";
   const isTransfer = t.type === "transfer";
 
-  const colorClass = isIncome ? "text-[#22C55E]"
-    : isTransfer ? "text-[#3B82F6]"
-    : "text-[#EF4444]";
+  const colorClass = isIncome ? "text-[#22C55E]" : isTransfer ? "text-[#3B82F6]" : "text-[#EF4444]";
 
-  const bgClass = isIncome ? "bg-[var(--color-income-bg)]"
-    : isTransfer ? "bg-[var(--color-transfer-bg)]"
-    : "bg-[var(--color-expense-bg)]";
+  const bgClass = isIncome
+    ? "bg-[var(--color-income-bg)]"
+    : isTransfer
+      ? "bg-[var(--color-transfer-bg)]"
+      : "bg-[var(--color-expense-bg)]";
 
   const Icon = isIncome ? ArrowDownLeft : isTransfer ? ArrowLeftRight : ArrowUpRight;
   const sign = isIncome ? "+" : isTransfer ? "" : "-";
 
   const title = t.categories
     ? `${t.categories.icon ?? ""} ${t.categories.name}${t.sub_categories ? " · " + t.sub_categories.name : ""}`
-    : isIncome ? (t.income_source_text ?? "Income")
-    : isTransfer ? "Transfer"
-    : "Expense";
+    : isIncome
+      ? (t.income_source_text ?? "Income")
+      : isTransfer
+        ? "Transfer"
+        : "Expense";
 
   const sub = isTransfer
     ? `${t.accounts?.label ?? ""} → ${t.to_account?.label ?? ""}`
     : t.accounts
-    ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ")
-    : "";
+      ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ")
+      : "";
 
   return (
     <div className="flex items-center gap-3 p-4 bg-card">
-      <div className={cn("h-10 w-10 rounded-full flex items-center justify-center shrink-0", bgClass, colorClass)}>
+      <div
+        className={cn(
+          "h-10 w-10 rounded-full flex items-center justify-center shrink-0",
+          bgClass,
+          colorClass,
+        )}
+      >
         <Icon className="h-5 w-5" />
       </div>
       <div className="flex-1 min-w-0">
@@ -480,8 +598,13 @@ function TxRow({ t, accountId }: { t: any; accountId: string }) {
         <p className="text-xs text-muted-foreground truncate">{sub}</p>
       </div>
       <div className="text-right shrink-0">
-        <p className={cn("text-sm font-mono font-semibold", colorClass)}>{sign}{formatMoney(t.amount)}</p>
-        <p className="text-[10px] text-muted-foreground font-mono">{formatDateTime(t.date, t.time)}</p>
+        <p className={cn("text-sm font-mono font-semibold", colorClass)}>
+          {sign}
+          {formatMoney(t.amount)}
+        </p>
+        <p className="text-[10px] text-muted-foreground font-mono">
+          {formatDateTime(t.date, t.time)}
+        </p>
       </div>
     </div>
   );
@@ -496,16 +619,22 @@ function SplitRow({ s }: { s: any }) {
   const isMulti = !isGroup && shares.length > 1;
   const isPerson = !isGroup && shares.length <= 1;
 
-  const description = s.description || (
-    isGroup ? (s.groups?.name ?? "Group split")
-    : isPerson ? `Split w/ ${shares[0]?.person_name ?? s.people?.name ?? ""}`
-    : "Split"
-  );
+  const description =
+    s.description ||
+    (isGroup
+      ? (s.groups?.name ?? "Group split")
+      : isPerson
+        ? `Split w/ ${shares[0]?.person_name ?? s.people?.name ?? ""}`
+        : "Split");
 
   const personName = s.people?.name ?? shares[0]?.person_name ?? "";
-  const peopleName = shares.length > 2
-    ? `${shares[0]?.person_name}, ${shares[1]?.person_name} +${shares.length - 2} more`
-    : shares.map((sh: any) => sh.person_name).filter(Boolean).join(", ");
+  const peopleName =
+    shares.length > 2
+      ? `${shares[0]?.person_name}, ${shares[1]?.person_name} +${shares.length - 2} more`
+      : shares
+          .map((sh: any) => sh.person_name)
+          .filter(Boolean)
+          .join(", ");
   const groupName = s.groups?.name ?? "Group";
   const shareCount = shares.length + 1;
   const perShare = shareCount > 0 ? total / shareCount : 0;
@@ -515,7 +644,9 @@ function SplitRow({ s }: { s: any }) {
       <div className="px-4 py-3">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium truncate flex-1">{description}</p>
-          <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">{formatMoney(total)}</p>
+          <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">
+            {formatMoney(total)}
+          </p>
         </div>
         {isPerson && (
           <div className="flex items-center justify-between gap-2 mt-0.5">
@@ -528,7 +659,9 @@ function SplitRow({ s }: { s: any }) {
         {(isMulti || isGroup) && (
           <>
             <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{isGroup ? groupName : peopleName}</p>
+              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
+                {isGroup ? groupName : peopleName}
+              </p>
               <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
                 {shares.length} × {formatMoney(perShare)}
               </p>
@@ -541,10 +674,10 @@ function SplitRow({ s }: { s: any }) {
             </div>
           </>
         )}
-        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{formatDateTime(s.date, s.time)}</p>
+        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">
+          {formatDateTime(s.date, s.time)}
+        </p>
       </div>
     </div>
   );
 }
-
-

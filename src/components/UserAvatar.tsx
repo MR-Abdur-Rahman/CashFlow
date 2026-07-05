@@ -16,7 +16,9 @@ export function UserAvatar({
   return (
     <Avatar style={{ height: size, width: size }} className={cn("border border-border", className)}>
       {url ? <AvatarImage src={url} alt={name ?? "avatar"} /> : null}
-      <AvatarFallback className="bg-primary/20 text-primary font-semibold">{initial}</AvatarFallback>
+      <AvatarFallback className="bg-primary/20 text-primary font-semibold">
+        {initial}
+      </AvatarFallback>
     </Avatar>
   );
 }

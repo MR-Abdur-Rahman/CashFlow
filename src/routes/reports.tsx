@@ -3,27 +3,57 @@ import { transactionsQuery, peopleQuery } from "@/lib/queries";
 import { formatMoney } from "@/lib/format";
 import { useState, useMemo } from "react";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer,
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
 } from "recharts";
 import {
-  startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear,
-  format, subMonths, addMonths, subWeeks, addWeeks, subYears, addYears,
-  subDays, addDays, eachMonthOfInterval,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  startOfYear,
+  endOfYear,
+  format,
+  subMonths,
+  addMonths,
+  subWeeks,
+  addWeeks,
+  subYears,
+  addYears,
+  subDays,
+  addDays,
+  eachMonthOfInterval,
 } from "date-fns";
 import { ChevronLeft, ChevronRight, ChevronDown, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SwipeRow } from "@/components/SwipeRow";
 import { deleteSettlement as deleteSettlementRpc } from "@/lib/deleteSettlement";
 import { EditTxSheet, EditSplitSheet } from "@/routes/home";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
@@ -40,13 +70,23 @@ function settlementReceivedByMe(s: any, myUid: string | undefined): boolean {
 function settlementCounterpartyName(s: any, myUid: string | undefined, people: any[]): string {
   const settlerIsMe = s.created_by === myUid;
   if (settlerIsMe) return s.split_shares?.person_name ?? s.person?.name ?? "Unknown";
-  return people.find((p) => p.linked_user_id === s.created_by)?.name ?? s.creator?.full_name ?? "Unknown";
+  return (
+    people.find((p) => p.linked_user_id === s.created_by)?.name ?? s.creator?.full_name ?? "Unknown"
+  );
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const COLORS = [
-  "#EF4444", "#F59E0B", "#10B981", "#3B82F6", "#8B5CF6",
-  "#EC4899", "#14B8A6", "#F97316", "#6366F1", "#84CC16",
+  "#EF4444",
+  "#F59E0B",
+  "#10B981",
+  "#3B82F6",
+  "#8B5CF6",
+  "#EC4899",
+  "#14B8A6",
+  "#F97316",
+  "#6366F1",
+  "#84CC16",
 ];
 
 type Period = "today" | "weekly" | "monthly" | "annually";
@@ -71,14 +111,16 @@ function getPeriodRange(period: Period, anchor: Date): { dateFrom: string; dateT
     const d = format(anchor, "yyyy-MM-dd");
     return { dateFrom: d, dateTo: d };
   }
-  if (period === "weekly") return {
-    dateFrom: format(startOfWeek(anchor, { weekStartsOn: 1 }), "yyyy-MM-dd"),
-    dateTo: format(endOfWeek(anchor, { weekStartsOn: 1 }), "yyyy-MM-dd"),
-  };
-  if (period === "monthly") return {
-    dateFrom: format(startOfMonth(anchor), "yyyy-MM-dd"),
-    dateTo: format(endOfMonth(anchor), "yyyy-MM-dd"),
-  };
+  if (period === "weekly")
+    return {
+      dateFrom: format(startOfWeek(anchor, { weekStartsOn: 1 }), "yyyy-MM-dd"),
+      dateTo: format(endOfWeek(anchor, { weekStartsOn: 1 }), "yyyy-MM-dd"),
+    };
+  if (period === "monthly")
+    return {
+      dateFrom: format(startOfMonth(anchor), "yyyy-MM-dd"),
+      dateTo: format(endOfMonth(anchor), "yyyy-MM-dd"),
+    };
   return {
     dateFrom: format(startOfYear(anchor), "yyyy-MM-dd"),
     dateTo: format(endOfYear(anchor), "yyyy-MM-dd"),
@@ -122,7 +164,14 @@ function PieLabel({ cx, cy, midAngle, outerRadius, name, percent }: any) {
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
   if (percent < 0.04) return null;
   return (
-    <text x={x} y={y} fill="#9CA3AF" textAnchor={x > cx ? "start" : "end"} dominantBaseline="central" fontSize={10}>
+    <text
+      x={x}
+      y={y}
+      fill="#9CA3AF"
+      textAnchor={x > cx ? "start" : "end"}
+      dominantBaseline="central"
+      fontSize={10}
+    >
       {name} {(percent * 100).toFixed(1)}%
     </text>
   );
@@ -164,29 +213,40 @@ function SplitItemRow({ s, highlightPerson }: { s: any; highlightPerson?: string
     ? [s.accounts.institution, s.accounts.label].filter(Boolean).join(" · ")
     : "";
   const dateStr = fmtDT(s.date, s.time);
-  const description = s.description || (
-    isGroup ? (s.groups?.name ?? "Group split")
-    : isPerson ? `Split w/ ${shares[0]?.person_name ?? ""}`
-    : "Split"
-  );
+  const description =
+    s.description ||
+    (isGroup
+      ? (s.groups?.name ?? "Group split")
+      : isPerson
+        ? `Split w/ ${shares[0]?.person_name ?? ""}`
+        : "Split");
   const peopleLine = highlightPerson
     ? highlightPerson
     : isGroup
-    ? (s.groups?.name ?? "Group")
-    : shares.map((sh: any) => sh.person_name).filter(Boolean).join(", ");
+      ? (s.groups?.name ?? "Group")
+      : shares
+          .map((sh: any) => sh.person_name)
+          .filter(Boolean)
+          .join(", ");
 
   return (
     <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
       <div className="px-4 py-3">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium truncate flex-1">{description}</p>
-          <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">{formatMoney(total)}</p>
+          <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">
+            {formatMoney(total)}
+          </p>
         </div>
         {isPerson && (
           <>
             <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{shares[0]?.person_name ?? ""}</p>
-              <p className="text-[12px] font-mono text-[#10B981] shrink-0">You lent {formatMoney(totalShares)}</p>
+              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
+                {shares[0]?.person_name ?? ""}
+              </p>
+              <p className="text-[12px] font-mono text-[#10B981] shrink-0">
+                You lent {formatMoney(totalShares)}
+              </p>
             </div>
             <div className="flex items-center justify-between gap-2 mt-0.5">
               <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
@@ -198,11 +258,15 @@ function SplitItemRow({ s, highlightPerson }: { s: any; highlightPerson?: string
           <>
             <div className="flex items-center justify-between gap-2 mt-0.5">
               <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{peopleLine}</p>
-              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">{shares.length} × {formatMoney(perShare)}</p>
+              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+                {shares.length} × {formatMoney(perShare)}
+              </p>
             </div>
             <div className="flex items-center justify-between gap-2 mt-0.5">
               <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
-              <p className="text-[12px] font-mono text-[#10B981] shrink-0">You lent {formatMoney(totalShares)}</p>
+              <p className="text-[12px] font-mono text-[#10B981] shrink-0">
+                You lent {formatMoney(totalShares)}
+              </p>
             </div>
             <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5 text-right">{dateStr}</p>
           </>
@@ -221,7 +285,9 @@ function SettlementExpenseRow({ s, personName }: { s: any; personName: string })
       <div className="px-4 py-3">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium">You → {personName}</p>
-          <p className="text-sm font-mono font-semibold text-[#EF4444] shrink-0">{formatMoney(s.amount)}</p>
+          <p className="text-sm font-mono font-semibold text-[#EF4444] shrink-0">
+            {formatMoney(s.amount)}
+          </p>
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
           <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
@@ -233,9 +299,7 @@ function SettlementExpenseRow({ s, personName }: { s: any; personName: string })
 }
 
 function IncomeRow({ t }: { t: any }) {
-  const label = t.income_source_text
-    ?? (t.people?.name ?? null)
-    ?? (t.categories?.name ?? "Income");
+  const label = t.income_source_text ?? t.people?.name ?? null ?? t.categories?.name ?? "Income";
   const account = t.accounts
     ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ")
     : "";
@@ -263,7 +327,9 @@ function SettlementIncomeRow({ s }: { s: any }) {
       <div className="px-4 py-3">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium">{payerName} → You</p>
-          <p className="text-sm font-mono font-semibold text-[#22C55E] shrink-0">+{formatMoney(s.amount)}</p>
+          <p className="text-sm font-mono font-semibold text-[#22C55E] shrink-0">
+            +{formatMoney(s.amount)}
+          </p>
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
           <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
@@ -276,7 +342,11 @@ function SettlementIncomeRow({ s }: { s: any }) {
 
 // ─── Period Nav (shared) ─────────────────────────────────────────────────────
 function PeriodNav({
-  period, anchor, onNavigate, onChangePeriod, compact = false,
+  period,
+  anchor,
+  onNavigate,
+  onChangePeriod,
+  compact = false,
 }: {
   period: Period;
   anchor: Date;
@@ -304,15 +374,17 @@ function PeriodNav({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className={compact ? dropCls : `${dropCls} ml-auto`}>
-            {PERIOD_OPTIONS.find(p => p.key === period)?.label}
+            {PERIOD_OPTIONS.find((p) => p.key === period)?.label}
             <ChevronDown className={compact ? "h-3 w-3" : "h-4 w-4"} />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-36">
-          {PERIOD_OPTIONS.map(p => (
-            <DropdownMenuItem key={p.key}
+          {PERIOD_OPTIONS.map((p) => (
+            <DropdownMenuItem
+              key={p.key}
               onClick={() => onChangePeriod(p.key)}
-              className={cn("py-3 text-base", period === p.key && "text-primary font-medium")}>
+              className={cn("py-3 text-base", period === p.key && "text-primary font-medium")}
+            >
               {p.label}
             </DropdownMenuItem>
           ))}
@@ -352,7 +424,9 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       if (!u.user) return [];
       const { data, error } = await supabase
         .from("transactions")
-        .select("*, categories:category_id(name,icon), sub_categories:sub_category_id(name), accounts:account_id(label,institution)")
+        .select(
+          "*, categories:category_id(name,icon), sub_categories:sub_category_id(name), accounts:account_id(label,institution)",
+        )
         .eq("user_id", u.user.id)
         .eq("type", "expense")
         .eq("is_split", false)
@@ -361,9 +435,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
         .order("date", { ascending: false })
         .order("time", { ascending: false });
       if (error) throw error;
-      return (data ?? []).filter((t: any) =>
-        (t.categories?.name ?? "Other") === drillItem.name,
-      );
+      return (data ?? []).filter((t: any) => (t.categories?.name ?? "Other") === drillItem.name);
     },
     enabled: isExpenseCat,
   });
@@ -376,7 +448,9 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       if (!u.user) return [];
       const { data, error } = await supabase
         .from("splits")
-        .select("*, categories:category_id(name,icon), split_shares(*), accounts:account_id(label,institution), groups:group_id(name), people:person_id(name)")
+        .select(
+          "*, categories:category_id(name,icon), split_shares(*), accounts:account_id(label,institution), groups:group_id(name), people:person_id(name)",
+        )
         .eq("paid_by", "me")
         .eq("created_by", u.user.id)
         .gte("date", dateFrom)
@@ -385,7 +459,8 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
         .order("time", { ascending: false });
       if (error) throw error;
       return (data ?? []).filter((s: any) => {
-        if (isExpenseCat) return ((s.categories as any)?.name ?? "Uncategorized") === drillItem.name;
+        if (isExpenseCat)
+          return ((s.categories as any)?.name ?? "Uncategorized") === drillItem.name;
         if (isExpensePerson) {
           return (s.split_shares as any[]).some((sh: any) => sh.person_name === drillItem.name);
         }
@@ -403,7 +478,9 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       if (!u.user) return [];
       const { data, error } = await supabase
         .from("splits")
-        .select("*, categories:category_id(name,icon), split_shares(*), accounts:account_id(label,institution), groups:group_id(name), people:person_id(name)")
+        .select(
+          "*, categories:category_id(name,icon), split_shares(*), accounts:account_id(label,institution), groups:group_id(name), people:person_id(name)",
+        )
         .eq("pending_for_user_id", u.user.id)
         .eq("account_pending", false)
         .not("category_id", "is", null)
@@ -412,8 +489,9 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
         .order("date", { ascending: false })
         .order("time", { ascending: false });
       if (error) throw error;
-      return (data ?? []).filter((s: any) =>
-        ((s.categories as any)?.name ?? "Uncategorized") === drillItem.name);
+      return (data ?? []).filter(
+        (s: any) => ((s.categories as any)?.name ?? "Uncategorized") === drillItem.name,
+      );
     },
     enabled: isExpenseCat,
   });
@@ -426,7 +504,9 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       if (!u.user) return [];
       const { data, error } = await supabase
         .from("transactions")
-        .select("*, categories:category_id(name), sub_categories:sub_category_id(name), accounts:account_id(label,institution), people:income_person_id(name)")
+        .select(
+          "*, categories:category_id(name), sub_categories:sub_category_id(name), accounts:account_id(label,institution), people:income_person_id(name)",
+        )
         .eq("user_id", u.user.id)
         .eq("type", "income")
         .gte("date", dateFrom)
@@ -435,9 +515,10 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
         .order("time", { ascending: false });
       if (error) throw error;
       return (data ?? []).filter((t: any) => {
-        const label = t.income_source_type === "person"
-          ? (t.people?.name ?? "Unknown")
-          : (t.income_source_text ?? "Other");
+        const label =
+          t.income_source_type === "person"
+            ? (t.people?.name ?? "Unknown")
+            : (t.income_source_text ?? "Other");
         return label === drillItem.name;
       });
     },
@@ -456,7 +537,9 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       if (!u.user) return [];
       const { data, error } = await supabase
         .from("settlements")
-        .select("*, person:person_id(name), creator:created_by(full_name), split_shares:split_share_id(person_name, share_amount), accounts:account_id(label,institution)")
+        .select(
+          "*, person:person_id(name), creator:created_by(full_name), split_shares:split_share_id(person_name, share_amount), accounts:account_id(label,institution)",
+        )
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999");
       if (error) throw error;
@@ -466,8 +549,12 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
   });
   // Only the money I RECEIVED from THIS drill person (either direction, whoever recorded).
   const drillSettlements = useMemo(
-    () => (drillSettlementsRaw as any[]).filter((s) =>
-      settlementReceivedByMe(s, s._uid) && settlementCounterpartyName(s, s._uid, people as any[]) === drillItem.name),
+    () =>
+      (drillSettlementsRaw as any[]).filter(
+        (s) =>
+          settlementReceivedByMe(s, s._uid) &&
+          settlementCounterpartyName(s, s._uid, people as any[]) === drillItem.name,
+      ),
     [drillSettlementsRaw, people, drillItem.name],
   );
 
@@ -487,7 +574,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       });
     }
     if (drillPeriod === "monthly") {
-      return [1, 2, 3, 4, 5].map(w => ({ label: `W${w}`, key: w }));
+      return [1, 2, 3, 4, 5].map((w) => ({ label: `W${w}`, key: w }));
     }
     // annually
     const year = drillAnchor.getFullYear();
@@ -501,7 +588,8 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
     function txnKey(dateStr: string, timeStr?: string | null): number | string {
       if (drillPeriod === "today") return parseInt((timeStr ?? "00:00").split(":")[0], 10);
       if (drillPeriod === "weekly") return dateStr;
-      if (drillPeriod === "monthly") return Math.min(Math.ceil(parseInt(dateStr.split("-")[2], 10) / 7), 5);
+      if (drillPeriod === "monthly")
+        return Math.min(Math.ceil(parseInt(dateStr.split("-")[2], 10) / 7), 5);
       return parseInt(dateStr.split("-")[1], 10);
     }
     function caKey(createdAt: string): number | string {
@@ -511,21 +599,50 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       if (drillPeriod === "monthly") return Math.min(Math.ceil(d.getDate() / 7), 5);
       return d.getMonth() + 1;
     }
-    const sums = new Map<number | string, number>(chartBuckets.map(b => [b.key, 0]));
+    const sums = new Map<number | string, number>(chartBuckets.map((b) => [b.key, 0]));
     if (isExpenseCat) {
-      for (const t of expTxns as any[]) { const k = txnKey(t.date, t.time); sums.set(k, (sums.get(k) ?? 0) + Number(t.amount)); }
-      for (const s of drillSplits as any[]) { const k = txnKey(s.date, s.time); sums.set(k, (sums.get(k) ?? 0) + Number(s.total_amount)); }
-      for (const s of drillPayerSplits as any[]) { const k = txnKey(s.date, s.time); sums.set(k, (sums.get(k) ?? 0) + Number(s.total_amount)); }
+      for (const t of expTxns as any[]) {
+        const k = txnKey(t.date, t.time);
+        sums.set(k, (sums.get(k) ?? 0) + Number(t.amount));
+      }
+      for (const s of drillSplits as any[]) {
+        const k = txnKey(s.date, s.time);
+        sums.set(k, (sums.get(k) ?? 0) + Number(s.total_amount));
+      }
+      for (const s of drillPayerSplits as any[]) {
+        const k = txnKey(s.date, s.time);
+        sums.set(k, (sums.get(k) ?? 0) + Number(s.total_amount));
+      }
     } else if (isExpensePerson) {
-      for (const s of drillSplits as any[]) { const k = txnKey(s.date, s.time); sums.set(k, (sums.get(k) ?? 0) + Number(s.total_amount)); }
+      for (const s of drillSplits as any[]) {
+        const k = txnKey(s.date, s.time);
+        sums.set(k, (sums.get(k) ?? 0) + Number(s.total_amount));
+      }
     } else {
-      for (const t of incTxns as any[]) { const k = txnKey(t.date, t.time); sums.set(k, (sums.get(k) ?? 0) + Number(t.amount)); }
+      for (const t of incTxns as any[]) {
+        const k = txnKey(t.date, t.time);
+        sums.set(k, (sums.get(k) ?? 0) + Number(t.amount));
+      }
       if (isIncomePerson) {
-        for (const s of drillSettlements as any[]) { const k = caKey(s.created_at); sums.set(k, (sums.get(k) ?? 0) + Number(s.amount)); }
+        for (const s of drillSettlements as any[]) {
+          const k = caKey(s.created_at);
+          sums.set(k, (sums.get(k) ?? 0) + Number(s.amount));
+        }
       }
     }
-    return chartBuckets.map(b => ({ label: b.label, value: sums.get(b.key) ?? 0 }));
-  }, [chartBuckets, expTxns, drillSplits, drillPayerSplits, incTxns, drillSettlements, drillPeriod, isExpenseCat, isExpensePerson, isIncomePerson]);
+    return chartBuckets.map((b) => ({ label: b.label, value: sums.get(b.key) ?? 0 }));
+  }, [
+    chartBuckets,
+    expTxns,
+    drillSplits,
+    drillPayerSplits,
+    incTxns,
+    drillSettlements,
+    drillPeriod,
+    isExpenseCat,
+    isExpensePerson,
+    isIncomePerson,
+  ]);
 
   // Sub-categories for filter list (expense-category only, from expense txns)
   const subItems = useMemo(() => {
@@ -547,38 +664,75 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
     const items: any[] = [];
     if (isExpenseCat) {
       const filteredTxns = selectedSub
-        ? (expTxns as any[]).filter(t => (t.sub_categories?.name ?? "Uncategorized") === selectedSub)
-        : expTxns as any[];
-      filteredTxns.forEach(t => items.push({ ...t, _type: "exp", _sort: `${t.date}T${t.time ?? "00:00"}` }));
+        ? (expTxns as any[]).filter(
+            (t) => (t.sub_categories?.name ?? "Uncategorized") === selectedSub,
+          )
+        : (expTxns as any[]);
+      filteredTxns.forEach((t) =>
+        items.push({ ...t, _type: "exp", _sort: `${t.date}T${t.time ?? "00:00"}` }),
+      );
       if (!selectedSub) {
-        (drillSplits as any[]).forEach(s => items.push({ ...s, _type: "split", _sort: `${s.date}T${s.time ?? "00:00"}` }));
-        (drillPayerSplits as any[]).forEach(s => items.push({ ...s, _type: "split", _sort: `${s.date}T${s.time ?? "00:00"}` }));
+        (drillSplits as any[]).forEach((s) =>
+          items.push({ ...s, _type: "split", _sort: `${s.date}T${s.time ?? "00:00"}` }),
+        );
+        (drillPayerSplits as any[]).forEach((s) =>
+          items.push({ ...s, _type: "split", _sort: `${s.date}T${s.time ?? "00:00"}` }),
+        );
       }
     } else if (isExpensePerson) {
-      (drillSplits as any[]).forEach(s => items.push({ ...s, _type: "split", _sort: `${s.date}T${s.time ?? "00:00"}` }));
+      (drillSplits as any[]).forEach((s) =>
+        items.push({ ...s, _type: "split", _sort: `${s.date}T${s.time ?? "00:00"}` }),
+      );
     } else if (isIncomeSource) {
-      (incTxns as any[]).forEach(t => items.push({ ...t, _type: "inc", _sort: `${t.date}T${t.time ?? "00:00"}` }));
+      (incTxns as any[]).forEach((t) =>
+        items.push({ ...t, _type: "inc", _sort: `${t.date}T${t.time ?? "00:00"}` }),
+      );
     } else if (isIncomePerson) {
-      (incTxns as any[]).forEach(t => items.push({ ...t, _type: "inc", _sort: `${t.date}T${t.time ?? "00:00"}` }));
-      (drillSettlements as any[]).forEach(s => items.push({ ...s, _type: "set-inc", _sort: s.created_at ?? "" }));
+      (incTxns as any[]).forEach((t) =>
+        items.push({ ...t, _type: "inc", _sort: `${t.date}T${t.time ?? "00:00"}` }),
+      );
+      (drillSettlements as any[]).forEach((s) =>
+        items.push({ ...s, _type: "set-inc", _sort: s.created_at ?? "" }),
+      );
     }
     return items.sort((a, b) => b._sort.localeCompare(a._sort));
-  }, [expTxns, drillSplits, drillPayerSplits, incTxns, drillSettlements, selectedSub, isExpenseCat, isExpensePerson, isIncomeSource, isIncomePerson]);
+  }, [
+    expTxns,
+    drillSplits,
+    drillPayerSplits,
+    incTxns,
+    drillSettlements,
+    selectedSub,
+    isExpenseCat,
+    isExpensePerson,
+    isIncomeSource,
+    isIncomePerson,
+  ]);
 
-  const total = useMemo(() => allItems.reduce((s, item) => {
-    if (item._type === "exp") return s + Number(item.amount);
-    if (item._type === "split") return s + Number(item.total_amount);
-    if (item._type === "inc") return s + Number(item.amount);
-    if (item._type === "set-inc") return s + Number(item.amount);
-    return s;
-  }, 0), [allItems]);
+  const total = useMemo(
+    () =>
+      allItems.reduce((s, item) => {
+        if (item._type === "exp") return s + Number(item.amount);
+        if (item._type === "split") return s + Number(item.total_amount);
+        if (item._type === "inc") return s + Number(item.amount);
+        if (item._type === "set-inc") return s + Number(item.amount);
+        return s;
+      }, 0),
+    [allItems],
+  );
 
   // Re-compute total for sub-filter "All" row
   const totalAll = useMemo(() => {
     let t = 0;
-    (expTxns as any[]).forEach(x => { t += Number(x.amount); });
-    (drillSplits as any[]).forEach(x => { t += Number(x.total_amount); });
-    (drillPayerSplits as any[]).forEach(x => { t += Number(x.total_amount); });
+    (expTxns as any[]).forEach((x) => {
+      t += Number(x.amount);
+    });
+    (drillSplits as any[]).forEach((x) => {
+      t += Number(x.total_amount);
+    });
+    (drillPayerSplits as any[]).forEach((x) => {
+      t += Number(x.total_amount);
+    });
     return t;
   }, [expTxns, drillSplits, drillPayerSplits]);
 
@@ -594,8 +748,11 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
           period={drillPeriod}
           anchor={drillAnchor}
           compact
-          onNavigate={(dir) => setDrillAnchor(a => navigateAnchor(drillPeriod, a, dir))}
-          onChangePeriod={(p) => { setDrillPeriod(p); setDrillAnchor(new Date()); }}
+          onNavigate={(dir) => setDrillAnchor((a) => navigateAnchor(drillPeriod, a, dir))}
+          onChangePeriod={(p) => {
+            setDrillPeriod(p);
+            setDrillAnchor(new Date());
+          }}
         />
       </div>
 
@@ -604,30 +761,40 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
         <div className="px-4 py-4">
           <p className="text-xs text-muted-foreground">Total</p>
           <p className="text-3xl font-mono font-bold" style={{ color }}>
-            {isIncome ? "+" : ""}{formatMoney(total)}
+            {isIncome ? "+" : ""}
+            {formatMoney(total)}
           </p>
         </div>
 
         {/* Sub-category filter list (expense-category only) */}
         {showSubFilter && (
           <div className="mx-4 rounded-xl overflow-hidden border border-border mb-4">
-            <button type="button"
+            <button
+              type="button"
               onClick={() => setSelectedSub(null)}
-              className={cn("w-full flex items-center justify-between px-4 py-3 text-sm border-b border-border",
-                selectedSub === null ? "bg-primary/10" : "bg-card")}>
+              className={cn(
+                "w-full flex items-center justify-between px-4 py-3 text-sm border-b border-border",
+                selectedSub === null ? "bg-primary/10" : "bg-card",
+              )}
+            >
               <span className="font-medium">All</span>
               <div className="flex items-center gap-4">
                 <span className="text-muted-foreground text-xs">100%</span>
                 <span className="font-mono text-xs">{formatMoney(totalAll)}</span>
               </div>
             </button>
-            {subItems.map(item => {
+            {subItems.map((item) => {
               const pct = totalAll > 0 ? (item.value / totalAll) * 100 : 0;
               return (
-                <button key={item.name} type="button"
+                <button
+                  key={item.name}
+                  type="button"
                   onClick={() => setSelectedSub(selectedSub === item.name ? null : item.name)}
-                  className={cn("w-full flex items-center justify-between px-4 py-3 text-sm border-b border-border last:border-0",
-                    selectedSub === item.name ? "bg-primary/10" : "bg-card")}>
+                  className={cn(
+                    "w-full flex items-center justify-between px-4 py-3 text-sm border-b border-border last:border-0",
+                    selectedSub === item.name ? "bg-primary/10" : "bg-card",
+                  )}
+                >
                   <span>{item.name}</span>
                   <div className="flex items-center gap-4">
                     <span className="text-muted-foreground text-xs">{pct.toFixed(0)}%</span>
@@ -647,16 +814,42 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
             <div className="mx-4 mb-4 rounded-xl overflow-hidden bg-[#0A0A0A]">
               <div style={{ overflowX: "auto", touchAction: "pan-x" }}>
                 <div style={{ width: chartW, padding: "12px 8px 4px 0" }}>
-                  <LineChart width={chartW} height={140} data={trendData} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
+                  <LineChart
+                    width={chartW}
+                    height={140}
+                    data={trendData}
+                    margin={{ top: 4, right: 16, bottom: 0, left: 0 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" />
-                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "#9CA3AF" }} width={44} axisLine={false} tickLine={false} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 10, fill: "#9CA3AF" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: "#9CA3AF" }}
+                      width={44}
+                      axisLine={false}
+                      tickLine={false}
+                    />
                     <Tooltip
-                      contentStyle={{ background: "#1A1A1A", border: "1px solid #2A2A2A", fontSize: 11, color: "#FFFFFF" }}
+                      contentStyle={{
+                        background: "#1A1A1A",
+                        border: "1px solid #2A2A2A",
+                        fontSize: 11,
+                        color: "#FFFFFF",
+                      }}
                       labelStyle={{ color: "#9CA3AF" }}
                       formatter={(v: any) => [formatMoney(v), ""]}
                     />
-                    <Line type="monotone" dataKey="value" stroke="#FFFFFF" strokeWidth={2} dot={{ fill: "#FFFFFF", r: 3 }} />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#FFFFFF"
+                      strokeWidth={2}
+                      dot={{ fill: "#FFFFFF", r: 3 }}
+                    />
                   </LineChart>
                 </div>
               </div>
@@ -667,32 +860,53 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
         {/* Transaction list */}
         <div className="mx-4 rounded-xl overflow-hidden border border-border divide-y divide-border">
           {allItems.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-8">No data for this period</p>
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No data for this period
+            </p>
           )}
           {allItems.map((item) => {
-            if (item._type === "exp") return (
-              <SwipeRow key={item.id} onEdit={() => setEditItem(item)} onDelete={() => setDeleteItem(item)}>
-                <ExpenseRow t={item} />
-              </SwipeRow>
-            );
+            if (item._type === "exp")
+              return (
+                <SwipeRow
+                  key={item.id}
+                  onEdit={() => setEditItem(item)}
+                  onDelete={() => setDeleteItem(item)}
+                >
+                  <ExpenseRow t={item} />
+                </SwipeRow>
+              );
             if (item._type === "split") {
               const highlight = isExpensePerson ? drillItem.name : undefined;
               return (
-                <SwipeRow key={item.id} onEdit={() => setEditItem(item)} onDelete={() => setDeleteItem(item)}>
+                <SwipeRow
+                  key={item.id}
+                  onEdit={() => setEditItem(item)}
+                  onDelete={() => setDeleteItem(item)}
+                >
                   <SplitItemRow s={item} highlightPerson={highlight} />
                 </SwipeRow>
               );
             }
-            if (item._type === "inc") return (
-              <SwipeRow key={item.id} onEdit={() => setEditItem(item)} onDelete={() => setDeleteItem(item)}>
-                <IncomeRow t={item} />
-              </SwipeRow>
-            );
-            if (item._type === "set-inc") return (
-              <SwipeRow key={item.id} onEdit={() => setEditItem(item)} onDelete={() => setDeleteItem(item)}>
-                <SettlementIncomeRow s={item} />
-              </SwipeRow>
-            );
+            if (item._type === "inc")
+              return (
+                <SwipeRow
+                  key={item.id}
+                  onEdit={() => setEditItem(item)}
+                  onDelete={() => setDeleteItem(item)}
+                >
+                  <IncomeRow t={item} />
+                </SwipeRow>
+              );
+            if (item._type === "set-inc")
+              return (
+                <SwipeRow
+                  key={item.id}
+                  onEdit={() => setEditItem(item)}
+                  onDelete={() => setDeleteItem(item)}
+                >
+                  <SettlementIncomeRow s={item} />
+                </SwipeRow>
+              );
             return null;
           })}
         </div>
@@ -704,7 +918,10 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
           txn={editItem}
           open={!!editItem}
           onOpenChange={(o) => {
-            if (!o) { setEditItem(null); qc.invalidateQueries({ queryKey: ["drill"] }); }
+            if (!o) {
+              setEditItem(null);
+              qc.invalidateQueries({ queryKey: ["drill"] });
+            }
           }}
         />
       )}
@@ -713,7 +930,10 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
           split={editItem}
           open={!!editItem}
           onOpenChange={(o) => {
-            if (!o) { setEditItem(null); qc.invalidateQueries({ queryKey: ["drill"] }); }
+            if (!o) {
+              setEditItem(null);
+              qc.invalidateQueries({ queryKey: ["drill"] });
+            }
           }}
         />
       )}
@@ -722,13 +942,21 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
           settlement={editItem}
           open={!!editItem}
           onOpenChange={(o) => {
-            if (!o) { setEditItem(null); qc.invalidateQueries({ queryKey: ["drill"] }); }
+            if (!o) {
+              setEditItem(null);
+              qc.invalidateQueries({ queryKey: ["drill"] });
+            }
           }}
         />
       )}
 
       {/* Delete dialog */}
-      <AlertDialog open={!!deleteItem} onOpenChange={(o) => { if (!o) setDeleteItem(null); }}>
+      <AlertDialog
+        open={!!deleteItem}
+        onOpenChange={(o) => {
+          if (!o) setDeleteItem(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -736,37 +964,42 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-white" onClick={async () => {
-              if (!deleteItem) return;
-              const item = deleteItem;
-              setDeleteItem(null);
-              let error: any = null;
-              if (item._type === "exp" || item._type === "inc") {
-                ({ error } = await supabase.from("transactions").delete().eq("id", item.id));
-                if (!error) {
-                  qc.invalidateQueries({ queryKey: ["transactions"] });
-                  qc.invalidateQueries({ queryKey: ["accounts"] });
-                  qc.invalidateQueries({ queryKey: ["splits"] });
+            <AlertDialogAction
+              className="bg-destructive text-white"
+              onClick={async () => {
+                if (!deleteItem) return;
+                const item = deleteItem;
+                setDeleteItem(null);
+                let error: any = null;
+                if (item._type === "exp" || item._type === "inc") {
+                  ({ error } = await supabase.from("transactions").delete().eq("id", item.id));
+                  if (!error) {
+                    qc.invalidateQueries({ queryKey: ["transactions"] });
+                    qc.invalidateQueries({ queryKey: ["accounts"] });
+                    qc.invalidateQueries({ queryKey: ["splits"] });
+                    qc.invalidateQueries({ queryKey: ["drill"] });
+                  }
+                } else if (item._type === "split") {
+                  ({ error } = await supabase.from("splits").delete().eq("id", item.id));
+                  if (!error) {
+                    qc.invalidateQueries({ queryKey: ["splits"] });
+                    qc.invalidateQueries({ queryKey: ["transactions"] });
+                    qc.invalidateQueries({ queryKey: ["accounts"] });
+                    qc.invalidateQueries({ queryKey: ["drill"] });
+                  }
+                } else if (item._type === "set-inc") {
+                  // Routed through the delete_settlement RPC (permission + balance triggers +
+                  // notifications). It shows its own toast, so return before the generic one.
+                  await deleteSettlementRpc(item.id, qc);
                   qc.invalidateQueries({ queryKey: ["drill"] });
+                  return;
                 }
-              } else if (item._type === "split") {
-                ({ error } = await supabase.from("splits").delete().eq("id", item.id));
-                if (!error) {
-                  qc.invalidateQueries({ queryKey: ["splits"] });
-                  qc.invalidateQueries({ queryKey: ["transactions"] });
-                  qc.invalidateQueries({ queryKey: ["accounts"] });
-                  qc.invalidateQueries({ queryKey: ["drill"] });
-                }
-              } else if (item._type === "set-inc") {
-                // Routed through the delete_settlement RPC (permission + balance triggers +
-                // notifications). It shows its own toast, so return before the generic one.
-                await deleteSettlementRpc(item.id, qc);
-                qc.invalidateQueries({ queryKey: ["drill"] });
-                return;
-              }
-              if (error) toast.error(error.message);
-              else toast.success("Deleted");
-            }}>Delete</AlertDialogAction>
+                if (error) toast.error(error.message);
+                else toast.success("Deleted");
+              }}
+            >
+              Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -780,7 +1013,11 @@ export default function ReportsPage() {
   const [anchor, setAnchor] = useState(new Date());
   const [tab, setTab] = useState<"income" | "expense">("expense");
   const [drillItem, setDrillItem] = useState<DrillItem | null>(null);
-  const [activeSlice, setActiveSlice] = useState<{ name: string; value: number; color: string } | null>(null);
+  const [activeSlice, setActiveSlice] = useState<{
+    name: string;
+    value: number;
+    color: string;
+  } | null>(null);
 
   const { dateFrom, dateTo } = useMemo(() => getPeriodRange(period, anchor), [period, anchor]);
 
@@ -836,7 +1073,9 @@ export default function ReportsPage() {
       if (!u.user) return [];
       const { data, error } = await supabase
         .from("settlements")
-        .select("*, person:person_id(name), creator:created_by(full_name), split_shares:split_share_id(person_name, share_amount)")
+        .select(
+          "*, person:person_id(name), creator:created_by(full_name), split_shares:split_share_id(person_name, share_amount)",
+        )
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999");
       if (error) throw error;
@@ -847,17 +1086,17 @@ export default function ReportsPage() {
   // ── Expense pie: normal expenses (non-split) + splits grouped by category
   const expenseData = useMemo(() => {
     const map = new Map<string, number>();
-    (txns as any[]).forEach(t => {
+    (txns as any[]).forEach((t) => {
       if (t.type !== "expense" || t.is_split) return;
       const name = t.categories?.name ?? "Other";
       map.set(name, (map.get(name) ?? 0) + Number(t.amount));
     });
-    (mySplits as any[]).forEach(s => {
+    (mySplits as any[]).forEach((s) => {
       const name = (s.categories as any)?.name ?? "Uncategorized";
       map.set(name, (map.get(name) ?? 0) + Number(s.total_amount));
     });
     // Incoming splits I paid (full amount left my account on confirm).
-    (payerSplits as any[]).forEach(s => {
+    (payerSplits as any[]).forEach((s) => {
       const name = (s.categories as any)?.name ?? "Uncategorized";
       map.set(name, (map.get(name) ?? 0) + Number(s.total_amount));
     });
@@ -866,20 +1105,17 @@ export default function ReportsPage() {
       .sort((a, b) => b.value - a.value);
   }, [txns, mySplits, payerSplits]);
 
-  const expenseTotal = useMemo(
-    () => expenseData.reduce((s, d) => s + d.value, 0),
-    [expenseData],
-  );
+  const expenseTotal = useMemo(() => expenseData.reduce((s, d) => s + d.value, 0), [expenseData]);
 
   // ── Income pie: income transactions + settlements received grouped by source/person
   const incomeData = useMemo(() => {
     const map = new Map<string, { value: number; drillType: DrillType }>();
-    (txns as any[]).forEach(t => {
+    (txns as any[]).forEach((t) => {
       if (t.type !== "income") return;
       let name: string;
       let dt: DrillType;
       if (t.income_source_type === "person") {
-        const person = (people as any[]).find(p => p.id === t.income_person_id);
+        const person = (people as any[]).find((p) => p.id === t.income_person_id);
         name = person?.name ?? "Unknown";
         dt = "income-person";
       } else {
@@ -889,7 +1125,7 @@ export default function ReportsPage() {
       const ex = map.get(name);
       map.set(name, { value: (ex?.value ?? 0) + Number(t.amount), drillType: ex?.drillType ?? dt });
     });
-    (incomeSettlements as any[]).forEach(s => {
+    (incomeSettlements as any[]).forEach((s) => {
       if (!settlementReceivedByMe(s, s._uid)) return; // only money I actually received is income
       const name = settlementCounterpartyName(s, s._uid, people as any[]);
       const ex = map.get(name);
@@ -901,10 +1137,7 @@ export default function ReportsPage() {
       .sort((a, b) => b.value - a.value);
   }, [txns, incomeSettlements, people]);
 
-  const incomeTotal = useMemo(
-    () => incomeData.reduce((s, d) => s + d.value, 0),
-    [incomeData],
-  );
+  const incomeTotal = useMemo(() => incomeData.reduce((s, d) => s + d.value, 0), [incomeData]);
 
   const chartData = tab === "expense" ? expenseData : incomeData;
   const chartTotal = tab === "expense" ? expenseTotal : incomeTotal;
@@ -912,7 +1145,12 @@ export default function ReportsPage() {
   if (drillItem) {
     return (
       <div className="h-full flex flex-col">
-        <DrillPage drillItem={drillItem} onBack={() => { setDrillItem(null); }} />
+        <DrillPage
+          drillItem={drillItem}
+          onBack={() => {
+            setDrillItem(null);
+          }}
+        />
       </div>
     );
   }
@@ -925,23 +1163,44 @@ export default function ReportsPage() {
           <PeriodNav
             period={period}
             anchor={anchor}
-            onNavigate={(dir) => { setAnchor(a => navigateAnchor(period, a, dir)); setActiveSlice(null); }}
-            onChangePeriod={(p) => { setPeriod(p); setAnchor(new Date()); setActiveSlice(null); }}
+            onNavigate={(dir) => {
+              setAnchor((a) => navigateAnchor(period, a, dir));
+              setActiveSlice(null);
+            }}
+            onChangePeriod={(p) => {
+              setPeriod(p);
+              setAnchor(new Date());
+              setActiveSlice(null);
+            }}
           />
         </div>
 
         {/* Income / Expense tabs */}
         <div className="flex rounded-xl bg-secondary p-1 gap-1">
-          <button type="button"
-            onClick={() => { setTab("income"); setActiveSlice(null); }}
-            className={cn("flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
-              tab === "income" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}>
+          <button
+            type="button"
+            onClick={() => {
+              setTab("income");
+              setActiveSlice(null);
+            }}
+            className={cn(
+              "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
+              tab === "income" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+            )}
+          >
             Income <span className="font-mono text-xs ml-1">{formatMoney(incomeTotal)}</span>
           </button>
-          <button type="button"
-            onClick={() => { setTab("expense"); setActiveSlice(null); }}
-            className={cn("flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
-              tab === "expense" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}>
+          <button
+            type="button"
+            onClick={() => {
+              setTab("expense");
+              setActiveSlice(null);
+            }}
+            className={cn(
+              "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
+              tab === "expense" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+            )}
+          >
             Expenses <span className="font-mono text-xs ml-1">{formatMoney(expenseTotal)}</span>
           </button>
         </div>
@@ -988,7 +1247,10 @@ export default function ReportsPage() {
             {activeSlice && (
               <div className="mx-auto w-fit bg-card border border-border rounded-xl px-5 py-3 text-center shadow-lg -mt-4 mb-2">
                 <p className="text-sm font-semibold text-foreground">{activeSlice.name}</p>
-                <p className="font-mono text-base font-bold mt-0.5" style={{ color: activeSlice.color }}>
+                <p
+                  className="font-mono text-base font-bold mt-0.5"
+                  style={{ color: activeSlice.color }}
+                >
                   {formatMoney(activeSlice.value)}
                 </p>
               </div>
@@ -1002,12 +1264,15 @@ export default function ReportsPage() {
         {chartData.map((item, i) => {
           const pct = chartTotal > 0 ? Math.round((item.value / chartTotal) * 100) : 0;
           return (
-            <button key={item.name} type="button"
+            <button
+              key={item.name}
+              type="button"
               onClick={() => {
                 setDrillItem({ name: item.name, colorIdx: i, drillType: item.drillType });
                 setActiveSlice(null);
               }}
-              className="w-full flex items-center gap-3 px-3 py-3.5 active:bg-secondary/40">
+              className="w-full flex items-center gap-3 px-3 py-3.5 active:bg-secondary/40"
+            >
               <div
                 className="h-9 w-12 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
                 style={{ background: COLORS[i % COLORS.length] }}

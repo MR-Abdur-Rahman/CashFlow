@@ -34,7 +34,8 @@ export default function AuthPage() {
     try {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
-          email, password,
+          email,
+          password,
           options: { data: { full_name: name }, emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
@@ -86,7 +87,7 @@ export default function AuthPage() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.origin + "/home" }
+        options: { redirectTo: window.location.origin + "/home" },
       });
       if (error) throw error;
     } catch {
@@ -108,10 +109,18 @@ export default function AuthPage() {
       <div className="surface-card w-full p-5 space-y-4">
         <div className="flex gap-2 rounded-lg bg-secondary p-1">
           {(["email", "phone"] as const).map((t) => (
-            <button key={t} type="button"
-              onClick={() => { setTab(t); setOtpSent(false); }}
-              className={cn("flex-1 rounded-md py-1.5 text-sm capitalize",
-                tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>
+            <button
+              key={t}
+              type="button"
+              onClick={() => {
+                setTab(t);
+                setOtpSent(false);
+              }}
+              className={cn(
+                "flex-1 rounded-md py-1.5 text-sm capitalize",
+                tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground",
+              )}
+            >
               {t}
             </button>
           ))}
@@ -121,9 +130,15 @@ export default function AuthPage() {
           <form onSubmit={handleEmail} className="space-y-4">
             <div className="flex gap-2 rounded-lg bg-secondary p-1">
               {(["signin", "signup"] as const).map((m) => (
-                <button type="button" key={m} onClick={() => setMode(m)}
-                  className={cn("flex-1 rounded-md py-1.5 text-sm",
-                    mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>
+                <button
+                  type="button"
+                  key={m}
+                  onClick={() => setMode(m)}
+                  className={cn(
+                    "flex-1 rounded-md py-1.5 text-sm",
+                    mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground",
+                  )}
+                >
                   {m === "signin" ? "Sign in" : "Sign up"}
                 </button>
               ))}
@@ -136,11 +151,24 @@ export default function AuthPage() {
             )}
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Input
+                id="password"
+                type="password"
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {mode === "signin" ? "Sign in" : "Create account"}
@@ -150,24 +178,41 @@ export default function AuthPage() {
           <form onSubmit={otpSent ? verifyOtp : sendOtp} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="phone">Phone number</Label>
-              <Input id="phone" type="tel" placeholder="+9477..."
-                value={phone} onChange={(e) => setPhone(e.target.value)}
-                required disabled={otpSent} />
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="+9477..."
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                disabled={otpSent}
+              />
             </div>
             {otpSent && (
               <div className="space-y-1.5">
                 <Label htmlFor="otp">6-digit code</Label>
-                <Input id="otp" inputMode="numeric" maxLength={6}
-                  value={otp} onChange={(e) => setOtp(e.target.value)} required />
+                <Input
+                  id="otp"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  required
+                />
               </div>
             )}
             <Button type="submit" className="w-full" disabled={loading}>
               {otpSent ? "Verify & sign in" : "Send code"}
             </Button>
             {otpSent && (
-              <button type="button"
+              <button
+                type="button"
                 className="w-full text-xs text-muted-foreground underline"
-                onClick={() => { setOtpSent(false); setOtp(""); }}>
+                onClick={() => {
+                  setOtpSent(false);
+                  setOtp("");
+                }}
+              >
                 Use a different number
               </button>
             )}
@@ -179,8 +224,13 @@ export default function AuthPage() {
           <span className="absolute left-0 top-1/2 w-full border-t border-border" />
         </div>
 
-        <Button type="button" variant="outline" className="w-full"
-          onClick={handleGoogle} disabled={loading}>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={handleGoogle}
+          disabled={loading}
+        >
           Continue with Google
         </Button>
       </div>
