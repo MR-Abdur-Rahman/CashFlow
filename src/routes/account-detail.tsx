@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { accountQuery, transactionsQuery, splitBalancesQuery } from "@/lib/queries";
 import { settlementNetAfter } from "@/lib/balance";
 import { AccountIcon } from "@/components/AccountIcon";
+import { UserAvatar } from "@/components/UserAvatar";
+import { splitRowAvatar } from "@/lib/people";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +26,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Users,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -590,45 +593,55 @@ function SplitRow({ s }: { s: any }) {
   const groupName = s.groups?.name ?? "Group";
   const shareCount = shares.length + 1;
   const perShare = shareCount > 0 ? total / shareCount : 0;
+  const rowAv = splitRowAvatar(s);
 
   return (
-    <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
-      <div className="px-4 py-3">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium truncate flex-1">{description}</p>
-          <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">
-            {formatMoney(total)}
-          </p>
-        </div>
-        {isPerson && (
-          <div className="flex items-center justify-between gap-2 mt-0.5">
-            <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{personName}</p>
-            <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
-              You lent {formatMoney(totalShares)}
+    <div className="bg-card">
+      <div className="px-4 py-3 flex gap-3">
+        {rowAv.kind === "people" ? (
+          <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
+            <Users className="h-5 w-5" />
+          </div>
+        ) : (
+          <UserAvatar url={rowAv.url} name={rowAv.name} size={40} className="shrink-0" />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-medium truncate flex-1">{description}</p>
+            <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">
+              {formatMoney(total)}
             </p>
           </div>
-        )}
-        {(isMulti || isGroup) && (
-          <>
+          {isPerson && (
             <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
-                {isGroup ? groupName : peopleName}
-              </p>
-              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
-                {shares.length} × {formatMoney(perShare)}
-              </p>
-            </div>
-            <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF]">Paid by You</p>
+              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{personName}</p>
               <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
                 You lent {formatMoney(totalShares)}
               </p>
             </div>
-          </>
-        )}
-        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">
-          {formatDateTime(s.date, s.time)}
-        </p>
+          )}
+          {(isMulti || isGroup) && (
+            <>
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
+                  {isGroup ? groupName : peopleName}
+                </p>
+                <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+                  {shares.length} × {formatMoney(perShare)}
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <p className="text-[12px] text-[#9CA3AF]">Paid by You</p>
+                <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
+                  You lent {formatMoney(totalShares)}
+                </p>
+              </div>
+            </>
+          )}
+          <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">
+            {formatDateTime(s.date, s.time)}
+          </p>
+        </div>
       </div>
     </div>
   );

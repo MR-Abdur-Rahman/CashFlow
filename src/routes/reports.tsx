@@ -23,8 +23,10 @@ import {
   navigateAnchor,
   formatAnchorLabel,
 } from "@/lib/period";
-import { ChevronLeft, ChevronRight, ChevronDown, ArrowLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ArrowLeft, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UserAvatar } from "@/components/UserAvatar";
+import { splitRowAvatar } from "@/lib/people";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
@@ -178,48 +180,58 @@ function SplitItemRow({ s, highlightPerson }: { s: any; highlightPerson?: string
           .filter(Boolean)
           .join(", ");
 
+  const rowAv = splitRowAvatar(s);
   return (
-    <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
-      <div className="px-4 py-3">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium truncate flex-1">{description}</p>
-          <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">
-            {formatMoney(total)}
-          </p>
+    <div className="bg-card">
+      <div className="px-4 py-3 flex gap-3">
+        {rowAv.kind === "people" ? (
+          <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
+            <Users className="h-5 w-5" />
+          </div>
+        ) : (
+          <UserAvatar url={rowAv.url} name={rowAv.name} size={40} className="shrink-0" />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-medium truncate flex-1">{description}</p>
+            <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">
+              {formatMoney(total)}
+            </p>
+          </div>
+          {isPerson && (
+            <>
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
+                  {shares[0]?.person_name ?? ""}
+                </p>
+                <p className="text-[12px] font-mono text-[#10B981] shrink-0">
+                  You lent {formatMoney(totalShares)}
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
+                <p className="text-[10px] text-[#9CA3AF] font-mono shrink-0">{dateStr}</p>
+              </div>
+            </>
+          )}
+          {(isMulti || isGroup) && (
+            <>
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{peopleLine}</p>
+                <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+                  {shares.length} × {formatMoney(perShare)}
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
+                <p className="text-[12px] font-mono text-[#10B981] shrink-0">
+                  You lent {formatMoney(totalShares)}
+                </p>
+              </div>
+              <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5 text-right">{dateStr}</p>
+            </>
+          )}
         </div>
-        {isPerson && (
-          <>
-            <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
-                {shares[0]?.person_name ?? ""}
-              </p>
-              <p className="text-[12px] font-mono text-[#10B981] shrink-0">
-                You lent {formatMoney(totalShares)}
-              </p>
-            </div>
-            <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
-              <p className="text-[10px] text-[#9CA3AF] font-mono shrink-0">{dateStr}</p>
-            </div>
-          </>
-        )}
-        {(isMulti || isGroup) && (
-          <>
-            <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{peopleLine}</p>
-              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
-                {shares.length} × {formatMoney(perShare)}
-              </p>
-            </div>
-            <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
-              <p className="text-[12px] font-mono text-[#10B981] shrink-0">
-                You lent {formatMoney(totalShares)}
-              </p>
-            </div>
-            <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5 text-right">{dateStr}</p>
-          </>
-        )}
       </div>
     </div>
   );
