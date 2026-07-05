@@ -176,7 +176,6 @@ export default function Home() {
   const [deleteHomeSettlement, setDeleteHomeSettlement] = useState<any>(null);
   const [period, setPeriod] = useState<FilterPeriod>("today");
   const [notifOpen, setNotifOpen] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<string>("all");
   const qc = useQueryClient();
   const [userId, setUserId] = useState<string | undefined>();
   useEffect(() => {
@@ -273,12 +272,9 @@ export default function Home() {
       };
     });
 
-    let items: any[];
-    if (typeFilter === "split") items = splitItems;
-    else if (typeFilter === "settlement") items = settlementItems;
-    else if (typeFilter === "all") items = [...txnItems, ...splitItems, ...settlementItems];
-    else items = txnItems.filter((t) => t.type === typeFilter); // income / expense / transfer
-    return items.sort((a, b) => b._sortKey.localeCompare(a._sortKey));
+    return [...txnItems, ...splitItems, ...settlementItems].sort((a, b) =>
+      b._sortKey.localeCompare(a._sortKey),
+    );
   }, [
     txns,
     allSplitsForTab,
@@ -288,7 +284,6 @@ export default function Home() {
     netSettlements,
     netMeId,
     netMyPids,
-    typeFilter,
   ]);
 
   const { data: profile } = useQuery(profileQuery(userId));
@@ -456,23 +451,6 @@ export default function Home() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-
-        {/* History-style type filter */}
-        <div className="flex gap-2 text-xs flex-wrap mb-3">
-          {["all", "income", "expense", "transfer", "split", "settlement"].map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTypeFilter(t)}
-              className={cn(
-                "px-3 py-1.5 rounded-full capitalize",
-                typeFilter === t ? "bg-primary text-white" : "bg-secondary",
-              )}
-            >
-              {t}
-            </button>
-          ))}
         </div>
 
         <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">

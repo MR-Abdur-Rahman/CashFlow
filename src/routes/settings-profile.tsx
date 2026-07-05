@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { profileQuery } from "@/lib/queries";
 import { UserAvatar } from "@/components/UserAvatar";
+import { ImageCropDialog } from "@/components/ImageCropDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +45,8 @@ export default function ProfileEditPage() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
@@ -71,16 +74,20 @@ export default function ProfileEditPage() {
     onError: (e) => toast.error(e.message),
   });
 
-  async function uploadPhoto(file: File) {
+  function pickPhoto(f: File) {
+    if (f.size > 5 * 1024 * 1024) return toast.error("Image must be under 5MB");
+    setCropFile(f);
+    setCropOpen(true);
+  }
+
+  async function uploadPhoto(blob: Blob) {
     if (!userId) return;
-    if (file.size > 5 * 1024 * 1024) return toast.error("Image must be under 5MB");
     setBusy(true);
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-      const path = `${userId}/avatar-${Date.now()}.${ext}`;
+      const path = `${userId}/avatar-${Date.now()}.jpg`;
       const { error: upErr } = await supabase.storage
         .from("avatars")
-        .upload(path, file, { upsert: true, contentType: file.type });
+        .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
       if (upErr) throw upErr;
       const { data } = await supabase.storage
         .from("avatars")
@@ -173,7 +180,7 @@ export default function ProfileEditPage() {
           onChange={(e) => {
             const f = e.target.files?.[0];
             e.target.value = "";
-            if (f) uploadPhoto(f);
+            if (f) pickPhoto(f);
           }}
         />
         <input
@@ -184,11 +191,18 @@ export default function ProfileEditPage() {
           onChange={(e) => {
             const f = e.target.files?.[0];
             e.target.value = "";
-            if (f) uploadPhoto(f);
+            if (f) pickPhoto(f);
           }}
         />
         <p className="text-xs text-muted-foreground">Tap to edit photo</p>
       </div>
+
+      <ImageCropDialog
+        file={cropFile}
+        open={cropOpen}
+        onOpenChange={setCropOpen}
+        onCropped={uploadPhoto}
+      />
 
       <div className="surface-card p-4 space-y-4">
         <div className="space-y-1.5">
