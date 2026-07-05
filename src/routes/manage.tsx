@@ -29,10 +29,13 @@ import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { SwipeRow } from "@/components/SwipeRow";
 import { Plus, Archive, ChevronRight, ArrowLeft } from "lucide-react";
 import { formatMoney } from "@/lib/format";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 export default function ManagePage() {
   const [catDrill, setCatDrill] = useState<{ id: string; name: string; icon: string } | null>(null);
+  // Tab lives in the URL (?tab=) so navigating away and pressing Back restores the same tab.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get("tab") ?? "categories";
 
   // If drilling into a category's sub-categories
   if (catDrill) {
@@ -42,7 +45,7 @@ export default function ManagePage() {
   return (
     <div className="px-4 pt-6 pb-24 space-y-5">
       <h1 className="text-xl font-semibold">Manage</h1>
-      <Tabs defaultValue="categories">
+      <Tabs value={tab} onValueChange={(v) => setSearchParams({ tab: v }, { replace: true })}>
         <TabsList className="grid grid-cols-3 w-full">
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="people">People</TabsTrigger>

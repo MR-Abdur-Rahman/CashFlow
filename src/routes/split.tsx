@@ -50,11 +50,13 @@ export default function SplitPage() {
   const { data: pendingSplits = [] } = useQuery(pendingSplitsQuery());
   const { data: pendingSettlements = [] } = useQuery(pendingSettlementsQuery());
   const pendingCount = (pendingSplits as any[]).length + (pendingSettlements as any[]).length;
-  const [searchParams] = useSearchParams();
+  // Tab lives in the URL (?tab=) so pressing Back from a person/group restores the same tab.
+  const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const initialTab =
+  const tab: "people" | "groups" | "pending" =
     tabParam === "pending" ? "pending" : tabParam === "groups" ? "groups" : "people";
-  const [tab, setTab] = useState<"people" | "groups" | "pending">(initialTab);
+  const setTab = (v: "people" | "groups" | "pending") =>
+    setSearchParams({ tab: v }, { replace: true });
 
   function handleScan(text: string) {
     let obj: any;

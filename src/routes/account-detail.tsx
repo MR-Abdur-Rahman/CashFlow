@@ -39,7 +39,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { EditSplitSheet, EditTxSheet } from "@/routes/home";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import { SettlementRow } from "@/components/SettlementRow";
@@ -210,9 +210,12 @@ export default function AccountDetail() {
   return (
     <div className="px-4 pt-4 pb-24 space-y-4">
       {/* Back */}
-      <Link to="/accounts" className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-        <ArrowLeft className="h-4 w-4" /> Accounts
-      </Link>
+      <button
+        onClick={() => navigate(-1)}
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back
+      </button>
 
       {/* Account info */}
       <div className="flex items-center gap-4">
