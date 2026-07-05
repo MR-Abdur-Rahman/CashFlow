@@ -813,7 +813,16 @@ function SplitRowContent({ t }: { t: any }) {
   );
 }
 
-export function SplitDirectRow({ s, lentOweOverride }: { s: any; lentOweOverride?: number }) {
+export function SplitDirectRow({
+  s,
+  lentOweOverride,
+  iconAvatar,
+}: {
+  s: any;
+  lentOweOverride?: number;
+  // Person page: show a split TYPE icon instead of the counterparty photo (redundant there).
+  iconAvatar?: boolean;
+}) {
   const shares = (s.split_shares ?? []) as any[];
   const total = Number(s.total_amount);
   const totalShares = shares.reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
@@ -885,14 +894,17 @@ export function SplitDirectRow({ s, lentOweOverride }: { s: any; lentOweOverride
   );
 
   const rowAv = splitRowAvatar(s);
-  const avatarNode =
-    rowAv.kind === "people" ? (
-      <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
-        <Users className="h-5 w-5" />
-      </div>
-    ) : (
-      <UserAvatar url={rowAv.url} name={rowAv.name} size={40} className="shrink-0" />
-    );
+  const avatarNode = iconAvatar ? (
+    <div className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--color-split-bg)] text-split shrink-0">
+      <Users className="h-5 w-5" />
+    </div>
+  ) : rowAv.kind === "people" ? (
+    <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
+      <Users className="h-5 w-5" />
+    </div>
+  ) : (
+    <UserAvatar url={rowAv.url} name={rowAv.name} size={40} className="shrink-0" />
+  );
 
   return (
     <div className="bg-card">

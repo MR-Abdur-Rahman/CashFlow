@@ -1,5 +1,6 @@
 import { formatMoney } from "@/lib/format";
 import { format } from "date-fns";
+import { ArrowLeftRight } from "lucide-react";
 import { UserAvatar } from "./UserAvatar";
 
 // Shared settlement row used on Home, Account detail, Person detail and History so the
@@ -16,6 +17,7 @@ export function SettlementRow({
   createdAt,
   netAfter,
   avatarUrl,
+  iconAvatar,
 }: {
   description?: string | null;
   iPaid: boolean;
@@ -24,6 +26,8 @@ export function SettlementRow({
   remaining?: number;
   fullySettled?: boolean;
   createdAt?: string;
+  // Person page: show a settlement TYPE icon instead of the counterparty photo.
+  iconAvatar?: boolean;
   // Optional (person detail): the running NET balance right after this settlement, from the
   // viewer's perspective (+ = otherName owes you, − = you owe). When passed, line 3 shows the
   // overall balance at that point (the newest row equals the top card) instead of per-split remaining.
@@ -35,7 +39,13 @@ export function SettlementRow({
   return (
     <div className="bg-card">
       <div className="px-4 py-3 flex gap-3">
-        <UserAvatar url={avatarUrl} name={otherName} size={40} className="shrink-0" />
+        {iconAvatar ? (
+          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--color-income-bg)] text-income shrink-0">
+            <ArrowLeftRight className="h-5 w-5" />
+          </div>
+        ) : (
+          <UserAvatar url={avatarUrl} name={otherName} size={40} className="shrink-0" />
+        )}
         <div className="flex-1 min-w-0">
           {/* Line 1: description (defaults to "Settlement") */}
           <p className="text-sm font-medium text-foreground truncate">

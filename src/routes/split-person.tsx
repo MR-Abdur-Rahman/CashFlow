@@ -294,7 +294,7 @@ export default function PersonDetail() {
                     description={item.description}
                     iPaid={item._iPaid}
                     otherName={personName}
-                    avatarUrl={personAvatar}
+                    iconAvatar
                     amount={Number(item.amount)}
                     netAfter={item._netAfter}
                     createdAt={item.created_at}
@@ -310,7 +310,7 @@ export default function PersonDetail() {
                   editDeniedMessage="Only the creator or payer can edit this split"
                   deleteDeniedMessage="Only the creator or payer can delete this split"
                 >
-                  <SplitDirectRow s={item} lentOweOverride={bilateralRowAmount(item)} />
+                  <SplitDirectRow s={item} lentOweOverride={bilateralRowAmount(item)} iconAvatar />
                 </SwipeRow>
               ),
             )}
