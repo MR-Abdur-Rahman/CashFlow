@@ -64,15 +64,21 @@ export function AddGroupDialog({
         groupId = data.id;
       }
       if (members.length) {
-        const { error } = await supabase
-          .from("group_members")
-          .insert(members.map((person_id) => ({ group_id: groupId, person_id })));
+        const rows = members.map((person_id) => {
+          const p = (people as any[]).find((x) => x.id === person_id);
+          return { group_id: groupId, person_id, member_user_id: p?.linked_user_id ?? null };
+        });
+        const { error } = await supabase.from("group_members").insert(rows);
         if (error) throw error;
       }
+      // Mutually connect every member (creator + linked members) so all sides see each other.
+      await supabase.rpc("sync_group_member_connections", { p_group_id: groupId });
     },
     onSuccess: () => {
       toast.success("Saved");
       qc.invalidateQueries({ queryKey: ["groups"] });
+      qc.invalidateQueries({ queryKey: ["people"] });
+      qc.invalidateQueries({ queryKey: ["splits"] });
       onOpenChange(false);
     },
     onError: (e) => toast.error(e.message),

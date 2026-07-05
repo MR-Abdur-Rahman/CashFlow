@@ -131,7 +131,7 @@ export const groupsQuery = () =>
     queryFn: async () => {
       const { data, error } = await supabase
         .from("groups")
-        .select("*, group_members(person_id, people(*))")
+        .select("*, group_members(person_id, member_user_id, people(*))")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -144,7 +144,7 @@ export const groupQuery = (id: string) =>
     queryFn: async () => {
       const { data, error } = await supabase
         .from("groups")
-        .select("*, group_members(person_id, people(*))")
+        .select("*, group_members(person_id, member_user_id, people(*))")
         .eq("id", id)
         .maybeSingle();
       if (error) throw error;

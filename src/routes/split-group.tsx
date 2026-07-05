@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { groupQuery, splitBalancesQuery } from "@/lib/queries";
+import { groupQuery, splitBalancesQuery, peopleQuery } from "@/lib/queries";
 import { bilateralBalance } from "@/lib/balance";
+import { contactDisplay } from "@/lib/people";
 import {
   ArrowLeft,
   Archive,
@@ -57,6 +58,7 @@ export default function GroupDetail() {
   const qc = useQueryClient();
   const { data: group } = useQuery(groupQuery(groupId!));
   const { data: balanceData } = useQuery(splitBalancesQuery());
+  const { data: myContacts = [] } = useQuery(peopleQuery());
   const allSplits = balanceData?.splits ?? [];
   const allSettlements = balanceData?.settlements ?? [];
   const currentUserId = balanceData?.currentUserId ?? null;
@@ -95,24 +97,34 @@ export default function GroupDetail() {
     onError: (e) => toast.error(e.message),
   });
 
-  // Each member's balance is the FULL bilateral net between the viewer and that member (all
-  // splits, same as the person detail page) — not just this group's splits. Self excluded.
+  // Roster shown from THE VIEWER's perspective: each linked member (self excluded) is resolved to
+  // the viewer's OWN contact (created by the group auto-sync), so the name/avatar and the bilateral
+  // net are view-specific. Members are keyed by member_user_id (readable by every member), not the
+  // creator's private people rows.
   const memberBalances = useMemo(() => {
-    return (((group as any)?.group_members ?? []) as any[])
-      .map((m: any) => m.people)
-      .filter((p: any) => p && p.linked_user_id !== currentUserId)
-      .map((p: any) => ({
-        id: p.id as string,
-        name: (p.name ?? "?") as string,
+    const seen = new Set<string>();
+    const out: { id: string; name: string; avatarUrl: string | null; balance: number }[] = [];
+    for (const m of ((group as any)?.group_members ?? []) as any[]) {
+      const uid: string | null = m.member_user_id ?? m.people?.linked_user_id ?? null;
+      if (!uid || uid === currentUserId || seen.has(uid)) continue;
+      seen.add(uid);
+      const contact = (myContacts as any[]).find((c) => c.linked_user_id === uid);
+      const d = contactDisplay(contact ?? m.people ?? { linked_user_id: uid, name: "Member" });
+      out.push({
+        id: (contact?.id ?? m.person_id) as string,
+        name: d.name,
+        avatarUrl: d.avatarUrl,
         balance: bilateralBalance(
           allSplits as any[],
           allSettlements as any[],
-          p,
+          { id: contact?.id, linked_user_id: uid },
           currentUserId,
           myPersonIds,
         ),
-      }));
-  }, [group, allSplits, allSettlements, currentUserId, myPersonIds]);
+      });
+    }
+    return out;
+  }, [group, myContacts, allSplits, allSettlements, currentUserId, myPersonIds]);
 
   const { from: periodFrom, to: periodTo } = useMemo(
     () => getPeriodRange(period, anchor),
@@ -185,9 +197,10 @@ export default function GroupDetail() {
             <Link
               key={m.id}
               to={`/split/person/${m.id}`}
-              className="flex items-center justify-between px-4 py-3 text-sm active:bg-secondary/40"
+              className="flex items-center gap-3 px-4 py-3 text-sm active:bg-secondary/40"
             >
-              <span className="font-medium">{m.name}</span>
+              <UserAvatar url={m.avatarUrl} name={m.name} size={36} />
+              <span className="font-medium flex-1 truncate">{m.name}</span>
               <div className="flex items-center gap-1">
                 {Math.abs(m.balance) >= 0.005 ? (
                   <span
