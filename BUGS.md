@@ -10,7 +10,8 @@
 - Expected: Additional filters needed on History page (specifics to be defined when picked up).
 - Actual: Current filter set is incomplete.
 - Added: 2026-07-04
-- Partial (2026-07-04): "Daily / Today" period option added to the shared period selector (commit 24c20e1) — applies to History, person, and group pages. Remaining filter additions still TBD.
+- Partial (2026-07-04): "Daily / Today" period option added to the shared period selector (commit 24c20e1) — applies to History, person, and group pages.
+- Partial (2026-07-05): added a dedicated "settlement" type chip (settlements previously rendered but couldn't be filtered to; "split" now shows splits only, "settlement" shows settlements only); settlement search now matches bin fields (description / counterparty). Remaining candidates offered but not chosen: account, category, person filters.
 - Test Log: (none yet)
 
 ## Fixed

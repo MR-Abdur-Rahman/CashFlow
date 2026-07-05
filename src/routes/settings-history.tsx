@@ -124,12 +124,12 @@ export default function HistoryPage() {
   }, [allSplits, q, type, fromStr, toStr]);
 
   const filteredSettlements = useMemo(() => {
-    if (type !== "all" && type !== "split") return [];
+    if (type !== "all" && type !== "settlement") return [];
     return (settlements as any[]).filter((s) => {
       const day = String(s.created_at ?? "").slice(0, 10);
       if (day < fromStr || day > toStr) return false;
       if (!q) return true;
-      const hay = [s.splits?.description, s.split_shares?.person_name, s.method]
+      const hay = [s.description, s.splits?.description, s.person?.name, s.split_shares?.person_name, s.creator?.full_name, s.method]
         .filter(Boolean).join(" ").toLowerCase();
       return hay.includes(q.toLowerCase());
     });
@@ -165,7 +165,7 @@ export default function HistoryPage() {
       <h1 className="text-xl font-semibold">History</h1>
       <Input placeholder="Search by category, account, note..." value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="flex gap-2 text-xs flex-wrap">
-        {["all", "income", "expense", "transfer", "split"].map((t) => (
+        {["all", "income", "expense", "transfer", "split", "settlement"].map((t) => (
           <button key={t} onClick={() => setType(t)}
             className={`px-3 py-1.5 rounded-full capitalize ${type === t ? "bg-primary text-white" : "bg-secondary"}`}>
             {t}
