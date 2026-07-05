@@ -7,6 +7,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { peopleQuery } from "@/lib/queries";
+import { contactDisplay } from "@/lib/people";
+import { EntityAvatarUpload } from "./EntityAvatarUpload";
 import { toast } from "sonner";
 
 export function AddGroupDialog({
@@ -93,6 +95,16 @@ export function AddGroupDialog({
           }}
           className="space-y-4"
         >
+          {edit?.id && (
+            <EntityAvatarUpload
+              table="groups"
+              id={edit.id}
+              folder="groups"
+              currentUrl={edit.avatar_url}
+              name={name}
+              invalidateKey={["groups"]}
+            />
+          )}
           <div className="space-y-1.5">
             <Label>Name</Label>
             <Input
@@ -116,7 +128,7 @@ export function AddGroupDialog({
                       setMembers((s) => (c ? [...s, p.id] : s.filter((x) => x !== p.id)))
                     }
                   />
-                  <span className="text-sm">{p.name}</span>
+                  <span className="text-sm">{contactDisplay(p).name}</span>
                 </label>
               ))}
             </div>
