@@ -56,7 +56,9 @@ export function SettlementRow({
             <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
               {iPaid ? `You → ${otherName}` : `${otherName} → You`}
             </p>
-            <p className={`text-sm font-mono shrink-0 ${iPaid ? "text-expense" : "text-income"}`}>
+            <p
+              className={`text-sm font-mono font-semibold shrink-0 ${iPaid ? "text-expense" : "text-income"}`}
+            >
               {formatMoney(amount)}
             </p>
           </div>
