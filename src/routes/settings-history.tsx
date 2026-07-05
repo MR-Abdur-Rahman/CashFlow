@@ -46,8 +46,18 @@ export default function HistoryPage() {
   const { data: people = [] } = useQuery(peopleQuery());
   const [q, setQ] = useState("");
   const [type, setType] = useState<string>(searchParams.get("filter") ?? "all");
-  const [personId, setPersonId] = useState<string>(""); // "" = everyone
-  const selectedPerson = useMemo(() => (people as any[]).find((p) => p.id === personId) ?? null, [people, personId]);
+  // Search index for people: "name phone", keyed by contact id AND by their linked user id, so the
+  // search box can match a split/settlement by the person's name or mobile number.
+  const personSearch = useMemo(() => {
+    const byId = new Map<string, string>();
+    const byUid = new Map<string, string>();
+    for (const p of people as any[]) {
+      const s = [p.name, p.phone_number].filter(Boolean).join(" ").toLowerCase();
+      byId.set(p.id, s);
+      if (p.linked_user_id) byUid.set(p.linked_user_id, s);
+    }
+    return { byId, byUid };
+  }, [people]);
   const [period, setPeriod] = useState<Period>("monthly");
   const [anchor, setAnchor] = useState(new Date());
   const [editTxn, setEditTxn] = useState<any | null>(null);
@@ -69,7 +79,6 @@ export default function HistoryPage() {
   const filteredTxns = useMemo(() => {
     return (txns as any[]).filter((t) => {
       if (t.is_split) return false;
-      if (personId) return false; // a person filter → only splits/settlements involve a person
       if (t.date < fromStr || t.date > toStr) return false;
       if (type === "split") return false;
       if (type !== "all" && t.type !== type) return false;
@@ -85,7 +94,7 @@ export default function HistoryPage() {
       ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(q.toLowerCase());
     });
-  }, [txns, q, type, personId, fromStr, toStr]);
+  }, [txns, q, type, fromStr, toStr]);
 
   // Own + incoming splits, deduped (incoming version wins) — same as Home page.
   const allSplits = useMemo(() => {
@@ -114,13 +123,6 @@ export default function HistoryPage() {
     else return [];
     return base.filter((s) => {
       if (s.date < fromStr || s.date > toStr) return false;
-      if (selectedPerson) {
-        const p = selectedPerson;
-        const involved = s.person_id === p.id
-          || (s.split_shares ?? []).some((sh: any) => sh.person_id === p.id)
-          || (!!p.linked_user_id && s.created_by === p.linked_user_id);
-        if (!involved) return false;
-      }
       if (!q) return true;
       const hay = [
         s.description,
@@ -129,29 +131,31 @@ export default function HistoryPage() {
         s.groups?.name,
         s.paid_by,
         ...(s.split_shares ?? []).map((sh: any) => sh.person_name),
+        // person name + phone for each involved contact (own shares, individual person, creator)
+        ...(s.split_shares ?? []).map((sh: any) => personSearch.byId.get(sh.person_id)),
+        personSearch.byId.get(s.person_id),
+        personSearch.byUid.get(s.created_by),
       ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(q.toLowerCase());
     });
-  }, [allSplits, q, type, selectedPerson, fromStr, toStr]);
+  }, [allSplits, q, type, personSearch, fromStr, toStr]);
 
   const filteredSettlements = useMemo(() => {
     if (type !== "all" && type !== "settlement") return [];
     return (settlements as any[]).filter((s) => {
       const day = String(s.created_at ?? "").slice(0, 10);
       if (day < fromStr || day > toStr) return false;
-      if (selectedPerson) {
-        const p = selectedPerson;
-        const involved = s.person_id === p.id
-          || (!!p.linked_user_id && s.created_by === p.linked_user_id)
-          || (!!p.linked_user_id && s.pending_for_user_id === p.linked_user_id);
-        if (!involved) return false;
-      }
       if (!q) return true;
-      const hay = [s.description, s.splits?.description, s.person?.name, s.split_shares?.person_name, s.creator?.full_name, s.method]
-        .filter(Boolean).join(" ").toLowerCase();
+      const hay = [
+        s.description, s.splits?.description, s.person?.name, s.split_shares?.person_name, s.creator?.full_name, s.method,
+        // counterparty name + phone (whether I recorded it or they did)
+        personSearch.byId.get(s.person_id),
+        personSearch.byUid.get(s.created_by),
+        personSearch.byUid.get(s.pending_for_user_id),
+      ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(q.toLowerCase());
     });
-  }, [settlements, q, type, selectedPerson, fromStr, toStr]);
+  }, [settlements, q, type, personSearch, fromStr, toStr]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, any[]>();
@@ -181,7 +185,7 @@ export default function HistoryPage() {
         <ArrowLeft className="h-4 w-4 mr-1" /> Settings
       </Link>
       <h1 className="text-xl font-semibold">History</h1>
-      <Input placeholder="Search by category, account, note..." value={q} onChange={(e) => setQ(e.target.value)} />
+      <Input placeholder="Search by person, phone, category, note..." value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="flex gap-2 text-xs flex-wrap">
         {["all", "income", "expense", "transfer", "split", "settlement"].map((t) => (
           <button key={t} onClick={() => setType(t)}
@@ -190,34 +194,6 @@ export default function HistoryPage() {
           </button>
         ))}
       </div>
-
-      {/* Person filter — narrow to splits/settlements with one person (hides plain transactions) */}
-      {(people as any[]).length > 0 && (
-        <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-muted-foreground shrink-0" />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1.5 bg-secondary text-sm px-3 py-1.5 rounded-xl">
-                {selectedPerson ? selectedPerson.name : "All people"} <ChevronDown className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
-              <DropdownMenuItem onClick={() => setPersonId("")} className={!personId ? "text-primary font-medium" : ""}>
-                All people
-              </DropdownMenuItem>
-              {(people as any[]).map((p) => (
-                <DropdownMenuItem key={p.id} onClick={() => setPersonId(p.id)}
-                  className={personId === p.id ? "text-primary font-medium" : ""}>
-                  {p.name}{p.linked_user_id ? " 🔗" : ""}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {selectedPerson && (
-            <button onClick={() => setPersonId("")} className="text-xs text-muted-foreground underline">clear</button>
-          )}
-        </div>
-      )}
 
       {/* Period filter bar */}
       <div className="flex items-center gap-2">

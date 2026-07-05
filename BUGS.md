@@ -12,7 +12,7 @@
 - Added: 2026-07-04
 - Partial (2026-07-04): "Daily / Today" period option added to the shared period selector (commit 24c20e1) — applies to History, person, and group pages.
 - Partial (2026-07-05): added a dedicated "settlement" type chip (settlements previously rendered but couldn't be filtered to; "split" now shows splits only, "settlement" shows settlements only); settlement search now matches bin fields (description / counterparty).
-- Partial (2026-07-05): added a Person filter dropdown — narrows splits + settlements to one contact (matches share person_id / individual person / creator or pending linked user), hides plain transactions. Remaining candidates not yet requested: account, category filters.
+- Partial (2026-07-05): search box now also matches person NAME + MOBILE NUMBER — a split/settlement is found by typing an involved contact's name or phone (looked up by contact id and linked user id). (Replaced a short-lived person-filter dropdown per user preference.) Remaining candidates not yet requested: account, category filters.
 - Test Log: (none yet)
 
 ## Fixed
