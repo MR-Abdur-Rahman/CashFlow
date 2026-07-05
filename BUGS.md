@@ -2,16 +2,6 @@
 
 ## Open
 
-### [P3] Auto-settlement (opposing debts cancel automatically)
-- Scope: multi-user-sync
-- Severity: minor
-- Users involved: A, B
-- Steps to reproduce: N/A — new feature.
-- Expected: If A owes B and B owes A, the smaller debt should automatically cancel out, leaving only the net difference.
-- Actual: Not implemented — debts sit separately even when they'd naturally offset.
-- Added: 2026-07-04
-- Test Log: (none yet)
-
 ### [P3] History page filter additions
 - Scope: ui
 - Severity: minor
@@ -24,6 +14,15 @@
 - Test Log: (none yet)
 
 ## Fixed
+
+### [Feature] Settlement "bin" model + closes [P3] Auto-settlement — 2026-07-05
+- Settlements are now person-to-person payments against the NET (not per-split; no FIFO). Net = Σ gross split debts − Σ signed settlements. Full story + phase commits in DEVLOG.md.
+- **Closes [P3] Auto-settlement:** opposing debts now offset automatically inside the net (the bin IS the net), so no separate auto-cancel feature is needed.
+- Commits: 8ae9d29 (net math) · 904a731 (settle) · 79e71a8 (direction/delete) · 71a98e7 (cleanup) · 5ca82ab (reports) + DB migrations (person_id, delete_settlement, notification link/cleanup, drop is_settled trigger).
+- Known limitation (pre-existing): Reports "settlements received (income)" ignores direction — see DEVLOG.
+- Test Log:
+  1. 2026-07-05 — PASS — verified on live data: bin settlements (null split refs), net A owes B 2800, balances reconcile, pending prompt + receiver confirm + delete all fire; account-selection notification auto-clears on confirm/delete; orphan removed.
+  2. Pending live: group-split bilateral settle, and a settlement with a LOCAL (non-linked) person (no account-selection flow) — handled in code, not yet exercised on real data.
 
 ### [P3] Full split edit testing matrix — PASS 2026-07-05
 - QA pass over the split-edit rework (update_split RPC + merged edit sheets). Covered: individual/people/group; creator edits + payer (non-creator) edits; amount / participants / category changes; who-paid locked; settlement linkage preserved; permission block for non-creator-non-payer; same edit from Home / person / group / reports / history.

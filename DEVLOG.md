@@ -8,6 +8,30 @@ This file tells the *story* of each bug — the problem, the reasoning, and how 
 
 ## Completed
 
+### [Feature] Settlement "bin" model — settlements are person-to-person, not per-split — 2026-07-05
+**Motivation.** The old model attached each settlement to a specific `split_share`, and Settle Up FIFO-allocated one payment across shares — so paying LKR 500 could record as *two* rows (200 on one split + 300 on another). The user's mental model is a **"bin"**: one ledger per relationship holding all lents/owes/settlements, where a settlement is a single payment against the **net**. One payment = one row.
+
+**New model.**
+- A settlement carries `person_id` (the counterparty) and has `split_id`/`split_share_id` = NULL. No FIFO, no per-share allocation.
+- Net between two people = **Σ gross bilateral split debts − Σ signed settlements** (matched by counterparty). `bilateralBalance(splits, settlements, target, …)` and `settlementNetAfter(splits, settlements, settlement, …)` in `src/lib/balance.ts`; `splitBalancesQuery` returns a **flat** settlements list (bin settlements aren't nested under splits).
+- Direction comes from `settler_is_creditor` (true = recorder is the creditor recording a receipt), NOT the split payer.
+- Balances stay trigger-driven (`update_account_balance_on_settlement` + `settlement_receiver_balance`, keyed on `settler_is_creditor`/`account_id`/`receiver_account_id` — no split ref). Individual splits never show "settled" anymore (only the net does).
+
+**Built in 5 phases (each committed + verified).**
+1. **Schema** — add `settlements.person_id`, backfill from `pending_for_user_id`/settled share, make `split_id`/`split_share_id` nullable.
+2. **Net math** (`8ae9d29`) — rewrite `bilateralBalance` + `settlementNetAfter` to the bin formula; flat settlements list; wire all six callers. Verified net unchanged (A owes B 2700).
+3. **Settle Up** (`904a731`) — record ONE bin settlement (direction from net sign); drop FIFO/`unsettledItems` and the dead legacy share/split path. Added `settlements_select_counterparty` RLS policy + bin-aware `notify_settlement_created`.
+4. **Direction/display/delete** (`79e71a8`) — bin-aware `settlementDirection`, `delete_settlement` RPC (creator-or-debtor, keeps legacy split path), + `person`/`creator` joins on the home/history/account settlement queries.
+5. **Cleanup** (`71a98e7`) — `manage.tsx` uses the shared `bilateralBalance` (was a stale per-share balance); drop dead `ShareList` + orphaned `getSplitLabel`; remove unused `settlements(*)` nesting; drop the `sync_share_settled`/`is_settled` trigger.
+
+**Follow-ups.**
+- **Account-selection notification cleanup** — added `notifications.related_settlement_id` (FK ON DELETE CASCADE); the prompt now auto-clears when the receiver confirms (`trg_clear_settlement_account_notification`) or the settlement is deleted (cascade). Backfilled links; deleted a stale orphan.
+- **Reports** (`5ca82ab`) — resolved the settlement person via the bin counterparty (`person_id`); bin settlements were landing under "Unknown" and missing from the person drill.
+
+**Verified end-to-end on live data.** Bin settlements (null split refs), net = gross − settled (A owes B 2800), balances reconcile to the rupee, pending prompt + receiver confirmation both fire correctly, delete restores balances.
+
+**Known limitation (pre-existing, not bin-specific).** Reports' "settlements received (income)" counts every settlement the user *recorded* regardless of direction — a debtor-recorded payment is counted as income, and a receipt recorded by the *other* party is missed. Predates the bin work; left for a separate decision.
+
 ### [P1] Settlement payer's balance direction reversed (also closed [P1] #5 Settlement account direction + [P1] #2 Pending rows missing) — 2026-07-04
 **Symptom.** When User A settles a debt to User B, A's account balance moves the wrong way — it *increases* instead of decreasing (and reverses the same way on settlement delete).
 
