@@ -399,12 +399,12 @@ export default function Home() {
       {/* Accounts */}
       <div>
         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">Accounts</p>
-        <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
+        <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
           {accounts.map((a) => (
             <Link
               to={`/accounts/${a.id}`}
               key={a.id}
-              className="flex items-center gap-3 p-3 active:bg-secondary/40"
+              className="surface-card border border-border min-w-[180px] p-3 snap-start block active:opacity-80"
             >
               <AccountIcon
                 iconType={a.icon_type}
@@ -413,17 +413,16 @@ export default function Home() {
                 iconUrl={a.icon_url}
                 size={36}
               />
-              <p className="flex-1 min-w-0 text-sm font-medium truncate">
+              <p className="text-xs text-muted-foreground mt-2 truncate">
                 {[a.institution, a.label].filter(Boolean).join(" · ") || a.label}
               </p>
-              <span className="font-mono text-sm font-semibold shrink-0">
+              <p className="font-mono text-base font-semibold mt-0.5">
                 {formatMoney(a.current_balance)}
-              </span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              </p>
             </Link>
           ))}
           {accounts.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-6">No accounts yet</p>
+            <p className="text-sm text-muted-foreground py-4">No accounts yet</p>
           )}
         </div>
       </div>
