@@ -17,7 +17,8 @@ type UnsettledItem = {
   splitId: string;
   description: string;
   date: string;
-  time?: string; // split time — FIFO orders by date+time so same-day debts settle oldest-first
+  time?: string;      // split time (minute precision) — FIFO primary order
+  createdAt?: string; // split created_at (has seconds/ms) — FIFO tiebreaker for same-minute debts
   shareAmount: number;
   paidAmount: number;
   remaining: number;
@@ -119,7 +120,9 @@ export function SettleUpDialog({
       // OLDEST-FIRST (FIFO), creating a settlement per share consumed. The user no longer
       // picks individual splits — they just settle the overall amount owed. (This also
       // implements the FIFO-allocation behaviour.)
-      const key = (i: UnsettledItem) => `${i.date ?? ""}T${i.time ?? "00:00:00"}`;
+      // Order oldest-first by the debt's date+time (minute precision), breaking same-minute ties
+      // with the split's created_at (has seconds/ms) so genuine creation order wins.
+      const key = (i: UnsettledItem) => `${i.date ?? ""}T${i.time ?? "00:00:00"}|${i.createdAt ?? ""}`;
       const sorted = [...dirItems]
         .filter((i) => i.remaining > 0.005)
         .sort((a, b) => key(a).localeCompare(key(b)));
