@@ -10,6 +10,8 @@ import {
   subCategoriesQuery,
 } from "@/lib/queries";
 import { bilateralBalance } from "@/lib/balance";
+import { contactDisplay } from "@/lib/people";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Users, Plus, ChevronRight, Archive, QrCode, History, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -131,16 +133,17 @@ export default function SplitPage() {
               <div className="divide-y divide-border">
                 {(people as any[]).map((p) => {
                   const bal = personBalance(p);
+                  const { name, avatarUrl } = contactDisplay(p);
                   return (
                     <Link
                       key={p.id}
                       to={`/split/person/${p.id}`}
                       className="flex items-center gap-3 p-4 active:bg-secondary/40"
                     >
-                      <Avatar name={p.name} />
+                      <UserAvatar url={avatarUrl} name={name} size={40} />
                       <div className="flex-1">
                         <p className="text-sm font-medium">
-                          {p.name}
+                          {name}
                           {p.linked_user_id && " 🔗"}
                         </p>
                       </div>
@@ -578,14 +581,6 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-function Avatar({ name }: { name: string }) {
-  return (
-    <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
-      {name[0]?.toUpperCase()}
     </div>
   );
 }

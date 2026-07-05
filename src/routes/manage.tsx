@@ -7,6 +7,8 @@ import {
   splitBalancesQuery,
 } from "@/lib/queries";
 import { bilateralBalance } from "@/lib/balance";
+import { contactDisplay } from "@/lib/people";
+import { UserAvatar } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -450,6 +452,7 @@ function People() {
         )}
         {(people as any[]).map((p) => {
           const bal = bilateralBalance(allSplits, allSettlements, p, meId, myPids);
+          const { name, avatarUrl } = contactDisplay(p);
           return (
             <SwipeRow
               key={p.id}
@@ -465,12 +468,10 @@ function People() {
                 to={`/split/person/${p.id}`}
                 className="flex items-center gap-3 p-3 bg-card active:bg-secondary/40"
               >
-                <div className="h-9 w-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm">
-                  {p.name[0]?.toUpperCase()}
-                </div>
+                <UserAvatar url={avatarUrl} name={name} size={36} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {p.name}
+                    {name}
                     {p.linked_user_id && " 🔗"}
                   </p>
                   <p className="text-xs text-muted-foreground">{p.phone_number ?? "no phone"}</p>

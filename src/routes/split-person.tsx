@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { personQuery, personSplitsQuery, splitBalancesQuery } from "@/lib/queries";
 import { settlementNetAfter, bilateralBalance } from "@/lib/balance";
+import { contactDisplay } from "@/lib/people";
+import { UserAvatar } from "@/components/UserAvatar";
 import { ArrowLeft, Bell, Plus, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -151,6 +153,8 @@ export default function PersonDetail() {
 
   if (!person) return <div className="p-6">Person not found</div>;
 
+  const { name: personName, avatarUrl: personAvatar } = contactDisplay(person);
+
   return (
     <div className="px-4 pt-4 pb-24 space-y-5">
       <button
@@ -161,11 +165,9 @@ export default function PersonDetail() {
       </button>
 
       <div className="flex items-center gap-3">
-        <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-lg">
-          {person.name[0]?.toUpperCase()}
-        </div>
+        <UserAvatar url={personAvatar} name={personName} size={48} />
         <div>
-          <h1 className="text-xl font-semibold">{person.name}</h1>
+          <h1 className="text-xl font-semibold">{personName}</h1>
           <p className="text-xs text-muted-foreground">
             {person.phone_number ?? "no phone"}
             {person.linked_user_id && " · 🔗 linked"}
@@ -274,7 +276,7 @@ export default function PersonDetail() {
                   <SettlementRow
                     description={item.description}
                     iPaid={item._iPaid}
-                    otherName={person.name}
+                    otherName={personName}
                     amount={Number(item.amount)}
                     netAfter={item._netAfter}
                     createdAt={item.created_at}
@@ -302,7 +304,7 @@ export default function PersonDetail() {
         <SendReminderDialog
           open={reminderOpen}
           onOpenChange={setReminderOpen}
-          person={{ id: person.id, name: person.name, phone_number: person.phone_number }}
+          person={{ id: person.id, name: personName, phone_number: person.phone_number }}
           splitId={(splits[0] as any).id}
           amount={balance}
           description={(splits[0] as any).description}
@@ -316,7 +318,7 @@ export default function PersonDetail() {
           open={settleOpen}
           onOpenChange={setSettleOpen}
           personId={personId}
-          personName={person.name}
+          personName={personName}
           personLinkedUserId={person.linked_user_id}
           netBalance={balance}
         />

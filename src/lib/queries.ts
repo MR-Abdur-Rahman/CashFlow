@@ -103,7 +103,7 @@ export const peopleQuery = () =>
       if (!u.user) return [];
       const { data, error } = await supabase
         .from("people")
-        .select("*")
+        .select("*, linked:linked_user_id(full_name, avatar_url)")
         .eq("user_id", u.user.id)
         .order("name");
       if (error) throw error;
@@ -115,7 +115,11 @@ export const personQuery = (id: string) =>
   queryOptions({
     queryKey: ["people", id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("people").select("*").eq("id", id).maybeSingle();
+      const { data, error } = await supabase
+        .from("people")
+        .select("*, linked:linked_user_id(full_name, avatar_url)")
+        .eq("id", id)
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
