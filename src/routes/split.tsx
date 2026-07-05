@@ -23,6 +23,7 @@ export default function SplitPage() {
   const { data: groups = [] } = useQuery(groupsQuery());
   const { data: balanceData } = useQuery(splitBalancesQuery());
   const allSplits = balanceData?.splits ?? [];
+  const allSettlements = balanceData?.settlements ?? [];
   const myPersonIds = balanceData?.myPersonIds ?? [];
   const currentUserId = balanceData?.currentUserId ?? null;
   const [addPerson, setAddPerson] = useState(false);
@@ -51,7 +52,7 @@ export default function SplitPage() {
   }
 
   function personBalance(person: any): number {
-    return bilateralBalance(allSplits, person, currentUserId, myPersonIds);
+    return bilateralBalance(allSplits, allSettlements, person, currentUserId, myPersonIds);
   }
 
   return (

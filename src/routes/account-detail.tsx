@@ -116,6 +116,7 @@ export default function AccountDetail() {
   // Full split set (shared cache) for each settlement row's running net.
   const { data: balanceData } = useQuery(splitBalancesQuery());
   const netSplits = balanceData?.splits ?? [];
+  const netSettlements = balanceData?.settlements ?? [];
   const netMeId = balanceData?.currentUserId ?? null;
   const netMyPids = balanceData?.myPersonIds ?? [];
 
@@ -175,12 +176,12 @@ export default function AccountDetail() {
           _otherName: otherName,
           _remaining: remaining,
           _fullySettled: fullySettled,
-          _netAfter: settlementNetAfter(netSplits, s, netMeId, netMyPids) ?? undefined,
+          _netAfter: settlementNetAfter(netSplits, netSettlements, s, netMeId, netMyPids) ?? undefined,
         };
       }),
     ];
     return items.sort((a, b) => b._sortKey.localeCompare(a._sortKey));
-  }, [splits, settlements, userId, netSplits, netMeId, netMyPids]);
+  }, [splits, settlements, userId, netSplits, netSettlements, netMeId, netMyPids]);
 
   const delAccount = useMutation({
     mutationFn: async () => {

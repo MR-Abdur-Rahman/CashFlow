@@ -37,6 +37,7 @@ export default function GroupDetail() {
   const { data: group } = useQuery(groupQuery(groupId!));
   const { data: balanceData } = useQuery(splitBalancesQuery());
   const allSplits = balanceData?.splits ?? [];
+  const allSettlements = balanceData?.settlements ?? [];
   const currentUserId = balanceData?.currentUserId ?? null;
   const myPersonIds = balanceData?.myPersonIds ?? [];
   const [edit, setEdit] = useState(false);
@@ -72,9 +73,9 @@ export default function GroupDetail() {
       .map((p: any) => ({
         id: p.id as string,
         name: (p.name ?? "?") as string,
-        balance: bilateralBalance(allSplits as any[], p, currentUserId, myPersonIds),
+        balance: bilateralBalance(allSplits as any[], allSettlements as any[], p, currentUserId, myPersonIds),
       }));
-  }, [group, allSplits, currentUserId, myPersonIds]);
+  }, [group, allSplits, allSettlements, currentUserId, myPersonIds]);
 
   const { from: periodFrom, to: periodTo } = useMemo(
     () => getPeriodRange(period, anchor),

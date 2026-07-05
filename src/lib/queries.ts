@@ -320,7 +320,7 @@ export const splitBalancesQuery = () =>
     queryKey: ["splits", "balances"],
     queryFn: async () => {
       const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return { splits: [] as any[], myPersonIds: [] as string[], currentUserId: null as string | null };
+      if (!u.user) return { splits: [] as any[], settlements: [] as any[], myPersonIds: [] as string[], currentUserId: null as string | null };
       const currentUserId = u.user.id;
 
       const { data: myPeople } = await supabase
@@ -351,7 +351,13 @@ export const splitBalancesQuery = () =>
         ...(own ?? []).map((s: any) => ({ ...s, _isIncoming: false })),
       ].filter((s) => { if (seen.has(s.id)) return false; seen.add(s.id); return true; });
 
-      return { splits, myPersonIds, currentUserId };
+      // Bin model: settlements are person-to-person (not per split), so fetch them flat with the
+      // counterparty person joined. RLS returns every settlement the current user is part of.
+      const { data: settlements } = await supabase
+        .from("settlements")
+        .select("*, person:person_id(id, linked_user_id, name)");
+
+      return { splits, settlements: settlements ?? [], myPersonIds, currentUserId };
     },
   });
 

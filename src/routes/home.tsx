@@ -130,6 +130,7 @@ export default function Home() {
   // Full split set (shared cache) for each settlement row's running net.
   const { data: balanceData } = useQuery(splitBalancesQuery());
   const netSplits = balanceData?.splits ?? [];
+  const netSettlements = balanceData?.settlements ?? [];
   const netMeId = balanceData?.currentUserId ?? null;
   const netMyPids = balanceData?.myPersonIds ?? [];
 
@@ -193,12 +194,12 @@ export default function Home() {
         _otherName: otherName,
         _remaining: remaining,
         _fullySettled: fullySettled,
-        _netAfter: settlementNetAfter(netSplits, s, netMeId, netMyPids) ?? undefined,
+        _netAfter: settlementNetAfter(netSplits, netSettlements, s, netMeId, netMyPids) ?? undefined,
       };
     });
 
     return [...splitItems, ...settlementItems].sort((a, b) => b._sortKey.localeCompare(a._sortKey));
-  }, [allSplitsForTab, homeSettlements, userId, netSplits, netMeId, netMyPids]);
+  }, [allSplitsForTab, homeSettlements, userId, netSplits, netSettlements, netMeId, netMyPids]);
 
   const { data: profile } = useQuery(profileQuery(userId));
   const { data: notifications = [] } = useQuery(notificationsQuery());

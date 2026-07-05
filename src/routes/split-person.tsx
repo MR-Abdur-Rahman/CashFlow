@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { personQuery, personSplitsQuery, peopleQuery, groupsQuery, accountsQuery, categoriesQuery, subCategoriesQuery, splitBalancesQuery } from "@/lib/queries";
-import { settlementNetAfter } from "@/lib/balance";
+import { settlementNetAfter, bilateralBalance } from "@/lib/balance";
 import { ArrowLeft, Bell, Plus, ChevronLeft, ChevronRight, ChevronDown, QrCode, X, Check } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ export default function PersonDetail() {
   // Full own+incoming splits — used to compute each settlement row's running net (shared with all pages).
   const { data: balanceData } = useQuery(splitBalancesQuery());
   const allSplits = balanceData?.splits ?? [];
+  const allSettlements = balanceData?.settlements ?? [];
   const meId = balanceData?.currentUserId ?? null;
   const myPids = balanceData?.myPersonIds ?? [];
   const [period, setPeriod] = useState<Period>("monthly");
@@ -57,55 +58,16 @@ export default function PersonDetail() {
   const [editSettlement, setEditSettlement] = useState<any | null>(null);
   const [deleteSettlement, setDeleteSettlement] = useState<any | null>(null);
 
-  // Bilateral net balance between current user and target person.
-  // Positive = target owes me; negative = I owe target. Third-party-paid splits are skipped.
-  const balance = useMemo(() => {
-    let net = 0;
-    for (const s of splits as any[]) {
-      const shares = (s.split_shares ?? []) as any[];
-      const settlements = (s.settlements ?? []) as any[];
-      const myPersonIds: string[] = s._myPersonIds ?? [];
-      const currentUserId: string | null = s._currentUserId ?? null;
-      const targetLui: string | null = s._targetLinkedUserId ?? null;
-      const targetPid: string = s._targetPersonId ?? personId!;
-      const total = Number(s.total_amount);
-      const sumShares = shares.reduce((a: number, sh: any) => a + Number(sh.share_amount), 0);
-      const settledOf = (ss: any) => !ss ? 0 :
-        settlements.filter((x: any) => x.split_share_id === ss.id).reduce((a: number, x: any) => a + Number(x.amount), 0);
-      const payerAuthId: string | null = (() => {
-        if (s.paid_by_person_id) {
-          const ps = shares.find((ss: any) => ss.person_id === s.paid_by_person_id);
-          if (ps?.person?.linked_user_id) return ps.person.linked_user_id;
-        }
-        if (s.paid_by === "me") return s.created_by;
-        if (s.paid_by) {
-          const m = shares.find((ss: any) => ss.person?.name === s.paid_by || ss.person_name === s.paid_by);
-          if (m?.person?.linked_user_id) return m.person.linked_user_id;
-        }
-        return null;
-      })();
-      const myShareEntry = shares.find((ss: any) =>
-        myPersonIds.includes(ss.person_id) || ss.person?.linked_user_id === currentUserId);
-      const targetShareEntry = shares.find((ss: any) =>
-        (targetLui && ss.person?.linked_user_id === targetLui) || ss.person_id === targetPid);
-
-      // For an implicit creator share there is no split_share row to attach settlements to, so they
-      // land on the OTHER party's share. On a bilateral split every settlement reduces the single
-      // bilateral debt, so subtract ALL settlements on the split for the implicit branches.
-      const allSettledOnSplit = settlements.reduce((a: number, x: any) => a + Number(x.amount ?? 0), 0);
-      if (payerAuthId && payerAuthId === currentUserId) {
-        // I paid → target owes me their share (or their implicit creator share)
-        if (targetShareEntry) net += Number(targetShareEntry.share_amount) - settledOf(targetShareEntry);
-        else if (targetLui && s.created_by === targetLui) net += (total - sumShares) - allSettledOnSplit;
-      } else if (payerAuthId && targetLui && payerAuthId === targetLui) {
-        // Target paid → I owe my share (or my implicit creator share)
-        if (myShareEntry) net -= Number(myShareEntry.share_amount) - settledOf(myShareEntry);
-        else if (s.created_by === currentUserId) net -= (total - sumShares) - allSettledOnSplit;
-      }
-      // Third party paid → skip (no direct bilateral debt)
-    }
-    return net;
-  }, [splits, personId, person]);
+  // Bilateral net "bin" balance between current user and target person (shared bin formula:
+  // gross split debts − signed settlements). Positive = target owes me; negative = I owe target.
+  const balance = useMemo(
+    () => bilateralBalance(
+      allSplits, allSettlements,
+      { id: personId!, linked_user_id: person?.linked_user_id ?? null },
+      meId, myPids,
+    ),
+    [allSplits, allSettlements, personId, person, meId, myPids],
+  );
 
   const unsettledItems = useMemo(() => {
     return (splits as any[]).flatMap((s) => {
@@ -167,34 +129,32 @@ export default function PersonDetail() {
     [visibleSplits, fromStr, toStr]
   );
 
-  // Settlement rows between the two users — display only. These are already nested in the split
-  // data; the balance math above already accounts for them (via settledOf), so we do NOT re-add them.
-  // Direction comes from which share was settled: if it's mine, I paid the target; else they paid me.
+  // Settlement rows between the two users (bin model: settlements are person-to-person, matched by
+  // counterparty — not nested in splits). Each row shows the RUNNING NET as of that settlement (via
+  // the shared settlementNetAfter helper, so every page matches). Newest row = the top balance card.
   const filteredSettlements = useMemo(() => {
-    // Each settlement row shows the RUNNING NET balance as of that settlement (via the shared
-    // settlementNetAfter helper, so every page matches). Newest row = the top balance card.
-    const seen = new Set<string>();
+    const targetLui: string | null = person?.linked_user_id ?? null;
     const out: any[] = [];
-    for (const s of visibleSplits) {
-      const currentUserId: string | null = s._currentUserId ?? null;
-      const targetLui: string | null = s._targetLinkedUserId ?? null;
-      const payerAuthId = getPayerAuthId(s);
-      // "You → target" when the target paid the split (I'm the debtor settling my side).
-      const iPaid = !!payerAuthId && !!targetLui && payerAuthId === targetLui;
-      for (const st of (s.settlements ?? []) as any[]) {
-        if (seen.has(st.id)) continue;
-        seen.add(st.id);
-        const day = String(st.created_at ?? "").slice(0, 10);
-        if (day < fromStr || day > toStr) continue;
-        out.push({
-          ...st, _itemType: "settlement", _iPaid: iPaid,
-          _netAfter: settlementNetAfter(allSplits, st, meId, myPids) ?? 0,
-          _currentUserId: currentUserId,
-        });
-      }
+    for (const st of allSettlements as any[]) {
+      const settler = st.created_by;
+      const cpUid = st.person?.linked_user_id ?? null;
+      const settlerIsMe = settler === meId;
+      const betweenUs = settlerIsMe
+        ? (st.person_id === personId || (!!targetLui && cpUid === targetLui))
+        : (!!targetLui && settler === targetLui && cpUid === meId);
+      if (!betweenUs) continue;
+      const day = String(st.created_at ?? "").slice(0, 10);
+      if (day < fromStr || day > toStr) continue;
+      // "You → target": I paid the target when I'm the debtor (the target is the creditor).
+      const iPaid = settlerIsMe ? !st.settler_is_creditor : !!st.settler_is_creditor;
+      out.push({
+        ...st, _itemType: "settlement", _iPaid: iPaid,
+        _netAfter: settlementNetAfter(allSplits, allSettlements, st, meId, myPids) ?? 0,
+        _currentUserId: meId,
+      });
     }
     return out;
-  }, [visibleSplits, allSplits, meId, myPids, fromStr, toStr]);
+  }, [allSettlements, allSplits, meId, myPids, personId, person, fromStr, toStr]);
 
   const combinedItems = useMemo(() => {
     const items = [

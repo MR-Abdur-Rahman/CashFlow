@@ -324,7 +324,7 @@ function HistorySettlementRow({ s, all }: { s: any; all: any[] }) {
   const { iPaid, otherName } = settlementDirection(s, s._uid);
   const { remaining, fullySettled } = shareRemaining(s, all);
   const netAfter = settlementNetAfter(
-    balanceData?.splits ?? [], s, balanceData?.currentUserId ?? null, balanceData?.myPersonIds ?? [],
+    balanceData?.splits ?? [], balanceData?.settlements ?? [], s, balanceData?.currentUserId ?? null, balanceData?.myPersonIds ?? [],
   ) ?? undefined;
   return (
     <SettlementRow description={s.description} iPaid={iPaid} otherName={otherName} amount={Number(s.amount)}
