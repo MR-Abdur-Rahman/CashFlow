@@ -102,16 +102,25 @@ export default function GroupDetail() {
   // net are view-specific. Members are keyed by member_user_id (readable by every member), not the
   // creator's private people rows.
   const memberBalances = useMemo(() => {
+    const g = group as any;
+    // Roster = the group CREATOR + the linked members, minus the viewer. (The creator lives in
+    // groups.created_by, not group_members, so include them explicitly — otherwise a member's view
+    // is missing the creator.)
+    const uids: (string | null)[] = [
+      g?.created_by ?? null,
+      ...((g?.group_members ?? []) as any[]).map(
+        (m: any) => m.member_user_id ?? m.people?.linked_user_id ?? null,
+      ),
+    ];
     const seen = new Set<string>();
     const out: { id: string; name: string; avatarUrl: string | null; balance: number }[] = [];
-    for (const m of ((group as any)?.group_members ?? []) as any[]) {
-      const uid: string | null = m.member_user_id ?? m.people?.linked_user_id ?? null;
+    for (const uid of uids) {
       if (!uid || uid === currentUserId || seen.has(uid)) continue;
       seen.add(uid);
       const contact = (myContacts as any[]).find((c) => c.linked_user_id === uid);
-      const d = contactDisplay(contact ?? m.people ?? { linked_user_id: uid, name: "Member" });
+      const d = contactDisplay(contact ?? { linked_user_id: uid, name: "Member" });
       out.push({
-        id: (contact?.id ?? m.person_id) as string,
+        id: (contact?.id ?? uid) as string,
         name: d.name,
         avatarUrl: d.avatarUrl,
         balance: bilateralBalance(
