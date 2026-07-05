@@ -7,37 +7,21 @@ import {
   Pencil,
   Trash2,
   Plus,
-  Users,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  X,
-  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SwipeRow } from "@/components/SwipeRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { notifyToast } from "@/lib/notify";
 import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
-import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { formatMoney } from "@/lib/format";
 import { EditSplitSheet, SplitDirectRow } from "./home";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,

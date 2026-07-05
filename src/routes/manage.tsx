@@ -28,7 +28,6 @@ import { SwipeRow } from "@/components/SwipeRow";
 import { Plus, Archive, ChevronRight, ArrowLeft } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { Link } from "react-router-dom";
-import { cn } from "@/lib/utils";
 
 export default function ManagePage() {
   const [catDrill, setCatDrill] = useState<{ id: string; name: string; icon: string } | null>(null);

@@ -1,26 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  personQuery,
-  personSplitsQuery,
-  peopleQuery,
-  groupsQuery,
-  accountsQuery,
-  categoriesQuery,
-  subCategoriesQuery,
-  splitBalancesQuery,
-} from "@/lib/queries";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { personQuery, personSplitsQuery, splitBalancesQuery } from "@/lib/queries";
 import { settlementNetAfter, bilateralBalance } from "@/lib/balance";
-import {
-  ArrowLeft,
-  Bell,
-  Plus,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  QrCode,
-  X,
-  Check,
-} from "lucide-react";
+import { ArrowLeft, Bell, Plus, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { SendReminderDialog } from "@/components/SendReminderDialog";
@@ -30,26 +11,13 @@ import { SwipeRow } from "@/components/SwipeRow";
 import { SplitDirectRow, EditSplitSheet } from "./home";
 import { SettlementRow } from "@/components/SettlementRow";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
-import { notifyToast } from "@/lib/notify";
 import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
 import {
   canDeleteSettlement,
   deleteSettlement as deleteSettlementRpc,
 } from "@/lib/deleteSettlement";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -57,9 +25,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AddPersonDialog } from "@/components/AddPersonDialog";
-import { AddGroupDialog } from "@/components/AddGroupDialog";
-import { QrScannerDialog } from "@/components/QrScannerDialog";
 import {
   AlertDialog,
   AlertDialogAction,

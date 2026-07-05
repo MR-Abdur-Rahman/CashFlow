@@ -28,7 +28,6 @@ import {
   ChevronRight,
   Check,
   Bell,
-  X,
   Trash2,
   ShieldAlert,
   Wallet,

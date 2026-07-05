@@ -30,7 +30,6 @@ import {
   addYears,
   subDays,
   addDays,
-  eachMonthOfInterval,
 } from "date-fns";
 import { ChevronLeft, ChevronRight, ChevronDown, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -271,28 +270,6 @@ function SplitItemRow({ s, highlightPerson }: { s: any; highlightPerson?: string
             <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5 text-right">{dateStr}</p>
           </>
         )}
-      </div>
-    </div>
-  );
-}
-
-function SettlementExpenseRow({ s, personName }: { s: any; personName: string }) {
-  const account = s.accounts
-    ? [s.accounts.institution, s.accounts.label].filter(Boolean).join(" · ")
-    : "";
-  return (
-    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
-      <div className="px-4 py-3">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium">You → {personName}</p>
-          <p className="text-sm font-mono font-semibold text-[#EF4444] shrink-0">
-            {formatMoney(s.amount)}
-          </p>
-        </div>
-        <div className="flex items-center justify-between gap-2 mt-0.5">
-          <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
-          <p className="text-[10px] text-[#9CA3AF] font-mono shrink-0">{fmtCAT(s.created_at)}</p>
-        </div>
       </div>
     </div>
   );

@@ -6,7 +6,6 @@ import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { notifyToast } from "@/lib/notify";
 import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
 import {
   canDeleteSettlement,
@@ -37,16 +36,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { EditSplitSheet, EditTxSheet } from "@/routes/home";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
@@ -375,7 +364,7 @@ export default function AccountDetail() {
           ) : (
             visibleTxns.map((t: any) => (
               <SwipeRow key={t.id} onEdit={() => setEditTxn(t)} onDelete={() => setDeleteTxn(t)}>
-                <TxRow t={t} accountId={accountId!} />
+                <TxRow t={t} />
               </SwipeRow>
             ))
           )}
@@ -553,7 +542,7 @@ export default function AccountDetail() {
 }
 
 // ─── Transaction Row ────────────────────────────────────────────────────────
-function TxRow({ t, accountId }: { t: any; accountId: string }) {
+function TxRow({ t }: { t: any }) {
   const isIncome = t.type === "income";
   const isTransfer = t.type === "transfer";
 
