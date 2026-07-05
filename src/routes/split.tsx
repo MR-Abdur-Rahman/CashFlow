@@ -310,16 +310,12 @@ function PendingSettlementRow({ settlement, accounts }: { settlement: any; accou
   }
 
   return (
-    <div
-      className="rounded-2xl p-4 space-y-3"
-      style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}
-    >
+    <div className="rounded-2xl p-4 space-y-3 bg-card border border-border">
       {/* Line 1: description + amount (inflow green / outflow red) */}
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-white">{desc}</p>
+        <p className="text-sm font-medium text-foreground">{desc}</p>
         <span
-          className="text-sm font-mono font-semibold shrink-0"
-          style={{ color: iPaidOut ? "#EF4444" : "#10B981" }}
+          className={`text-sm font-mono font-semibold shrink-0 ${iPaidOut ? "text-expense" : "text-income"}`}
         >
           {iPaidOut ? "−" : "+"}
           {formatMoney(Number(settlement.amount))}
@@ -328,19 +324,19 @@ function PendingSettlementRow({ settlement, accounts }: { settlement: any; accou
 
       {/* Line 2: direction + date */}
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs" style={{ color: "#9CA3AF" }}>
+        <p className="text-xs text-muted-foreground">
           {iPaidOut
             ? `You paid ${settlerName} via ${methodLabel}`
             : `${settlerName} paid you via ${methodLabel}`}
         </p>
-        <span className="text-xs shrink-0" style={{ color: "#6B7280" }}>
+        <span className="text-xs shrink-0 text-muted-foreground">
           {format(new Date(settlement.created_at), "MMM d, yyyy")}
         </span>
       </div>
 
       {/* Line 3: receiving account dropdown + confirm */}
       {filteredAccounts.length === 0 ? (
-        <p className="text-xs" style={{ color: "#9CA3AF" }}>
+        <p className="text-xs text-muted-foreground">
           No {allowedType ?? "matching"} accounts found — add one in the Accounts tab.
         </p>
       ) : (
@@ -426,7 +422,6 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
   const selectedAccount = accounts.find((a) => a.id === accountId);
   const selectedCategory = (categories as any[]).find((c) => c.id === categoryId);
   const creatorName = split.creator?.full_name ?? "Someone";
-  const ddStyle = { background: "#0A0A0A", borderColor: "#2A2A2A", color: "#FFFFFF" } as const;
 
   async function confirmSelection() {
     if (!selectedAccount || !categoryId || saving) return;
@@ -465,24 +460,19 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
   }
 
   return (
-    <div
-      className="rounded-2xl p-4 space-y-3"
-      style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}
-    >
+    <div className="rounded-2xl p-4 space-y-3 bg-card border border-border">
       {/* Line 1: description + amount */}
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-white">{split.description || "Untitled"}</p>
-        <span className="text-sm font-mono font-semibold shrink-0" style={{ color: "#F59E0B" }}>
+        <p className="text-sm font-medium text-foreground">{split.description || "Untitled"}</p>
+        <span className="text-sm font-mono font-semibold shrink-0 text-split">
           {formatMoney(Number(split.total_amount))}
         </span>
       </div>
 
       {/* Line 2: creator + date */}
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs" style={{ color: "#9CA3AF" }}>
-          {creatorName} added this split
-        </p>
-        <span className="text-xs shrink-0" style={{ color: "#6B7280" }}>
+        <p className="text-xs text-muted-foreground">{creatorName} added this split</p>
+        <span className="text-xs shrink-0 text-muted-foreground">
           {format(new Date(split.created_at), "MMM d, yyyy")}
         </span>
       </div>
@@ -496,7 +486,7 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
             setSubCatId("");
           }}
         >
-          <SelectTrigger className="w-full" style={ddStyle}>
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="Select category" />
           </SelectTrigger>
           <SelectContent>
@@ -510,7 +500,7 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
         </Select>
         {categoryId && (
           <Select value={subCatId} onValueChange={setSubCatId}>
-            <SelectTrigger className="w-full" style={ddStyle}>
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="Sub-category (optional)" />
             </SelectTrigger>
             <SelectContent>
@@ -527,7 +517,7 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
       {/* Line 4: account dropdown + confirm */}
       <div className="flex items-center gap-2">
         <Select value={accountId} onValueChange={setAccountId}>
-          <SelectTrigger className="flex-1" style={ddStyle}>
+          <SelectTrigger className="flex-1">
             <SelectValue placeholder="Select account" />
           </SelectTrigger>
           <SelectContent>
