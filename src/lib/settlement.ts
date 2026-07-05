@@ -1,4 +1,5 @@
 // Shared settlement row helpers (kept out of the component file so React Fast Refresh stays happy).
+import { contactDisplay } from "./people";
 
 // Maps a settlement's payment `method` to the account `type` that can receive/send it.
 // Used to filter account dropdowns (SettleUpDialog + the Pending-tab settlement row) so a
@@ -39,7 +40,7 @@ export function settlementDirection(
   s: any,
   currentUserId: string | undefined,
   otherNameOverride?: string,
-): { iPaid: boolean; otherName: string } {
+): { iPaid: boolean; otherName: string; otherAvatar: string | null } {
   const share = s.split_shares as any;
   const split = s.splits as any;
 
@@ -48,10 +49,10 @@ export function settlementDirection(
   if (!split && !s.split_id) {
     const settlerIsMe = s.created_by === currentUserId;
     const iPaid = settlerIsMe ? !s.settler_is_creditor : !!s.settler_is_creditor;
-    const otherName =
-      otherNameOverride ??
-      (settlerIsMe ? (s.person?.name ?? "Someone") : (s.creator?.full_name ?? "Someone"));
-    return { iPaid, otherName };
+    const cp = settlerIsMe
+      ? contactDisplay(s.person)
+      : { name: s.creator?.full_name ?? "Someone", avatarUrl: s.creator?.avatar_url ?? null };
+    return { iPaid, otherName: otherNameOverride ?? cp.name, otherAvatar: cp.avatarUrl };
   }
   // Resolve the split's payer to an auth user id.
   let payerAuthId: string | null = null;
@@ -70,5 +71,5 @@ export function settlementDirection(
       ? (split?.creator?.full_name ?? "Someone")
       : (split?.paid_by_person?.name ?? split?.creator?.full_name ?? "Someone");
   const otherName = otherNameOverride ?? (iPaid ? creditorName : (share?.person_name ?? "Someone"));
-  return { iPaid, otherName };
+  return { iPaid, otherName, otherAvatar: null };
 }

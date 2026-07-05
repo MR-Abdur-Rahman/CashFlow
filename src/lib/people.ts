@@ -11,3 +11,27 @@ export function contactDisplay(p: any): { name: string; avatarUrl: string | null
   const avatarUrl = p.linked_user_id ? (linked?.avatar_url ?? null) : (p.avatar_url ?? null);
   return { name, avatarUrl };
 }
+
+// The avatar shown on a split row: group split → group photo; person split → the OTHER party's
+// photo (the creator for an incoming split, else the contact); people (multi) split → a Users icon
+// (kind "people", no url). Requires the split's people/creator/groups joins to carry avatar fields.
+export function splitRowAvatar(s: any): {
+  kind: "person" | "group" | "people";
+  name: string;
+  url: string | null;
+} {
+  const shares = (s?.split_shares ?? []) as any[];
+  if (s?.type === "group") {
+    return { kind: "group", name: s.groups?.name ?? "Group", url: s.groups?.avatar_url ?? null };
+  }
+  if (shares.length > 1) return { kind: "people", name: "People", url: null };
+  if (s?._isIncoming) {
+    return {
+      kind: "person",
+      name: s.creator?.full_name ?? "?",
+      url: s.creator?.avatar_url ?? null,
+    };
+  }
+  const d = contactDisplay(s?.people ?? shares[0]?.person);
+  return { kind: "person", name: d.name, url: d.avatarUrl };
+}

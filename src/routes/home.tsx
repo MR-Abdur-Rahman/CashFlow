@@ -33,6 +33,7 @@ import {
 import { format, startOfWeek, startOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
+import { splitRowAvatar } from "@/lib/people";
 import { SwipeRow } from "@/components/SwipeRow";
 import { toast } from "sonner";
 import { notifyToast } from "@/lib/notify";
@@ -204,7 +205,7 @@ export default function Home() {
       const { data, error } = await supabase
         .from("settlements")
         .select(
-          "*, person:person_id(name), creator:created_by(full_name), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name))",
+          "*, person:person_id(name, nickname, avatar_url, linked:linked_user_id(full_name, avatar_url)), creator:created_by(full_name, avatar_url), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name))",
         )
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999");
@@ -256,7 +257,7 @@ export default function Home() {
     }));
 
     const settlementItems = (homeSettlements as any[]).map((s) => {
-      const { iPaid, otherName } = settlementDirection(s, userId);
+      const { iPaid, otherName, otherAvatar } = settlementDirection(s, userId);
       const { remaining, fullySettled } = shareRemaining(s, homeSettlements as any[]);
       return {
         ...s,
@@ -264,6 +265,7 @@ export default function Home() {
         _sortKey: (s.created_at ?? "") as string,
         _iPaid: iPaid,
         _otherName: otherName,
+        _otherAvatar: otherAvatar,
         _remaining: remaining,
         _fullySettled: fullySettled,
         _netAfter:
@@ -495,6 +497,7 @@ export default function Home() {
                       description={item.description}
                       iPaid={item._iPaid}
                       otherName={item._otherName}
+                      avatarUrl={item._otherAvatar}
                       amount={Number(item.amount)}
                       remaining={item._remaining}
                       fullySettled={item._fullySettled}
@@ -903,71 +906,84 @@ export function SplitDirectRow({ s, lentOweOverride }: { s: any; lentOweOverride
     </p>
   );
 
+  const rowAv = splitRowAvatar(s);
+  const avatarNode =
+    rowAv.kind === "people" ? (
+      <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
+        <Users className="h-5 w-5" />
+      </div>
+    ) : (
+      <UserAvatar url={rowAv.url} name={rowAv.name} size={40} className="shrink-0" />
+    );
+
   return (
-    <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
-      <div className="px-4 py-3">
-        {/* Line 1: description + total */}
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium text-foreground truncate flex-1">{description}</p>
-          <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">
-            {formatMoney(total)}
-          </p>
-        </div>
+    <div className="bg-card">
+      <div className="px-4 py-3 flex gap-3">
+        {avatarNode}
+        <div className="flex-1 min-w-0">
+          {/* Line 1: description + total */}
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-medium text-foreground truncate flex-1">{description}</p>
+            <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">
+              {formatMoney(total)}
+            </p>
+          </div>
 
-        {/* Person split */}
-        {isPerson && (
-          <>
-            <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{line2Name}</p>
+          {/* Person split */}
+          {isPerson && (
+            <>
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{line2Name}</p>
+                {isMePaid ? (
+                  <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
+                    You lent {formatMoney(youLent)}
+                  </p>
+                ) : (
+                  <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">
+                    You owe {formatMoney(youOwe)}
+                  </p>
+                )}
+              </div>
               {isMePaid ? (
-                <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
-                  You lent {formatMoney(youLent)}
-                </p>
+                <div className="flex items-center justify-between gap-2 mt-0.5">
+                  <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{accountLabel}</p>
+                  {dateNode}
+                </div>
               ) : (
-                <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">
-                  You owe {formatMoney(youOwe)}
-                </p>
+                dateNode
               )}
-            </div>
-            {isMePaid ? (
-              <div className="flex items-center justify-between gap-2 mt-0.5">
-                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{accountLabel}</p>
-                {dateNode}
-              </div>
-            ) : (
-              dateNode
-            )}
-          </>
-        )}
+            </>
+          )}
 
-        {/* People / Group split */}
-        {(isMulti || isGroup) && (
-          <>
-            <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{line2Name}</p>
-              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
-                {isMePaid
-                  ? `${owersCount} × ${formatMoney(perShare)}`
-                  : `${formatMoney(perShare)} per share`}
-              </p>
-            </div>
-            {isMePaid ? (
+          {/* People / Group split */}
+          {(isMulti || isGroup) && (
+            <>
               <div className="flex items-center justify-between gap-2 mt-0.5">
-                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{accountLabel}</p>
-                <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
-                  You lent {formatMoney(lentOweOverride ?? youLent)}
+                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{line2Name}</p>
+                <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+                  {isMePaid
+                    ? `${owersCount} × ${formatMoney(perShare)}`
+                    : `${formatMoney(perShare)} per share`}
                 </p>
               </div>
-            ) : (
-              <div className="flex items-center justify-end gap-2 mt-0.5">
-                <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">
-                  You owe {formatMoney(lentOweOverride ?? youOwe)}
-                </p>
-              </div>
-            )}
-            {dateNode}
-          </>
-        )}
+              {isMePaid ? (
+                <div className="flex items-center justify-between gap-2 mt-0.5">
+                  <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{accountLabel}</p>
+                  <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
+                    You lent {formatMoney(lentOweOverride ?? youLent)}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-center justify-end gap-2 mt-0.5">
+                  <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">
+                    You owe {formatMoney(lentOweOverride ?? youOwe)}
+                  </p>
+                </div>
+              )}
+              {dateNode}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

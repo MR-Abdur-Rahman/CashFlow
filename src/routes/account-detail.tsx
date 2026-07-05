@@ -126,7 +126,7 @@ export default function AccountDetail() {
       const { data, error } = await supabase
         .from("settlements")
         .select(
-          "*, person:person_id(name), creator:created_by(full_name), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name)), accounts:account_id(label, institution)",
+          "*, person:person_id(name, nickname, avatar_url, linked:linked_user_id(full_name, avatar_url)), creator:created_by(full_name, avatar_url), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name)), accounts:account_id(label, institution)",
         )
         .or(`account_id.eq.${accountId},receiver_account_id.eq.${accountId}`)
         .gte("created_at", dateFrom)
@@ -154,7 +154,7 @@ export default function AccountDetail() {
       _sortKey: s.created_at ?? `${s.date}T${s.time ?? "00:00"}`,
     }));
     const settlementItems = (settlements as any[]).map((s) => {
-      const { iPaid, otherName } = settlementDirection(s, userId);
+      const { iPaid, otherName, otherAvatar } = settlementDirection(s, userId);
       const { remaining, fullySettled } = shareRemaining(s, settlements as any[]);
       return {
         ...s,
@@ -162,6 +162,7 @@ export default function AccountDetail() {
         _sortKey: (s.created_at ?? "") as string,
         _iPaid: iPaid,
         _otherName: otherName,
+        _otherAvatar: otherAvatar,
         _remaining: remaining,
         _fullySettled: fullySettled,
         _netAfter:
@@ -345,6 +346,7 @@ export default function AccountDetail() {
                   description={item.description}
                   iPaid={item._iPaid}
                   otherName={item._otherName}
+                  avatarUrl={item._otherAvatar}
                   amount={Number(item.amount)}
                   remaining={item._remaining}
                   fullySettled={item._fullySettled}

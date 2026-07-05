@@ -294,6 +294,7 @@ export default function PersonDetail() {
                     description={item.description}
                     iPaid={item._iPaid}
                     otherName={personName}
+                    avatarUrl={personAvatar}
                     amount={Number(item.amount)}
                     netAfter={item._netAfter}
                     createdAt={item.created_at}
