@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { transactionsQuery, incomingSplitsQuery, splitsQuery, splitBalancesQuery } from "@/lib/queries";
+import { transactionsQuery, incomingSplitsQuery, splitsQuery, splitBalancesQuery, peopleQuery } from "@/lib/queries";
 import { settlementNetAfter } from "@/lib/balance";
 import { SplitDirectRow, EditSplitSheet, EditTxSheet } from "./home";
 import { SettlementRow } from "@/components/SettlementRow";
@@ -43,8 +43,11 @@ export default function HistoryPage() {
       return (data ?? []).map((s: any) => ({ ...s, _uid: u.user!.id }));
     },
   });
+  const { data: people = [] } = useQuery(peopleQuery());
   const [q, setQ] = useState("");
   const [type, setType] = useState<string>(searchParams.get("filter") ?? "all");
+  const [personId, setPersonId] = useState<string>(""); // "" = everyone
+  const selectedPerson = useMemo(() => (people as any[]).find((p) => p.id === personId) ?? null, [people, personId]);
   const [period, setPeriod] = useState<Period>("monthly");
   const [anchor, setAnchor] = useState(new Date());
   const [editTxn, setEditTxn] = useState<any | null>(null);
@@ -66,6 +69,7 @@ export default function HistoryPage() {
   const filteredTxns = useMemo(() => {
     return (txns as any[]).filter((t) => {
       if (t.is_split) return false;
+      if (personId) return false; // a person filter → only splits/settlements involve a person
       if (t.date < fromStr || t.date > toStr) return false;
       if (type === "split") return false;
       if (type !== "all" && t.type !== type) return false;
@@ -81,7 +85,7 @@ export default function HistoryPage() {
       ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(q.toLowerCase());
     });
-  }, [txns, q, type, fromStr, toStr]);
+  }, [txns, q, type, personId, fromStr, toStr]);
 
   // Own + incoming splits, deduped (incoming version wins) — same as Home page.
   const allSplits = useMemo(() => {
@@ -110,6 +114,13 @@ export default function HistoryPage() {
     else return [];
     return base.filter((s) => {
       if (s.date < fromStr || s.date > toStr) return false;
+      if (selectedPerson) {
+        const p = selectedPerson;
+        const involved = s.person_id === p.id
+          || (s.split_shares ?? []).some((sh: any) => sh.person_id === p.id)
+          || (!!p.linked_user_id && s.created_by === p.linked_user_id);
+        if (!involved) return false;
+      }
       if (!q) return true;
       const hay = [
         s.description,
@@ -121,19 +132,26 @@ export default function HistoryPage() {
       ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(q.toLowerCase());
     });
-  }, [allSplits, q, type, fromStr, toStr]);
+  }, [allSplits, q, type, selectedPerson, fromStr, toStr]);
 
   const filteredSettlements = useMemo(() => {
     if (type !== "all" && type !== "settlement") return [];
     return (settlements as any[]).filter((s) => {
       const day = String(s.created_at ?? "").slice(0, 10);
       if (day < fromStr || day > toStr) return false;
+      if (selectedPerson) {
+        const p = selectedPerson;
+        const involved = s.person_id === p.id
+          || (!!p.linked_user_id && s.created_by === p.linked_user_id)
+          || (!!p.linked_user_id && s.pending_for_user_id === p.linked_user_id);
+        if (!involved) return false;
+      }
       if (!q) return true;
       const hay = [s.description, s.splits?.description, s.person?.name, s.split_shares?.person_name, s.creator?.full_name, s.method]
         .filter(Boolean).join(" ").toLowerCase();
       return hay.includes(q.toLowerCase());
     });
-  }, [settlements, q, type, fromStr, toStr]);
+  }, [settlements, q, type, selectedPerson, fromStr, toStr]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, any[]>();
@@ -172,6 +190,34 @@ export default function HistoryPage() {
           </button>
         ))}
       </div>
+
+      {/* Person filter — narrow to splits/settlements with one person (hides plain transactions) */}
+      {(people as any[]).length > 0 && (
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-1.5 bg-secondary text-sm px-3 py-1.5 rounded-xl">
+                {selectedPerson ? selectedPerson.name : "All people"} <ChevronDown className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
+              <DropdownMenuItem onClick={() => setPersonId("")} className={!personId ? "text-primary font-medium" : ""}>
+                All people
+              </DropdownMenuItem>
+              {(people as any[]).map((p) => (
+                <DropdownMenuItem key={p.id} onClick={() => setPersonId(p.id)}
+                  className={personId === p.id ? "text-primary font-medium" : ""}>
+                  {p.name}{p.linked_user_id ? " 🔗" : ""}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {selectedPerson && (
+            <button onClick={() => setPersonId("")} className="text-xs text-muted-foreground underline">clear</button>
+          )}
+        </div>
+      )}
 
       {/* Period filter bar */}
       <div className="flex items-center gap-2">
