@@ -75,7 +75,6 @@ export default function AccountDetail() {
   const { data: account } = useQuery(accountQuery(accountId!));
   const [period, setPeriod] = useState<Period>("monthly");
   const [anchor, setAnchor] = useState(new Date());
-  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [edit, setEdit] = useState(false);
   const [editTxn, setEditTxn] = useState<any | null>(null);
   const [deleteTxn, setDeleteTxn] = useState<any | null>(null);
@@ -174,23 +173,10 @@ export default function AccountDetail() {
           settlementNetAfter(netSplits, netSettlements, s, netMeId, netMyPids) ?? undefined,
       };
     });
-    let items: any[];
-    if (typeFilter === "split") items = splitItems;
-    else if (typeFilter === "settlement") items = settlementItems;
-    else if (typeFilter === "all") items = [...txnItems, ...splitItems, ...settlementItems];
-    else items = txnItems.filter((t) => t.type === typeFilter); // income / expense / transfer
-    return items.sort((a, b) => b._sortKey.localeCompare(a._sortKey));
-  }, [
-    txns,
-    splits,
-    settlements,
-    userId,
-    netSplits,
-    netSettlements,
-    netMeId,
-    netMyPids,
-    typeFilter,
-  ]);
+    return [...txnItems, ...splitItems, ...settlementItems].sort((a, b) =>
+      b._sortKey.localeCompare(a._sortKey),
+    );
+  }, [txns, splits, settlements, userId, netSplits, netSettlements, netMeId, netMyPids]);
 
   const delAccount = useMutation({
     mutationFn: async () => {
@@ -316,23 +302,6 @@ export default function AccountDetail() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
-
-      {/* History-style type filter */}
-      <div className="flex gap-2 text-xs flex-wrap">
-        {["all", "income", "expense", "transfer", "split", "settlement"].map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTypeFilter(t)}
-            className={cn(
-              "px-3 py-1.5 rounded-full capitalize",
-              typeFilter === t ? "bg-primary text-white" : "bg-secondary",
-            )}
-          >
-            {t}
-          </button>
-        ))}
       </div>
 
       <div className="rounded-xl overflow-hidden border border-border divide-y divide-border">
