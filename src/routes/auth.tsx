@@ -4,8 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 
-type Tab = "phone" | "email";
-
 // Shared dark-theme field styling (per design spec).
 const FIELD: React.CSSProperties = {
   background: "#1A1A1A",
@@ -15,10 +13,9 @@ const FIELD: React.CSSProperties = {
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>("phone");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  // One field accepts either an email or a phone number; routing is decided at submit.
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -30,8 +27,8 @@ export default function AuthPage() {
     });
   }, [navigate]);
 
-  // Existing email + password flow — UNCHANGED. Kept wired so email login keeps working.
-  async function handleEmail() {
+  // Email + password flow (the active method). UNCHANGED Supabase calls.
+  async function handleEmail(email: string) {
     setLoading(true);
     try {
       if (mode === "signup") {
@@ -57,11 +54,13 @@ export default function AuthPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (tab === "email") {
-      handleEmail();
+    const id = identifier.trim();
+    // An "@" means it's an email → the active flow. Anything else is treated as a phone number,
+    // which isn't wired yet.
+    if (id.includes("@")) {
+      handleEmail(id);
     } else {
-      // Phone + password is NOT wired yet — pending the signup-approach decision.
-      toast.message("Phone login is being set up — use Email or Google for now.");
+      toast.message("Phone login is being set up — use your email for now.");
     }
   }
 
@@ -78,23 +77,6 @@ export default function AuthPage() {
         </h2>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          {/* Phone | Email segmented toggle */}
-          <div className="flex gap-1 rounded-lg p-1" style={{ background: "#1A1A1A" }}>
-            {(["phone", "email"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                className="flex-1 rounded-lg py-2 text-sm font-medium capitalize transition-colors"
-                style={
-                  tab === t ? { background: "#7C3AED", color: "#FFFFFF" } : { color: "#9CA3AF" }
-                }
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-
           {mode === "signup" && (
             <input
               type="text"
@@ -106,26 +88,18 @@ export default function AuthPage() {
             />
           )}
 
-          {/* Identifier field switches with the toggle; password is shared */}
-          {tab === "phone" ? (
-            <input
-              type="tel"
-              placeholder="Phone number"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              style={FIELD}
-              className="w-full rounded-lg px-4 py-3 text-sm outline-none placeholder:text-[#9CA3AF]"
-            />
-          ) : (
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={FIELD}
-              className="w-full rounded-lg px-4 py-3 text-sm outline-none placeholder:text-[#9CA3AF]"
-            />
-          )}
+          {/* Single identifier — email or phone number */}
+          <input
+            type="text"
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            placeholder="Email / Phone Number"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            style={FIELD}
+            className="w-full rounded-lg px-4 py-3 text-sm outline-none placeholder:text-[#9CA3AF]"
+          />
 
           {/* Password with show/hide */}
           <div className="relative">
