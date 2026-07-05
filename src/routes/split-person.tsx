@@ -130,6 +130,7 @@ export default function PersonDetail() {
             splitId: s.id,
             description: getSplitLabel(s),
             date: s.date,
+            time: s.time,
             shareAmount: Number(sh.share_amount),
             paidAmount: paid,
             remaining: Number(sh.share_amount) - paid,
