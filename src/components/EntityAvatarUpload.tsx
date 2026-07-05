@@ -1,10 +1,15 @@
 import { useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Camera, Trash2, Loader2 } from "lucide-react";
+import { Camera, Image as ImageIcon, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { UserAvatar } from "./UserAvatar";
 import { ImageCropDialog } from "./ImageCropDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useQueryClient } from "@tanstack/react-query";
 
 // Picture upload/remove for a `people` or `groups` row. Stores into the shared private `avatars`
@@ -26,7 +31,8 @@ export function EntityAvatarUpload({
   invalidateKey: string[];
 }) {
   const qc = useQueryClient();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
@@ -88,43 +94,40 @@ export function EntityAvatarUpload({
   }
 
   return (
-    <div className="flex items-center gap-4">
-      <UserAvatar url={currentUrl} name={name} size={64} />
-      <div className="flex flex-col gap-2">
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*,image/heic,image/heif"
-          className="hidden"
-          onChange={onPick}
-        />
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={busy}
-          onClick={() => fileRef.current?.click()}
-        >
-          {busy ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Camera className="h-4 w-4 mr-2" />
+    <div className="flex flex-col items-center gap-2">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" className="relative" aria-label="Edit photo" disabled={busy}>
+            <UserAvatar url={currentUrl} name={name} size={72} />
+            <span className="absolute inset-0 grid place-items-center rounded-full bg-black/40 opacity-0 hover:opacity-100 transition-opacity text-white text-xs font-medium">
+              {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : "Edit"}
+            </span>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="center">
+          <DropdownMenuItem onClick={() => cameraRef.current?.click()}>
+            <Camera className="h-4 w-4 mr-2" /> Camera
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => galleryRef.current?.click()}>
+            <ImageIcon className="h-4 w-4 mr-2" /> Gallery
+          </DropdownMenuItem>
+          {currentUrl && (
+            <DropdownMenuItem className="text-expense" onClick={onRemove}>
+              <Trash2 className="h-4 w-4 mr-2" /> Remove
+            </DropdownMenuItem>
           )}
-          {currentUrl ? "Change photo" : "Upload photo"}
-        </Button>
-        {currentUrl && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="text-expense"
-            disabled={busy}
-            onClick={onRemove}
-          >
-            <Trash2 className="h-4 w-4 mr-2" /> Remove
-          </Button>
-        )}
-      </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <p className="text-xs text-muted-foreground">Tap to edit photo</p>
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="user"
+        className="hidden"
+        onChange={onPick}
+      />
+      <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={onPick} />
       <ImageCropDialog
         file={cropFile}
         open={cropOpen}
