@@ -358,13 +358,3 @@ function bilateralRowAmount(s: any): number | undefined {
   }
   return undefined; // can't determine → fall back to default whole-split amount
 }
-
-// ─── Helper: get display label for a split ────────────────────────────────
-function getSplitLabel(s: any, creatorName?: string): string {
-  if (s._isIncoming) return creatorName || s.description || "Split";
-  if (s.type === "group" && s.groups?.name) return s.groups.name;
-  if (s.type === "individual" && s.people?.name) return s.people.name;
-  const names = (s.split_shares ?? []).map((sh: any) => sh.person_name).filter(Boolean);
-  if (names.length > 0) return names.join(", ");
-  return s.description || "Split";
-}

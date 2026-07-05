@@ -231,7 +231,7 @@ export const personSplitsQuery = (personId: string) =>
       const { data: myContacts } = await supabase
         .from("people").select("id, name, linked_user_id").eq("user_id", currentUserId);
 
-      const SEL = "*, split_shares(*, person:people(id, linked_user_id, name)), settlements(*), groups:group_id(name), people:person_id(name), creator:created_by(full_name), accounts:account_id(label)";
+      const SEL = "*, split_shares(*, person:people(id, linked_user_id, name)), groups:group_id(name), people:person_id(name), creator:created_by(full_name), accounts:account_id(label)";
 
       // Category A — own splits (I'm the creator) where the target participates
       const { data: targetShares } = await supabase
@@ -327,7 +327,7 @@ export const splitBalancesQuery = () =>
         .from("people").select("id").eq("linked_user_id", currentUserId);
       const myPersonIds = (myPeople ?? []).map((p: any) => p.id);
 
-      const SEL = "*, split_shares(*, person:people(id, linked_user_id, name)), settlements(*), creator:created_by(full_name), accounts:account_id(label, institution)";
+      const SEL = "*, split_shares(*, person:people(id, linked_user_id, name)), creator:created_by(full_name), accounts:account_id(label, institution)";
 
       // Own splits
       const { data: own } = await supabase.from("splits").select(SEL).eq("created_by", currentUserId);

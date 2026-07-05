@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { categoriesQuery, subCategoriesQuery, peopleQuery, groupsQuery, splitsQuery } from "@/lib/queries";
+import { categoriesQuery, subCategoriesQuery, peopleQuery, groupsQuery, splitBalancesQuery } from "@/lib/queries";
+import { bilateralBalance } from "@/lib/balance";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -278,24 +279,15 @@ function CategoryDialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
 // ─── People ────────────────────────────────────────────────────────────────
 function People() {
   const { data: people = [] } = useQuery(peopleQuery());
-  const { data: splits = [] } = useQuery(splitsQuery());
+  const { data: balanceData } = useQuery(splitBalancesQuery());
+  const allSplits = balanceData?.splits ?? [];
+  const allSettlements = balanceData?.settlements ?? [];
+  const meId = balanceData?.currentUserId ?? null;
+  const myPids = balanceData?.myPersonIds ?? [];
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<any>(null);
 
-  function personBalance(personId: string) {
-    let owed = 0;
-    for (const s of splits as any[]) {
-      for (const sh of (s.split_shares ?? [])) {
-        if (sh.person_id === personId) {
-          const settledAmt = (s.settlements ?? []).filter((x: any) => x.split_share_id === sh.id)
-            .reduce((a: number, x: any) => a + Number(x.amount), 0);
-          owed += Number(sh.share_amount) - settledAmt;
-        }
-      }
-    }
-    return owed;
-  }
 
   const del = useMutation({
     mutationFn: async (id: string) => {
@@ -314,7 +306,7 @@ function People() {
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
         {people.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No people yet</p>}
         {(people as any[]).map((p) => {
-          const bal = personBalance(p.id);
+          const bal = bilateralBalance(allSplits, allSettlements, p, meId, myPids);
           return (
             <SwipeRow key={p.id}
               onEdit={() => { setEdit(p); setOpen(true); }}
