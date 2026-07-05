@@ -186,9 +186,13 @@ export default function SplitPage() {
                     to={`/split/group/${g.id}`}
                     className="flex items-center gap-3 p-4 active:bg-secondary/40"
                   >
-                    <div className="h-10 w-10 rounded-full bg-split/20 flex items-center justify-center text-split">
-                      <Users className="h-5 w-5" />
-                    </div>
+                    {g.avatar_url ? (
+                      <UserAvatar url={g.avatar_url} name={g.name} size={40} />
+                    ) : (
+                      <div className="h-10 w-10 rounded-full bg-split/20 flex items-center justify-center text-split">
+                        <Users className="h-5 w-5" />
+                      </div>
+                    )}
                     <div className="flex-1">
                       <p className="text-sm font-medium flex items-center gap-2">
                         {g.name}{" "}

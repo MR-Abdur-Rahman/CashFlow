@@ -7,10 +7,12 @@ import {
   Pencil,
   Trash2,
   Plus,
+  Users,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { SwipeRow } from "@/components/SwipeRow";
 import { supabase } from "@/integrations/supabase/client";
@@ -161,11 +163,20 @@ export default function GroupDetail() {
         <ArrowLeft className="h-4 w-4 mr-1" /> Split
       </Link>
 
-      <div>
-        <h1 className="text-xl font-semibold">{group.name}</h1>
-        <p className="text-xs text-muted-foreground">
-          {(group as any).group_members?.length ?? 0} members
-        </p>
+      <div className="flex items-center gap-3">
+        {(group as any).avatar_url ? (
+          <UserAvatar url={(group as any).avatar_url} name={group.name} size={48} />
+        ) : (
+          <div className="h-12 w-12 rounded-full bg-split/20 flex items-center justify-center text-split shrink-0">
+            <Users className="h-6 w-6" />
+          </div>
+        )}
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold truncate">{group.name}</h1>
+          <p className="text-xs text-muted-foreground">
+            {(group as any).group_members?.length ?? 0} members
+          </p>
+        </div>
       </div>
 
       {memberBalances.length > 0 && (
