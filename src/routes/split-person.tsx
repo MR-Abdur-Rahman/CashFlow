@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { personQuery, personSplitsQuery, peopleQuery, groupsQuery, accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
+import { personQuery, personSplitsQuery, peopleQuery, groupsQuery, accountsQuery, categoriesQuery, subCategoriesQuery, splitBalancesQuery } from "@/lib/queries";
+import { settlementNetAfter } from "@/lib/balance";
 import { ArrowLeft, Bell, Plus, ChevronLeft, ChevronRight, ChevronDown, QrCode, X, Check } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,11 @@ export default function PersonDetail() {
   const qc = useQueryClient();
   const { data: person } = useQuery(personQuery(personId!));
   const { data: splits = [] } = useQuery(personSplitsQuery(personId!));
+  // Full own+incoming splits — used to compute each settlement row's running net (shared with all pages).
+  const { data: balanceData } = useQuery(splitBalancesQuery());
+  const allSplits = balanceData?.splits ?? [];
+  const meId = balanceData?.currentUserId ?? null;
+  const myPids = balanceData?.myPersonIds ?? [];
   const [period, setPeriod] = useState<Period>("monthly");
   const [anchor, setAnchor] = useState(new Date());
   const [reminderOpen, setReminderOpen] = useState(false);
@@ -163,61 +169,30 @@ export default function PersonDetail() {
   // data; the balance math above already accounts for them (via settledOf), so we do NOT re-add them.
   // Direction comes from which share was settled: if it's mine, I paid the target; else they paid me.
   const filteredSettlements = useMemo(() => {
-    // Each settlement row shows the RUNNING NET balance as of that settlement (viewer-relative,
-    // + = target owes me). We start from the base net if there were no settlements (gross bilateral
-    // debts), then walk settlements oldest-first: a debtor's payment moves the net by ±amount. The
-    // newest settlement's net therefore equals the top balance card.
-    let baseNet = 0;
-    const events: { st: any; sign: number; iPaid: boolean; currentUserId: string | null }[] = [];
-    for (const s of visibleSplits) {
-      const myPersonIds: string[] = s._myPersonIds ?? [];
-      const currentUserId: string | null = s._currentUserId ?? null;
-      const targetLui: string | null = s._targetLinkedUserId ?? null;
-      const targetPid: string = s._targetPersonId ?? personId!;
-      const shares = (s.split_shares ?? []) as any[];
-      const total = Number(s.total_amount);
-      const sumShares = shares.reduce((a: number, sh: any) => a + Number(sh.share_amount ?? 0), 0);
-      const payerAuthId = getPayerAuthId(s);
-      const creditorIsMe = !!payerAuthId && payerAuthId === currentUserId;             // I paid → target owes me
-      const creditorIsTarget = !!payerAuthId && !!targetLui && payerAuthId === targetLui; // target paid → I owe
-      if (creditorIsMe) {
-        const targetShareEntry = shares.find((ss: any) => (targetLui && ss.person?.linked_user_id === targetLui) || ss.person_id === targetPid);
-        baseNet += targetShareEntry ? Number(targetShareEntry.share_amount) : (targetLui && s.created_by === targetLui ? (total - sumShares) : 0);
-      } else if (creditorIsTarget) {
-        const myShareEntry = shares.find((ss: any) => myPersonIds.includes(ss.person_id) || ss.person?.linked_user_id === currentUserId);
-        baseNet -= myShareEntry ? Number(myShareEntry.share_amount) : (s.created_by === currentUserId ? (total - sumShares) : 0);
-      }
-      // A settlement is the debtor paying the creditor. Creditor = me → target paid me down (net −);
-      // creditor = target → I paid them down (net +, and this row is "You → target").
-      const sign = creditorIsMe ? -1 : creditorIsTarget ? 1 : 0;
-      for (const st of (s.settlements ?? []) as any[]) {
-        events.push({ st, sign, iPaid: creditorIsTarget, currentUserId });
-      }
-    }
-    // Running net over ALL settlements oldest-first (independent of the period filter).
-    const netAfterById = new Map<string, number>();
-    let run = baseNet;
-    for (const e of [...events].sort((a, b) => String(a.st.created_at ?? "").localeCompare(String(b.st.created_at ?? "")))) {
-      run += e.sign * Number(e.st.amount ?? 0);
-      netAfterById.set(e.st.id, run);
-    }
-    // Build the display rows (dedupe + period filter).
+    // Each settlement row shows the RUNNING NET balance as of that settlement (via the shared
+    // settlementNetAfter helper, so every page matches). Newest row = the top balance card.
     const seen = new Set<string>();
     const out: any[] = [];
-    for (const e of events) {
-      const st = e.st;
-      if (seen.has(st.id)) continue;
-      seen.add(st.id);
-      const day = String(st.created_at ?? "").slice(0, 10);
-      if (day < fromStr || day > toStr) continue;
-      out.push({
-        ...st, _itemType: "settlement", _iPaid: e.iPaid,
-        _netAfter: netAfterById.get(st.id) ?? 0,
-        _currentUserId: e.currentUserId,
-      });
+    for (const s of visibleSplits) {
+      const currentUserId: string | null = s._currentUserId ?? null;
+      const targetLui: string | null = s._targetLinkedUserId ?? null;
+      const payerAuthId = getPayerAuthId(s);
+      // "You → target" when the target paid the split (I'm the debtor settling my side).
+      const iPaid = !!payerAuthId && !!targetLui && payerAuthId === targetLui;
+      for (const st of (s.settlements ?? []) as any[]) {
+        if (seen.has(st.id)) continue;
+        seen.add(st.id);
+        const day = String(st.created_at ?? "").slice(0, 10);
+        if (day < fromStr || day > toStr) continue;
+        out.push({
+          ...st, _itemType: "settlement", _iPaid: iPaid,
+          _netAfter: settlementNetAfter(allSplits, st, meId, myPids) ?? 0,
+          _currentUserId: currentUserId,
+        });
+      }
     }
     return out;
-  }, [visibleSplits, fromStr, toStr, personId]);
+  }, [visibleSplits, allSplits, meId, myPids, fromStr, toStr]);
 
   const combinedItems = useMemo(() => {
     const items = [

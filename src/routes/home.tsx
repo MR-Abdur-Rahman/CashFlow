@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { accountsQuery, transactionsQuery, profileQuery, notificationsQuery, peopleQuery, splitsQuery, incomingSplitsQuery, groupsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
+import { accountsQuery, transactionsQuery, profileQuery, notificationsQuery, peopleQuery, splitsQuery, incomingSplitsQuery, groupsQuery, categoriesQuery, subCategoriesQuery, splitBalancesQuery } from "@/lib/queries";
+import { settlementNetAfter } from "@/lib/balance";
 import { formatMoney, greeting } from "@/lib/format";
 import { AccountIcon } from "@/components/AccountIcon";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
@@ -126,6 +127,11 @@ export default function Home() {
   const { data: txns = [] } = useQuery(transactionsQuery({ dateFrom, dateTo }));
   const { data: ownSplits = [] } = useQuery(splitsQuery());
   const { data: incomingSplits = [] } = useQuery(incomingSplitsQuery());
+  // Full split set (shared cache) for each settlement row's running net.
+  const { data: balanceData } = useQuery(splitBalancesQuery());
+  const netSplits = balanceData?.splits ?? [];
+  const netMeId = balanceData?.currentUserId ?? null;
+  const netMyPids = balanceData?.myPersonIds ?? [];
 
   const { data: homeSettlements = [] } = useQuery({
     queryKey: ["settlements", "home", dateFrom, dateTo],
@@ -187,11 +193,12 @@ export default function Home() {
         _otherName: otherName,
         _remaining: remaining,
         _fullySettled: fullySettled,
+        _netAfter: settlementNetAfter(netSplits, s, netMeId, netMyPids) ?? undefined,
       };
     });
 
     return [...splitItems, ...settlementItems].sort((a, b) => b._sortKey.localeCompare(a._sortKey));
-  }, [allSplitsForTab, homeSettlements, userId]);
+  }, [allSplitsForTab, homeSettlements, userId, netSplits, netMeId, netMyPids]);
 
   const { data: profile } = useQuery(profileQuery(userId));
   const { data: notifications = [] } = useQuery(notificationsQuery());
@@ -355,7 +362,7 @@ export default function Home() {
                           canEdit={item.created_by === userId} canDelete={canDeleteSettlement(item, userId)}
                           editDeniedMessage="Only the creator can edit this settlement"
                           deleteDeniedMessage="Only the creator or payer can delete this settlement">
-                          <SettlementRow description={item.description} iPaid={item._iPaid} otherName={item._otherName} amount={Number(item.amount)} remaining={item._remaining} fullySettled={item._fullySettled} createdAt={item.created_at} />
+                          <SettlementRow description={item.description} iPaid={item._iPaid} otherName={item._otherName} amount={Number(item.amount)} remaining={item._remaining} fullySettled={item._fullySettled} netAfter={item._netAfter} createdAt={item.created_at} />
                         </SwipeRow>
                       ) : (
                         <SwipeRow key={item.id} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplit(item)}

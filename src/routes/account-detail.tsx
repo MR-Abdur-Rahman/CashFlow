@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { accountQuery, transactionsQuery } from "@/lib/queries";
+import { accountQuery, transactionsQuery, splitBalancesQuery } from "@/lib/queries";
+import { settlementNetAfter } from "@/lib/balance";
 import { AccountIcon } from "@/components/AccountIcon";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -112,6 +113,11 @@ export default function AccountDetail() {
   const { dateFrom, dateTo } = useMemo(() => getPeriodRange(period, anchor), [period, anchor]);
 
   const { data: txns = [] } = useQuery(transactionsQuery({ accountId, dateFrom, dateTo }));
+  // Full split set (shared cache) for each settlement row's running net.
+  const { data: balanceData } = useQuery(splitBalancesQuery());
+  const netSplits = balanceData?.splits ?? [];
+  const netMeId = balanceData?.currentUserId ?? null;
+  const netMyPids = balanceData?.myPersonIds ?? [];
 
   const { data: splits = [] } = useQuery({
     queryKey: ["splits", "account", accountId, dateFrom, dateTo],
@@ -169,11 +175,12 @@ export default function AccountDetail() {
           _otherName: otherName,
           _remaining: remaining,
           _fullySettled: fullySettled,
+          _netAfter: settlementNetAfter(netSplits, s, netMeId, netMyPids) ?? undefined,
         };
       }),
     ];
     return items.sort((a, b) => b._sortKey.localeCompare(a._sortKey));
-  }, [splits, settlements, userId]);
+  }, [splits, settlements, userId, netSplits, netMeId, netMyPids]);
 
   const delAccount = useMutation({
     mutationFn: async () => {
@@ -327,7 +334,7 @@ export default function AccountDetail() {
                   canEdit={item.created_by === userId} canDelete={canDeleteSettlement(item, userId)}
                   editDeniedMessage="Only the creator can edit this settlement"
                   deleteDeniedMessage="Only the creator or payer can delete this settlement">
-                  <SettlementRow description={item.description} iPaid={item._iPaid} otherName={item._otherName} amount={Number(item.amount)} remaining={item._remaining} fullySettled={item._fullySettled} createdAt={item.created_at} />
+                  <SettlementRow description={item.description} iPaid={item._iPaid} otherName={item._otherName} amount={Number(item.amount)} remaining={item._remaining} fullySettled={item._fullySettled} netAfter={item._netAfter} createdAt={item.created_at} />
                 </SwipeRow>
               ) : (
                 <SwipeRow key={`sp-${item.id}`} onEdit={() => setEditSplit(item)} onDelete={() => setDeleteSplitItem(item)}

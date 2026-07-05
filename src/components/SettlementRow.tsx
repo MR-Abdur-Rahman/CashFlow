@@ -39,10 +39,10 @@ export function SettlementRow({
         <div className="flex items-center justify-between gap-2 mt-0.5">
           {netAfter !== undefined ? (
             Math.abs(netAfter) < 0.005 ? (
-              <p className="text-[12px] font-medium text-[#10B981]">Settled up</p>
+              <p className="text-[12px] font-medium text-[#10B981]">Fully settled</p>
             ) : (
               <>
-                <p className="text-[12px] text-[#9CA3AF]">{netAfter > 0 ? `${otherName} owes you` : "You owe"}</p>
+                <p className="text-[12px] text-[#9CA3AF]">{netAfter > 0 ? "Still lent" : "Still owes"}</p>
                 <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">{formatMoney(Math.abs(netAfter))}</p>
               </>
             )

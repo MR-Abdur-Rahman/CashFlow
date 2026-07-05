@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { transactionsQuery, incomingSplitsQuery, splitsQuery } from "@/lib/queries";
+import { transactionsQuery, incomingSplitsQuery, splitsQuery, splitBalancesQuery } from "@/lib/queries";
+import { settlementNetAfter } from "@/lib/balance";
 import { SplitDirectRow, EditSplitSheet, EditTxSheet } from "./home";
 import { SettlementRow } from "@/components/SettlementRow";
 import { settlementDirection, shareRemaining } from "@/lib/settlement";
@@ -319,11 +320,15 @@ export default function HistoryPage() {
 
 // Settlement history row — uses the shared SettlementRow with per-share remaining + viewer direction.
 function HistorySettlementRow({ s, all }: { s: any; all: any[] }) {
+  const { data: balanceData } = useQuery(splitBalancesQuery());
   const { iPaid, otherName } = settlementDirection(s, s._uid);
   const { remaining, fullySettled } = shareRemaining(s, all);
+  const netAfter = settlementNetAfter(
+    balanceData?.splits ?? [], s, balanceData?.currentUserId ?? null, balanceData?.myPersonIds ?? [],
+  ) ?? undefined;
   return (
     <SettlementRow description={s.description} iPaid={iPaid} otherName={otherName} amount={Number(s.amount)}
-      remaining={remaining} fullySettled={fullySettled} createdAt={s.created_at} />
+      remaining={remaining} fullySettled={fullySettled} netAfter={netAfter} createdAt={s.created_at} />
   );
 }
 
