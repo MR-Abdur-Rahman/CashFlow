@@ -57,7 +57,9 @@ export function SettlementRow({
               {iPaid ? `You → ${otherName}` : `${otherName} → You`}
             </p>
             <p
-              className={`text-sm font-mono font-semibold shrink-0 ${iPaid ? "text-[#EF4444]" : "text-[#22C55E]"}`}
+              className={`text-sm font-mono font-semibold shrink-0 ${
+                iconAvatar ? "text-[#10B981]" : iPaid ? "text-[#EF4444]" : "text-[#22C55E]"
+              }`}
             >
               {formatMoney(amount)}
             </p>
