@@ -27,10 +27,9 @@ This file tells the *story* of each bug — the problem, the reasoning, and how 
 **Follow-ups.**
 - **Account-selection notification cleanup** — added `notifications.related_settlement_id` (FK ON DELETE CASCADE); the prompt now auto-clears when the receiver confirms (`trg_clear_settlement_account_notification`) or the settlement is deleted (cascade). Backfilled links; deleted a stale orphan.
 - **Reports** (`5ca82ab`) — resolved the settlement person via the bin counterparty (`person_id`); bin settlements were landing under "Unknown" and missing from the person drill.
+- **Reports income direction** (`8f6d570`) — "settlements received (income)" now counts a settlement only when the viewer is the CREDITOR (money actually received), in either direction and whoever recorded it (`settlementReceivedByMe`), attributed to the counterparty resolved to the viewer's own contact name. Previously it counted every settlement the user recorded (debtor-recorded payments wrongly as income; receipts recorded by the other party missed).
 
-**Verified end-to-end on live data.** Bin settlements (null split refs), net = gross − settled (A owes B 2800), balances reconcile to the rupee, pending prompt + receiver confirmation both fire correctly, delete restores balances.
-
-**Known limitation (pre-existing, not bin-specific).** Reports' "settlements received (income)" counts every settlement the user *recorded* regardless of direction — a debtor-recorded payment is counted as income, and a receipt recorded by the *other* party is missed. Predates the bin work; left for a separate decision.
+**Verified end-to-end on live data.** Bin settlements (null split refs), net = gross − settled, balances reconcile to the rupee, pending prompt + receiver confirmation both fire correctly, delete restores balances; settlement income counts only received money (B +300 from A, A 0).
 
 ### [P1] Settlement payer's balance direction reversed (also closed [P1] #5 Settlement account direction + [P1] #2 Pending rows missing) — 2026-07-04
 **Symptom.** When User A settles a debt to User B, A's account balance moves the wrong way — it *increases* instead of decreasing (and reverses the same way on settlement delete).
