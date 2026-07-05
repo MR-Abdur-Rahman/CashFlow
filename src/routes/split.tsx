@@ -194,7 +194,7 @@ function PendingSettlementRow({ settlement, accounts }: { settlement: any; accou
   const filteredAccounts = allowedType ? accounts.filter((a) => a.type === allowedType) : accounts;
   const selectedAccount = filteredAccounts.find((a) => a.id === accountId);
   const settlerName = settlement.creator?.full_name ?? "Someone";
-  const desc = settlement.splits?.description || "Settlement";
+  const desc = settlement.description || settlement.splits?.description || "Settlement";
   const methodLabel = String(settlement.method ?? "transfer").replace("_", " ");
   // When the SETTLER was the creditor, the prompted party (me) is the DEBTOR: the money left
   // MY account, so record an outflow. Otherwise I'm the creditor recording an inflow.

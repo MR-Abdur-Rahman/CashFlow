@@ -38,7 +38,7 @@ export default function HistoryPage() {
       if (!u.user) return [];
       const { data } = await supabase
         .from("settlements")
-        .select("*, split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(description, paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name))")
+        .select("*, person:person_id(name), creator:created_by(full_name), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(description, paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name))")
         .order("created_at", { ascending: false });
       return (data ?? []).map((s: any) => ({ ...s, _uid: u.user!.id }));
     },

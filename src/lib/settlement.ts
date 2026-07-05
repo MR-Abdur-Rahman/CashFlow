@@ -35,6 +35,16 @@ export function settlementDirection(
 ): { iPaid: boolean; otherName: string } {
   const share = s.split_shares as any;
   const split = s.splits as any;
+
+  // Bin settlement (person-to-person, no split): direction from settler_is_creditor, counterparty
+  // from person_id (when I recorded it) or the recorder's profile (when they did).
+  if (!split && !s.split_id) {
+    const settlerIsMe = s.created_by === currentUserId;
+    const iPaid = settlerIsMe ? !s.settler_is_creditor : !!s.settler_is_creditor;
+    const otherName = otherNameOverride
+      ?? (settlerIsMe ? (s.person?.name ?? "Someone") : (s.creator?.full_name ?? "Someone"));
+    return { iPaid, otherName };
+  }
   // Resolve the split's payer to an auth user id.
   let payerAuthId: string | null = null;
   if (split) {
