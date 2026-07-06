@@ -4,13 +4,14 @@ import { Switch } from "@/components/ui/switch";
 
 // Shared building blocks for the Settings hub + sub-pages. Pure presentation — no logic moved here.
 
-// Back arrow + page title. navigate(-1) so the arrow and the phone/browser back button behave the same.
-export function SettingsHeader({ title }: { title: string }) {
+// Back arrow + page title. Defaults to navigate(-1) (arrow == phone/browser back); pass `back` to
+// force a specific destination regardless of history.
+export function SettingsHeader({ title, back }: { title: string; back?: string }) {
   const navigate = useNavigate();
   return (
     <div className="flex items-center gap-2">
       <button
-        onClick={() => navigate(-1)}
+        onClick={() => (back ? navigate(back) : navigate(-1))}
         aria-label="Back"
         className="-ml-1 p-1 text-muted-foreground"
       >
