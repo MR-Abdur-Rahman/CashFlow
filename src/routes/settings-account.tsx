@@ -164,7 +164,7 @@ export default function AccountPage() {
         <SettingsHeader title="Account" />
         <Link
           to="/settings/account/edit"
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-primary active:bg-secondary/40"
+          className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-primary active:bg-secondary/40"
         >
           <Pencil className="h-4 w-4" /> Edit
         </Link>
@@ -271,7 +271,7 @@ export default function AccountPage() {
       <button
         type="button"
         onClick={() => setDelStep("confirm")}
-        className="mx-auto flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-expense active:bg-secondary/40"
+        className="mx-auto flex items-center gap-2 rounded-lg border border-expense/40 px-4 py-2 text-sm font-medium text-expense active:bg-secondary/40"
       >
         <Trash2 className="h-4 w-4" /> Delete account
       </button>

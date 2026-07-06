@@ -24,6 +24,7 @@ import {
   ChevronRight,
   ChevronDown,
   Users,
+  Pencil,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -193,13 +194,22 @@ export default function AccountDetail() {
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-4">
-      {/* Back */}
-      <button
-        onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back
-      </button>
+      {/* Back + Edit */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back
+        </button>
+        <button
+          type="button"
+          onClick={() => setEdit(true)}
+          className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-primary active:bg-secondary/40"
+        >
+          <Pencil className="h-4 w-4" /> Edit
+        </button>
+      </div>
 
       {/* Account info */}
       <div className="flex items-center gap-4">
