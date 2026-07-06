@@ -111,18 +111,17 @@ export function AddAccountSheet({
   async function uploadIcon(blob: Blob) {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    const path = `${u.user.id}/${Date.now()}.jpg`;
+    // Reuse the public "avatars" bucket (account-icons subfolder) — public URL, never expires.
+    const path = `${u.user.id}/account-icons/${Date.now()}.jpg`;
     const { error } = await supabase.storage
-      .from("account-icons")
+      .from("avatars")
       .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
     if (error) {
       toast.error(error.message);
       return;
     }
-    const { data } = await supabase.storage
-      .from("account-icons")
-      .createSignedUrl(path, 60 * 60 * 24 * 365);
-    setA((s) => ({ ...s, icon_type: "upload", icon_url: data?.signedUrl ?? null }));
+    const publicUrl = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+    setA((s) => ({ ...s, icon_type: "upload", icon_url: publicUrl }));
   }
 
   return (
