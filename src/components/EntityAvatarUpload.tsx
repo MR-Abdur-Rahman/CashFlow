@@ -4,6 +4,7 @@ import { Camera, Image as ImageIcon, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { UserAvatar } from "./UserAvatar";
 import { ImageCropDialog } from "./ImageCropDialog";
+import { PhotoPreviewDialog } from "./PhotoPreviewDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +37,8 @@ export function EntityAvatarUpload({
   const [busy, setBusy] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   async function signedUrl(path: string) {
     // Public bucket — plain public URL (never expires, loads for every viewer).
@@ -93,30 +96,50 @@ export function EntityAvatarUpload({
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button type="button" className="relative" aria-label="Edit photo" disabled={busy}>
-            <UserAvatar url={currentUrl} name={name} size={72} />
-            <span className="absolute inset-0 grid place-items-center rounded-full bg-black/40 opacity-0 hover:opacity-100 transition-opacity text-white text-xs font-medium">
-              {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : "Edit"}
-            </span>
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="center">
-          <DropdownMenuItem onClick={() => cameraRef.current?.click()}>
-            <Camera className="h-4 w-4 mr-2" /> Camera
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => galleryRef.current?.click()}>
-            <ImageIcon className="h-4 w-4 mr-2" /> Gallery
-          </DropdownMenuItem>
-          {currentUrl && (
-            <DropdownMenuItem className="text-expense" onClick={onRemove}>
-              <Trash2 className="h-4 w-4 mr-2" /> Remove
+      <div className="relative">
+        {/* Tap avatar → preview (or the edit menu if there's no photo yet) */}
+        <button
+          type="button"
+          aria-label="View photo"
+          disabled={busy}
+          onClick={() => (currentUrl ? setPreviewOpen(true) : setMenuOpen(true))}
+        >
+          <UserAvatar url={currentUrl} name={name} size={72} />
+        </button>
+        {/* Camera badge → edit menu */}
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Edit photo"
+              disabled={busy}
+              className="absolute -bottom-0.5 -right-0.5 h-8 w-8 rounded-full grid place-items-center border-2 border-background text-white"
+              style={{ background: "#7C3AED" }}
+            >
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center">
+            <DropdownMenuItem onClick={() => cameraRef.current?.click()}>
+              <Camera className="h-4 w-4 mr-2" /> Camera
             </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <p className="text-xs text-muted-foreground">Tap to edit photo</p>
+            <DropdownMenuItem onClick={() => galleryRef.current?.click()}>
+              <ImageIcon className="h-4 w-4 mr-2" /> Gallery
+            </DropdownMenuItem>
+            {currentUrl && (
+              <DropdownMenuItem className="text-expense" onClick={onRemove}>
+                <Trash2 className="h-4 w-4 mr-2" /> Remove
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <PhotoPreviewDialog
+        url={currentUrl}
+        name={name}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+      />
       <input
         ref={cameraRef}
         type="file"

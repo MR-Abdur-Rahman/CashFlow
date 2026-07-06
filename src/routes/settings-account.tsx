@@ -1,39 +1,39 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { profileQuery } from "@/lib/queries";
 import { UserAvatar } from "@/components/UserAvatar";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
+import { PhotoPreviewDialog } from "@/components/PhotoPreviewDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Camera, Image as ImageIcon, Trash2, Loader2, User, Phone, Mail } from "lucide-react";
-import { SettingsHeader } from "@/components/SettingsRows";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  Camera,
+  Image as ImageIcon,
+  Trash2,
+  Loader2,
+  User,
+  Phone,
+  Mail,
+  Pencil,
+} from "lucide-react";
+import { SettingsHeader } from "@/components/SettingsRows";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 export default function AccountPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [userId, setUserId] = useState<string | undefined>();
   const [email, setEmail] = useState<string | undefined>();
-
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUserId(data.user?.id);
@@ -42,45 +42,24 @@ export default function AccountPage() {
   }, []);
 
   const { data: profile } = useQuery(profileQuery(userId));
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
+  const fullName = profile?.full_name ?? "";
+  const phone = profile?.phone_number ?? "";
+  const google = profile?.google_email ?? email ?? "—";
+
   const [busy, setBusy] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState("");
-  const [editing, setEditing] = useState<"name" | "phone" | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (profile) {
-      setFullName(profile.full_name ?? "");
-      setPhone(profile.phone_number ?? "");
-    }
-  }, [profile]);
-
-  const save = useMutation({
-    mutationFn: async () => {
-      if (!userId) throw new Error("Not signed in");
-      const { error } = await supabase
-        .from("profiles")
-        .update({ full_name: fullName, phone_number: phone || null })
-        .eq("id", userId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Saved");
-      qc.invalidateQueries({ queryKey: ["profile"] });
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
+  // ── Photo upload (public URL, crop) ─────────────────────────────────────────
   function pickPhoto(f: File) {
     if (f.size > 5 * 1024 * 1024) return toast.error("Image must be under 5MB");
     setCropFile(f);
     setCropOpen(true);
   }
-
   async function uploadPhoto(blob: Blob) {
     if (!userId) return;
     setBusy(true);
@@ -104,7 +83,6 @@ export default function AccountPage() {
       setBusy(false);
     }
   }
-
   async function removePhoto() {
     if (!userId) return;
     setBusy(true);
@@ -126,45 +104,114 @@ export default function AccountPage() {
     }
   }
 
-  async function deleteAccount() {
+  // ── Delete account (verify via emailed code, then delete) ────────────────────
+  const [delStep, setDelStep] = useState<"confirm" | "method" | "code" | null>(null);
+  const [delMethod, setDelMethod] = useState<"email" | "phone">("email");
+  const [code, setCode] = useState("");
+  const [sending, setSending] = useState(false);
+
+  async function onContinueDelete() {
     if (!userId) return;
-    if (deleteConfirm !== "DELETE") return toast.error("Type DELETE to confirm");
     const { data: blocked } = await supabase.rpc("has_unsettled_splits", { _user_id: userId });
     if (blocked) return toast.error("Settle all splits before deleting your account");
-    const { error } = await supabase.from("profiles").delete().eq("id", userId);
-    if (error) return toast.error(error.message);
-    await supabase.auth.signOut();
-    navigate("/auth");
+    setDelStep("method");
+  }
+  async function sendCode() {
+    if (delMethod === "phone")
+      return toast.message("Phone verification is coming soon — use Email.");
+    if (!email) return toast.error("No email on this account");
+    setSending(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: false },
+      });
+      if (error) throw error;
+      toast.success("Code sent to your email");
+      setCode("");
+      setDelStep("code");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSending(false);
+    }
+  }
+  async function verifyAndDelete() {
+    if (!email || !userId) return;
+    setSending(true);
+    try {
+      const { error: vErr } = await supabase.auth.verifyOtp({
+        email,
+        token: code.trim(),
+        type: "email",
+      });
+      if (vErr) throw new Error("Invalid or expired code");
+      const { error } = await supabase.from("profiles").delete().eq("id", userId);
+      if (error) throw error;
+      await supabase.auth.signOut();
+      navigate("/auth");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-6">
-      <SettingsHeader title="Account" />
+      {/* Header with Edit button top-right */}
+      <div className="flex items-center justify-between">
+        <SettingsHeader title="Account" />
+        <Link
+          to="/settings/account/edit"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-primary active:bg-secondary/40"
+        >
+          <Pencil className="h-4 w-4" /> Edit
+        </Link>
+      </div>
 
-      <div className="flex flex-col items-center gap-3">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button type="button" className="relative" aria-label="Edit photo" disabled={busy}>
-              <UserAvatar url={profile?.avatar_url} name={fullName || email} size={120} />
-              <span className="absolute inset-0 grid place-items-center rounded-full bg-black/40 opacity-0 hover:opacity-100 transition-opacity text-white text-xs font-medium">
-                {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : "Edit"}
-              </span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="center">
-            <DropdownMenuItem onClick={() => cameraRef.current?.click()}>
-              <Camera className="h-4 w-4 mr-2" /> Camera
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => galleryRef.current?.click()}>
-              <ImageIcon className="h-4 w-4 mr-2" /> Gallery
-            </DropdownMenuItem>
-            {profile?.avatar_url && (
-              <DropdownMenuItem className="text-expense" onClick={removePhoto}>
-                <Trash2 className="h-4 w-4 mr-2" /> Remove
+      {/* Avatar: tap image → preview; camera badge → edit menu */}
+      <div className="flex flex-col items-center">
+        <div className="relative">
+          <button
+            type="button"
+            aria-label="View photo"
+            disabled={busy}
+            onClick={() => (profile?.avatar_url ? setPreviewOpen(true) : setMenuOpen(true))}
+          >
+            <UserAvatar url={profile?.avatar_url} name={fullName || email} size={120} />
+          </button>
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Edit photo"
+                disabled={busy}
+                className="absolute bottom-1 right-1 h-9 w-9 rounded-full grid place-items-center border-2 border-background text-white"
+                style={{ background: "#7C3AED" }}
+              >
+                {busy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Camera className="h-4 w-4" />
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center">
+              <DropdownMenuItem onClick={() => cameraRef.current?.click()}>
+                <Camera className="h-4 w-4 mr-2" /> Camera
               </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <DropdownMenuItem onClick={() => galleryRef.current?.click()}>
+                <ImageIcon className="h-4 w-4 mr-2" /> Gallery
+              </DropdownMenuItem>
+              {profile?.avatar_url && (
+                <DropdownMenuItem className="text-expense" onClick={removePhoto}>
+                  <Trash2 className="h-4 w-4 mr-2" /> Remove
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         <input
           ref={cameraRef}
           type="file"
@@ -188,9 +235,14 @@ export default function AccountPage() {
             if (f) pickPhoto(f);
           }}
         />
-        <p className="text-xs text-muted-foreground">Tap to edit photo</p>
       </div>
 
+      <PhotoPreviewDialog
+        url={profile?.avatar_url}
+        name={fullName || email || "You"}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+      />
       <ImageCropDialog
         file={cropFile}
         open={cropOpen}
@@ -198,102 +250,113 @@ export default function AccountPage() {
         onCropped={uploadPhoto}
       />
 
-      {/* Icon-led data rows (WhatsApp style). Tap a value to edit it inline. */}
+      {/* Read-only info rows (edit via the Edit button) */}
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
-        <div className="flex items-center gap-4 px-4 py-3">
-          <User className="h-6 w-6 text-muted-foreground shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-muted-foreground">Full name</p>
-            {editing === "name" ? (
-              <input
-                autoFocus
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                onBlur={() => setEditing(null)}
-                className="w-full bg-transparent text-base text-foreground outline-none mt-0.5"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setEditing("name")}
-                className="w-full text-left text-base text-foreground mt-0.5 truncate"
-              >
-                {fullName || <span className="text-muted-foreground">Add your name</span>}
-              </button>
-            )}
+        {[
+          { icon: User, label: "Full name", value: fullName || "Add your name" },
+          { icon: Phone, label: "Phone number", value: phone || "Add a phone number" },
+          { icon: Mail, label: "Google account", value: google },
+        ].map(({ icon: Icon, label, value }) => (
+          <div key={label} className="flex items-center gap-4 px-4 py-3">
+            <Icon className="h-6 w-6 text-muted-foreground shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="text-base text-foreground mt-0.5 truncate">{value}</p>
+            </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-4 px-4 py-3">
-          <Phone className="h-6 w-6 text-muted-foreground shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-muted-foreground">Phone number</p>
-            {editing === "phone" ? (
-              <input
-                autoFocus
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                onBlur={() => setEditing(null)}
-                placeholder="+94..."
-                className="w-full bg-transparent text-base text-foreground outline-none mt-0.5 placeholder:text-muted-foreground"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setEditing("phone")}
-                className="w-full text-left text-base text-foreground mt-0.5 truncate"
-              >
-                {phone || <span className="text-muted-foreground">Add a phone number</span>}
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 px-4 py-3">
-          <Mail className="h-6 w-6 text-muted-foreground shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-muted-foreground">Google account</p>
-            <p className="text-base text-foreground mt-0.5 truncate">
-              {profile?.google_email ?? email ?? "—"}
-            </p>
-          </div>
-        </div>
+        ))}
       </div>
 
-      <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>
-        Save changes
-      </Button>
+      {/* Delete account — small, opens the verify-code flow */}
+      <button
+        type="button"
+        onClick={() => setDelStep("confirm")}
+        className="mx-auto flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-expense active:bg-secondary/40"
+      >
+        <Trash2 className="h-4 w-4" /> Delete account
+      </button>
 
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <button
-            type="button"
-            className="mx-auto flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-expense active:bg-secondary/40"
-          >
-            <Trash2 className="h-4 w-4" /> Delete account
-          </button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently deletes all your data. Type DELETE to confirm.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <Input
-            value={deleteConfirm}
-            onChange={(e) => setDeleteConfirm(e.target.value)}
-            placeholder="DELETE"
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteConfirm("")}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={deleteAccount} disabled={deleteConfirm !== "DELETE"}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete flow: confirm → method → code */}
+      <Dialog open={delStep !== null} onOpenChange={(o) => !o && setDelStep(null)}>
+        <DialogContent className="max-w-xs">
+          {delStep === "confirm" && (
+            <>
+              <DialogTitle>Delete your account?</DialogTitle>
+              <DialogDescription>
+                This permanently deletes all your data. You'll verify with a code first.
+              </DialogDescription>
+              <div className="flex justify-end gap-2 mt-2">
+                <Button variant="ghost" onClick={() => setDelStep(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={onContinueDelete}>Continue</Button>
+              </div>
+            </>
+          )}
+          {delStep === "method" && (
+            <>
+              <DialogTitle>Send a verification code</DialogTitle>
+              <DialogDescription>Choose where to receive your code.</DialogDescription>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setDelMethod("email")}
+                  className={cn(
+                    "flex items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-medium",
+                    delMethod === "email"
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border text-muted-foreground",
+                  )}
+                >
+                  <Mail className="h-4 w-4" /> Email
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toast.message("Phone verification is coming soon")}
+                  className="flex items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-sm font-medium text-muted-foreground opacity-60"
+                >
+                  <Phone className="h-4 w-4" /> Phone
+                </button>
+              </div>
+              <div className="flex justify-end gap-2 mt-2">
+                <Button variant="ghost" onClick={() => setDelStep(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={sendCode} disabled={sending}>
+                  {sending ? "Sending…" : "Send code"}
+                </Button>
+              </div>
+            </>
+          )}
+          {delStep === "code" && (
+            <>
+              <DialogTitle>Enter your code</DialogTitle>
+              <DialogDescription>
+                We sent a code to {email}. Enter it to permanently delete your account.
+              </DialogDescription>
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="Code"
+                inputMode="numeric"
+                autoFocus
+              />
+              <div className="flex justify-end gap-2 mt-2">
+                <Button variant="ghost" onClick={sendCode} disabled={sending}>
+                  Resend
+                </Button>
+                <Button
+                  className="bg-expense hover:bg-expense/90"
+                  onClick={verifyAndDelete}
+                  disabled={sending || !code.trim()}
+                >
+                  {sending ? "Deleting…" : "Delete account"}
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
