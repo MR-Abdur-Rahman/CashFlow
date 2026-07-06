@@ -38,10 +38,8 @@ export function EntityAvatarUpload({
   const [cropOpen, setCropOpen] = useState(false);
 
   async function signedUrl(path: string) {
-    const { data } = await supabase.storage
-      .from("avatars")
-      .createSignedUrl(path, 60 * 60 * 24 * 365);
-    return data?.signedUrl ?? null;
+    // Public bucket — plain public URL (never expires, loads for every viewer).
+    return supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
   }
 
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {

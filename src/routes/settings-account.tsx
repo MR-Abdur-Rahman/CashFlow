@@ -90,12 +90,10 @@ export default function AccountPage() {
         .from("avatars")
         .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
       if (upErr) throw upErr;
-      const { data } = await supabase.storage
-        .from("avatars")
-        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      const publicUrl = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
       const { error } = await supabase
         .from("profiles")
-        .update({ avatar_url: data?.signedUrl ?? null })
+        .update({ avatar_url: publicUrl })
         .eq("id", userId);
       if (error) throw error;
       toast.success("Photo updated");

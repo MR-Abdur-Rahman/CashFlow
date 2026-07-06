@@ -23,11 +23,8 @@ export function AvatarUpload({
   const [cropOpen, setCropOpen] = useState(false);
 
   async function urlForPath(path: string) {
-    // Bucket is private — use a signed URL valid for 1 year.
-    const { data } = await supabase.storage
-      .from("avatars")
-      .createSignedUrl(path, 60 * 60 * 24 * 365);
-    return data?.signedUrl ?? null;
+    // Public bucket — plain public URL (never expires, loads for every viewer).
+    return supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
   }
 
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
