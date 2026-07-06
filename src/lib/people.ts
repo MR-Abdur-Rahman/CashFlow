@@ -7,8 +7,13 @@
 export function contactDisplay(p: any): { name: string; avatarUrl: string | null } {
   if (!p) return { name: "?", avatarUrl: null };
   const linked = p.linked ?? null;
-  const name = p.nickname || (p.linked_user_id ? (linked?.full_name ?? p.name) : p.name) || "?";
-  const avatarUrl = p.linked_user_id ? (linked?.avatar_url ?? null) : (p.avatar_url ?? null);
+  // A contact is "linked" if it carries either the linked_user_id scalar OR the embedded `linked`
+  // profile join. Several split-row queries embed `linked:linked_user_id(...)` WITHOUT also
+  // selecting the linked_user_id column, so keying off the scalar alone would misread a linked
+  // contact as local and drop the synced profile photo.
+  const isLinked = p.linked_user_id != null || linked != null;
+  const name = p.nickname || (isLinked ? (linked?.full_name ?? p.name) : p.name) || "?";
+  const avatarUrl = isLinked ? (linked?.avatar_url ?? null) : (p.avatar_url ?? null);
   return { name, avatarUrl };
 }
 
