@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   Bell,
   LayoutGrid,
+  Database,
   History,
   HelpCircle,
   Shield,
@@ -63,6 +64,7 @@ const MAIN: Item[] = [
     title: "History",
     subtitle: "Notification and transaction history",
   },
+  { to: "/settings/data", icon: Database, title: "Data & Backup", subtitle: "Export, import" },
   {
     onClick: () => toast("Coming soon"),
     icon: HelpCircle,

@@ -27,6 +27,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { SwipeRow } from "@/components/SwipeRow";
+import { ListToolbar } from "@/components/ListToolbar";
+import { QrScannerDialog } from "@/components/QrScannerDialog";
+import { connectViaQr } from "@/lib/connectQr";
 import { Plus, Archive, ChevronRight, ArrowLeft } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { Link, useSearchParams } from "react-router-dom";
@@ -424,6 +427,8 @@ function People() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<any>(null);
+  const [q, setQ] = useState("");
+  const [scanOpen, setScanOpen] = useState(false);
 
   const del = useMutation({
     mutationFn: async (id: string) => {
@@ -437,23 +442,35 @@ function People() {
     onError: (e) => toast.error(e.message),
   });
 
+  // Filter by name / nickname (others hidden).
+  const filtered = (people as any[]).filter((p) => {
+    if (!q.trim()) return true;
+    const hay = [contactDisplay(p).name, p.name, p.nickname]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return hay.includes(q.trim().toLowerCase());
+  });
+
   return (
     <div className="space-y-3 mt-4">
-      <Button
-        className="w-full"
-        variant="outline"
-        onClick={() => {
+      <ListToolbar
+        query={q}
+        onQuery={setQ}
+        placeholder="Search people"
+        onAdd={() => {
           setEdit(null);
           setOpen(true);
         }}
-      >
-        <Plus className="h-4 w-4 mr-2" /> Add person
-      </Button>
+        onScan={() => setScanOpen(true)}
+      />
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
-        {people.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-8">No people yet</p>
+        {filtered.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-8">
+            {q ? "No people found" : "No people yet"}
+          </p>
         )}
-        {(people as any[]).map((p) => {
+        {filtered.map((p) => {
           const bal = bilateralBalance(allSplits, allSettlements, p, meId, myPids);
           const { name, avatarUrl } = contactDisplay(p);
           return (
@@ -494,12 +511,18 @@ function People() {
         })}
       </div>
       <AddPersonDialog open={open} onOpenChange={setOpen} edit={edit} />
+      <QrScannerDialog
+        open={scanOpen}
+        onOpenChange={setScanOpen}
+        onScan={(t) => connectViaQr(t, qc)}
+      />
     </div>
   );
 }
 
 // ─── Groups ────────────────────────────────────────────────────────────────
 function Groups() {
+  const [q, setQ] = useState("");
   const { data: groups = [] } = useQuery(groupsQuery());
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -533,21 +556,22 @@ function Groups() {
     onError: (e) => toast.error(e.message),
   });
 
-  const activeGroups = (groups as any[]).filter((g) => !g.is_archived);
-  const archivedGroups = (groups as any[]).filter((g) => g.is_archived);
+  const match = (g: any) =>
+    !q.trim() || (g.name ?? "").toLowerCase().includes(q.trim().toLowerCase());
+  const activeGroups = (groups as any[]).filter((g) => !g.is_archived && match(g));
+  const archivedGroups = (groups as any[]).filter((g) => g.is_archived && match(g));
 
   return (
     <div className="space-y-3 mt-4">
-      <Button
-        className="w-full"
-        variant="outline"
-        onClick={() => {
+      <ListToolbar
+        query={q}
+        onQuery={setQ}
+        placeholder="Search groups"
+        onAdd={() => {
           setEdit(null);
           setOpen(true);
         }}
-      >
-        <Plus className="h-4 w-4 mr-2" /> Create group
-      </Button>
+      />
 
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
         {activeGroups.length === 0 && (

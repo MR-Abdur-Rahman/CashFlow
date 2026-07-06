@@ -12,7 +12,7 @@ import {
 import { bilateralBalance } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
 import { UserAvatar } from "@/components/UserAvatar";
-import { Users, Plus, ChevronRight, Archive, QrCode, History, CheckCircle } from "lucide-react";
+import { Users, ChevronRight, Archive, History, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -28,6 +28,7 @@ import { AccountIcon } from "@/components/AccountIcon";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { QrScannerDialog } from "@/components/QrScannerDialog";
+import { ListToolbar } from "@/components/ListToolbar";
 import { formatMoney } from "@/lib/format";
 import { methodToAccountType } from "@/lib/settlement";
 import { format } from "date-fns";
@@ -47,6 +48,8 @@ export default function SplitPage() {
   const [addGroup, setAddGroup] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanned, setScanned] = useState<{ name?: string; phone?: string } | undefined>();
+  const [pq, setPq] = useState("");
+  const [gq, setGq] = useState("");
   const { data: pendingSplits = [] } = useQuery(pendingSplitsQuery());
   const { data: pendingSettlements = [] } = useQuery(pendingSettlementsQuery());
   const pendingCount = (pendingSplits as any[]).length + (pendingSettlements as any[]).length;
@@ -78,6 +81,19 @@ export default function SplitPage() {
   function personBalance(person: any): number {
     return bilateralBalance(allSplits, allSettlements, person, currentUserId, myPersonIds);
   }
+
+  // Search filters — people by name/nickname, groups by name (others hidden).
+  const filteredPeople = (people as any[]).filter((p) => {
+    if (!pq.trim()) return true;
+    const hay = [contactDisplay(p).name, p.name, p.nickname]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return hay.includes(pq.trim().toLowerCase());
+  });
+  const filteredGroups = (groups as any[]).filter(
+    (g) => !gq.trim() || (g.name ?? "").toLowerCase().includes(gq.trim().toLowerCase()),
+  );
 
   return (
     <div className="px-4 pt-6 space-y-4 pb-24">
@@ -111,29 +127,22 @@ export default function SplitPage() {
 
         {/* People */}
         <TabsContent value="people" className="space-y-3">
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => setScanOpen(true)}
-              className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground"
-            >
-              <QrCode className="h-5 w-5" />
-            </button>
-            <button
-              onClick={() => {
-                setScanned(undefined);
-                setAddPerson(true);
-              }}
-              className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground"
-            >
-              <Plus className="h-5 w-5" />
-            </button>
-          </div>
+          <ListToolbar
+            query={pq}
+            onQuery={setPq}
+            placeholder="Search people"
+            onAdd={() => {
+              setScanned(undefined);
+              setAddPerson(true);
+            }}
+            onScan={() => setScanOpen(true)}
+          />
           <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-            {people.length === 0 ? (
-              <Empty text="No people yet" />
+            {filteredPeople.length === 0 ? (
+              <Empty text={pq ? "No people found" : "No people yet"} />
             ) : (
               <div className="divide-y divide-border">
-                {(people as any[]).map((p) => {
+                {filteredPeople.map((p) => {
                   const bal = personBalance(p);
                   const { name, avatarUrl } = contactDisplay(p);
                   return (
@@ -169,20 +178,18 @@ export default function SplitPage() {
 
         {/* Groups */}
         <TabsContent value="groups" className="space-y-3">
-          <div className="flex justify-end">
-            <button
-              onClick={() => setAddGroup(true)}
-              className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground"
-            >
-              <Plus className="h-5 w-5" />
-            </button>
-          </div>
+          <ListToolbar
+            query={gq}
+            onQuery={setGq}
+            placeholder="Search groups"
+            onAdd={() => setAddGroup(true)}
+          />
           <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-            {groups.length === 0 ? (
-              <Empty text="No groups yet" />
+            {filteredGroups.length === 0 ? (
+              <Empty text={gq ? "No groups found" : "No groups yet"} />
             ) : (
               <div className="divide-y divide-border">
-                {(groups as any[]).map((g) => (
+                {filteredGroups.map((g) => (
                   <Link
                     key={g.id}
                     to={`/split/group/${g.id}`}
