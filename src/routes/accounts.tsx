@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { accountsQuery } from "@/lib/queries";
 import { AccountIcon } from "@/components/AccountIcon";
 import { formatMoney } from "@/lib/format";
-import { Button } from "@/components/ui/button";
 import { Plus, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { AddAccountSheet } from "@/components/AddAccountSheet";
@@ -29,9 +28,14 @@ export default function AccountsPage() {
           <p className="text-sm text-muted-foreground">Total balance</p>
           <p className="text-3xl font-mono font-bold">{formatMoney(total)}</p>
         </div>
-        <Button size="sm" onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Add
-        </Button>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Add account"
+          className="h-10 w-10 shrink-0 rounded-lg bg-primary text-white grid place-items-center active:opacity-80"
+        >
+          <Plus className="h-5 w-5" />
+        </button>
       </div>
 
       {Object.entries(grouped).map(([type, byInst]) => (

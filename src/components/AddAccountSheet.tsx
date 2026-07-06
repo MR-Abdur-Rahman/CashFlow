@@ -14,6 +14,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AccountIcon, PRESET_ICONS, ICON_COLORS } from "./AccountIcon";
+import { ImageCropDialog } from "./ImageCropDialog";
 import { cn } from "@/lib/utils";
 
 type Account = {
@@ -48,6 +49,8 @@ export function AddAccountSheet({
     icon_color: ICON_COLORS[0],
     icon_url: null,
   });
+  const [iconCropFile, setIconCropFile] = useState<File | null>(null);
+  const [iconCropOpen, setIconCropOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -103,13 +106,13 @@ export function AddAccountSheet({
     onError: (e) => toast.error(e.message),
   });
 
-  async function uploadIcon(file: File) {
+  async function uploadIcon(blob: Blob) {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    const path = `${u.user.id}/${Date.now()}-${file.name}`;
+    const path = `${u.user.id}/${Date.now()}.jpg`;
     const { error } = await supabase.storage
       .from("account-icons")
-      .upload(path, file, { upsert: true });
+      .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
     if (error) {
       toast.error(error.message);
       return;
@@ -240,7 +243,11 @@ export function AddAccountSheet({
                 accept="image/*"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) uploadIcon(f);
+                  e.target.value = "";
+                  if (f) {
+                    setIconCropFile(f);
+                    setIconCropOpen(true);
+                  }
                 }}
               />
             </div>
@@ -252,6 +259,12 @@ export function AddAccountSheet({
           </div>
         </form>
       </SheetContent>
+      <ImageCropDialog
+        file={iconCropFile}
+        open={iconCropOpen}
+        onOpenChange={setIconCropOpen}
+        onCropped={uploadIcon}
+      />
     </Sheet>
   );
 }
