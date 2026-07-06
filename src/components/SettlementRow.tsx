@@ -40,7 +40,13 @@ export function SettlementRow({
     <div className="bg-card">
       <div className="px-4 py-3 flex gap-3">
         {iconAvatar ? (
-          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--color-income-bg)] text-income shrink-0">
+          <div
+            className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${
+              iPaid
+                ? "bg-[var(--color-expense-bg)] text-expense"
+                : "bg-[var(--color-income-bg)] text-income"
+            }`}
+          >
             <ArrowLeftRight className="h-5 w-5" />
           </div>
         ) : (
@@ -58,7 +64,7 @@ export function SettlementRow({
             </p>
             <p
               className={`text-sm font-mono font-semibold shrink-0 ${
-                iconAvatar ? "text-settled" : iPaid ? "text-expense" : "text-income"
+                iPaid ? "text-expense" : "text-income"
               }`}
             >
               {formatMoney(amount)}

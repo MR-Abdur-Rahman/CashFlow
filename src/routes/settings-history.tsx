@@ -196,8 +196,13 @@ export default function HistoryPage() {
   }, [allSplits, q, type, personSearch, fromStr, toStr]);
 
   const filteredSettlements = useMemo(() => {
-    if (type !== "all" && type !== "settlement") return [];
+    // "all"/"settlement" → every settlement. A settlement is real money moving between two people,
+    // so it's also the debtor's EXPENSE and the creditor's INCOME: surface it under those chips too
+    // (direction is viewer-relative via settlementDirection.iPaid). transfer/split → none.
+    if (type === "transfer" || type === "split") return [];
     return (settlements as any[]).filter((s) => {
+      if (type === "expense" && !settlementDirection(s, s._uid).iPaid) return false;
+      if (type === "income" && settlementDirection(s, s._uid).iPaid) return false;
       const day = String(s.created_at ?? "").slice(0, 10);
       if (day < fromStr || day > toStr) return false;
       if (!q) return true;

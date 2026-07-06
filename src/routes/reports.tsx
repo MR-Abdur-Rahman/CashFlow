@@ -58,6 +58,13 @@ function settlementReceivedByMe(s: any, myUid: string | undefined): boolean {
   const settlerIsMe = s.created_by === myUid;
   return settlerIsMe ? !!s.settler_is_creditor : !s.settler_is_creditor;
 }
+// Mirror of settlementReceivedByMe: a settlement counts as the viewer's EXPENSE when the viewer is
+// the DEBTOR (paid the money out). Exactly the inverse direction of "received by me".
+function settlementPaidByMe(s: any, myUid: string | undefined): boolean {
+  if (!myUid) return false;
+  const settlerIsMe = s.created_by === myUid;
+  return settlerIsMe ? !s.settler_is_creditor : !!s.settler_is_creditor;
+}
 // The other party's display name, resolved to the viewer's own contact name so the same person
 // isn't split across their profile name vs contact name.
 function settlementCounterpartyName(s: any, myUid: string | undefined, people: any[]): string {
@@ -287,6 +294,38 @@ function SettlementIncomeRow({ s }: { s: any }) {
   );
 }
 
+// Mirror of SettlementIncomeRow for the DEBTOR side: a settlement the current user PAID reads as an
+// expense (red, "-", "You → <receiver>"). `name` is the drill person (already the receiver here).
+function SettlementExpenseRow({ s, name }: { s: any; name?: string }) {
+  const receiverName =
+    name ??
+    s.creator?.full_name ??
+    (s.person as any)?.name ??
+    (s.split_shares as any)?.person_name ??
+    "Unknown";
+  const account = s.accounts
+    ? [s.accounts.institution, s.accounts.label].filter(Boolean).join(" · ")
+    : "";
+  return (
+    <div className="bg-card" style={{ borderLeft: "3px solid var(--expense)" }}>
+      <div className="px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium">You → {receiverName}</p>
+          <p className="text-sm font-mono font-semibold text-expense shrink-0">
+            -{formatMoney(s.amount)}
+          </p>
+        </div>
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          <p className="text-[12px] text-muted-foreground truncate flex-1">{account}</p>
+          <p className="text-[10px] text-muted-foreground font-mono shrink-0">
+            {fmtCAT(s.created_at)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Period Nav (shared) ─────────────────────────────────────────────────────
 function PeriodNav({
   period,
@@ -363,7 +402,6 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
   const isExpensePerson = drillItem.drillType === "expense-person";
   const isIncomeSource = drillItem.drillType === "income-source";
   const isIncomePerson = drillItem.drillType === "income-person";
-  const isExpense = isExpenseCat || isExpensePerson;
   const isIncome = isIncomeSource || isIncomePerson;
 
   // Expense transactions (non-split) for this category
@@ -411,13 +449,11 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       return (data ?? []).filter((s: any) => {
         if (isExpenseCat)
           return ((s.categories as any)?.name ?? "Uncategorized") === drillItem.name;
-        if (isExpensePerson) {
-          return (s.split_shares as any[]).some((sh: any) => sh.person_name === drillItem.name);
-        }
         return false;
       });
     },
-    enabled: isExpense,
+    // expense-person drills are settlement-only (mirror of income-person); category drills use splits.
+    enabled: isExpenseCat,
   });
 
   // Incoming splits the current user paid (confirmed) for this expense category.
@@ -495,17 +531,19 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       if (error) throw error;
       return (data ?? []).map((s: any) => ({ ...s, _uid: u.user!.id }));
     },
-    enabled: isIncomePerson,
+    enabled: isIncomePerson || isExpensePerson,
   });
-  // Only the money I RECEIVED from THIS drill person (either direction, whoever recorded).
+  // Settlements with THIS drill person that match the drill's direction:
+  //   income-person  → money I RECEIVED, expense-person → money I PAID (either direction, whoever recorded).
   const drillSettlements = useMemo(
     () =>
-      (drillSettlementsRaw as any[]).filter(
-        (s) =>
-          settlementReceivedByMe(s, s._uid) &&
-          settlementCounterpartyName(s, s._uid, people as any[]) === drillItem.name,
-      ),
-    [drillSettlementsRaw, people, drillItem.name],
+      (drillSettlementsRaw as any[]).filter((s) => {
+        const dirMatch = isExpensePerson
+          ? settlementPaidByMe(s, s._uid)
+          : settlementReceivedByMe(s, s._uid);
+        return dirMatch && settlementCounterpartyName(s, s._uid, people as any[]) === drillItem.name;
+      }),
+    [drillSettlementsRaw, people, drillItem.name, isExpensePerson],
   );
 
   // ─── Chart buckets: X-axis structure driven by drillPeriod ─────────────────
@@ -564,9 +602,9 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
         sums.set(k, (sums.get(k) ?? 0) + Number(s.total_amount));
       }
     } else if (isExpensePerson) {
-      for (const s of drillSplits as any[]) {
-        const k = txnKey(s.date, s.time);
-        sums.set(k, (sums.get(k) ?? 0) + Number(s.total_amount));
+      for (const s of drillSettlements as any[]) {
+        const k = caKey(s.created_at);
+        sums.set(k, (sums.get(k) ?? 0) + Number(s.amount));
       }
     } else {
       for (const t of incTxns as any[]) {
@@ -630,8 +668,8 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
         );
       }
     } else if (isExpensePerson) {
-      (drillSplits as any[]).forEach((s) =>
-        items.push({ ...s, _type: "split", _sort: `${s.date}T${s.time ?? "00:00"}` }),
+      (drillSettlements as any[]).forEach((s) =>
+        items.push({ ...s, _type: "set-exp", _sort: s.created_at ?? "" }),
       );
     } else if (isIncomeSource) {
       (incTxns as any[]).forEach((t) =>
@@ -666,6 +704,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
         if (item._type === "split") return s + Number(item.total_amount);
         if (item._type === "inc") return s + Number(item.amount);
         if (item._type === "set-inc") return s + Number(item.amount);
+        if (item._type === "set-exp") return s + Number(item.amount);
         return s;
       }, 0),
     [allItems],
@@ -857,6 +896,16 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
                   <SettlementIncomeRow s={item} />
                 </SwipeRow>
               );
+            if (item._type === "set-exp")
+              return (
+                <SwipeRow
+                  key={item.id}
+                  onEdit={() => setEditItem(item)}
+                  onDelete={() => setDeleteItem(item)}
+                >
+                  <SettlementExpenseRow s={item} name={drillItem.name} />
+                </SwipeRow>
+              );
             return null;
           })}
         </div>
@@ -1033,27 +1082,38 @@ export default function ReportsPage() {
     },
   });
 
-  // ── Expense pie: normal expenses (non-split) + splits grouped by category
+  // ── Expense pie: normal expenses (non-split) + splits grouped by category, plus settlements I
+  // PAID grouped under the receiver's name (mirror of how received settlements group under the
+  // payer's name in the income pie). Category slices drill as expense-category; settlement slices
+  // drill as expense-person.
   const expenseData = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { value: number; drillType: DrillType }>();
+    const add = (name: string, amount: number, drillType: DrillType) => {
+      const ex = map.get(name);
+      map.set(name, { value: (ex?.value ?? 0) + amount, drillType: ex?.drillType ?? drillType });
+    };
     (txns as any[]).forEach((t) => {
       if (t.type !== "expense" || t.is_split) return;
-      const name = t.categories?.name ?? "Other";
-      map.set(name, (map.get(name) ?? 0) + Number(t.amount));
+      add(t.categories?.name ?? "Other", Number(t.amount), "expense-category");
     });
     (mySplits as any[]).forEach((s) => {
-      const name = (s.categories as any)?.name ?? "Uncategorized";
-      map.set(name, (map.get(name) ?? 0) + Number(s.total_amount));
+      add((s.categories as any)?.name ?? "Uncategorized", Number(s.total_amount), "expense-category");
     });
     // Incoming splits I paid (full amount left my account on confirm).
     (payerSplits as any[]).forEach((s) => {
-      const name = (s.categories as any)?.name ?? "Uncategorized";
-      map.set(name, (map.get(name) ?? 0) + Number(s.total_amount));
+      add((s.categories as any)?.name ?? "Uncategorized", Number(s.total_amount), "expense-category");
+    });
+    (incomeSettlements as any[]).forEach((s) => {
+      if (!settlementPaidByMe(s, s._uid)) return; // only money I actually paid out is expense
+      const name = settlementCounterpartyName(s, s._uid, people as any[]);
+      const ex = map.get(name);
+      // settlement overrides drillType to expense-person
+      map.set(name, { value: (ex?.value ?? 0) + Number(s.amount), drillType: "expense-person" });
     });
     return Array.from(map.entries())
-      .map(([name, value]) => ({ name, value, drillType: "expense-category" as DrillType }))
+      .map(([name, { value, drillType }]) => ({ name, value, drillType }))
       .sort((a, b) => b.value - a.value);
-  }, [txns, mySplits, payerSplits]);
+  }, [txns, mySplits, payerSplits, incomeSettlements, people]);
 
   const expenseTotal = useMemo(() => expenseData.reduce((s, d) => s + d.value, 0), [expenseData]);
 
