@@ -7,7 +7,8 @@ import {
   peopleQuery,
 } from "@/lib/queries";
 import { settlementNetAfter } from "@/lib/balance";
-import { SplitDirectRow, EditSplitSheet, EditTxSheet } from "./home";
+import { EditSplitSheet, EditTxSheet } from "./home";
+import { SplitDirectRow } from "@/components/SplitDirectRow";
 import { SettlementRow } from "@/components/SettlementRow";
 import { settlementDirection, shareRemaining } from "@/lib/settlement";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";

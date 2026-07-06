@@ -1,3 +1,12 @@
+import { format } from "date-fns";
+
+// "MMM dd, yyyy · hh:mm a" from a date (YYYY-MM-DD) + optional time (HH:mm).
+export function formatDateTime(date?: string, time?: string): string {
+  if (!date) return "";
+  const t = time?.slice(0, 5) ?? "00:00";
+  return format(new Date(`${date}T${t}`), "MMM dd, yyyy · hh:mm a");
+}
+
 export type MoneyFormatConfig = {
   symbol: string;
   thousandSeparator: "," | "." | " " | "";

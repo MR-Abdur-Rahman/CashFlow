@@ -14,7 +14,8 @@ import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { formatMoney } from "@/lib/format";
-import { EditSplitSheet, SplitDirectRow } from "./home";
+import { EditSplitSheet } from "./home";
+import { SplitDirectRow } from "@/components/SplitDirectRow";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,

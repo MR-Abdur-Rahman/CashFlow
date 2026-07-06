@@ -4,7 +4,7 @@ import { settlementNetAfter } from "@/lib/balance";
 import { AccountIcon } from "@/components/AccountIcon";
 import { UserAvatar } from "@/components/UserAvatar";
 import { splitRowAvatar } from "@/lib/people";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDateTime } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
@@ -56,12 +56,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-
-function formatDateTime(date?: string, time?: string): string {
-  if (!date) return "";
-  const t = time?.slice(0, 5) ?? "00:00";
-  return format(new Date(`${date}T${t}`), "MMM dd, yyyy · hh:mm a");
-}
 
 // ─── Main Page ─────────────────────────────────────────────────────────────
 export default function AccountDetail() {
