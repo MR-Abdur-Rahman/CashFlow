@@ -27,14 +27,13 @@ import { Button } from "@/components/ui/button";
 import { AccountIcon } from "@/components/AccountIcon";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
-import { QrScannerDialog } from "@/components/QrScannerDialog";
 import { ListToolbar } from "@/components/ListToolbar";
 import { formatMoney } from "@/lib/format";
 import { methodToAccountType } from "@/lib/settlement";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 
 export default function SplitPage() {
   const { data: people = [] } = useQuery(peopleQuery());
@@ -44,9 +43,9 @@ export default function SplitPage() {
   const allSettlements = balanceData?.settlements ?? [];
   const myPersonIds = balanceData?.myPersonIds ?? [];
   const currentUserId = balanceData?.currentUserId ?? null;
+  const navigate = useNavigate();
   const [addPerson, setAddPerson] = useState(false);
   const [addGroup, setAddGroup] = useState(false);
-  const [scanOpen, setScanOpen] = useState(false);
   const [scanned, setScanned] = useState<{ name?: string; phone?: string } | undefined>();
   const [pq, setPq] = useState("");
   const [gq, setGq] = useState("");
@@ -60,23 +59,6 @@ export default function SplitPage() {
     tabParam === "pending" ? "pending" : tabParam === "groups" ? "groups" : "people";
   const setTab = (v: "people" | "groups" | "pending") =>
     setSearchParams({ tab: v }, { replace: true });
-
-  function handleScan(text: string) {
-    let obj: any;
-    try {
-      obj = JSON.parse(text);
-    } catch {
-      return toast.error("Not a valid QR code");
-    }
-    if (obj?.app !== "cashflow") return toast.error("That doesn't look like a CashFlow QR");
-    const name = typeof obj.name === "string" ? obj.name.trim().slice(0, 80) : "";
-    const phoneRaw = typeof obj.phone === "string" ? obj.phone.trim() : "";
-    const phone = phoneRaw && /^\+?[0-9 ()-]{6,20}$/.test(phoneRaw) ? phoneRaw : undefined;
-    if (!name && !phone) return toast.error("QR is missing name and phone");
-    setScanned({ name: name || undefined, phone });
-    setAddPerson(true);
-    toast.success("QR scanned — review and save");
-  }
 
   function personBalance(person: any): number {
     return bilateralBalance(allSplits, allSettlements, person, currentUserId, myPersonIds);
@@ -135,7 +117,7 @@ export default function SplitPage() {
               setScanned(undefined);
               setAddPerson(true);
             }}
-            onScan={() => setScanOpen(true)}
+            onScan={() => navigate("/settings/qr")}
           />
           <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
             {filteredPeople.length === 0 ? (
@@ -230,7 +212,6 @@ export default function SplitPage() {
 
       <AddPersonDialog open={addPerson} onOpenChange={setAddPerson} initial={scanned} />
       <AddGroupDialog open={addGroup} onOpenChange={setAddGroup} />
-      <QrScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScan} />
     </div>
   );
 }

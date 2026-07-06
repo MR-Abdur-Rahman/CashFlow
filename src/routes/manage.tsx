@@ -31,11 +31,9 @@ import { AddAccountSheet } from "@/components/AddAccountSheet";
 import { AccountIcon } from "@/components/AccountIcon";
 import { SwipeRow } from "@/components/SwipeRow";
 import { ListToolbar } from "@/components/ListToolbar";
-import { QrScannerDialog } from "@/components/QrScannerDialog";
-import { connectViaQr } from "@/lib/connectQr";
 import { Plus, Archive, ChevronRight, ArrowLeft } from "lucide-react";
 import { formatMoney } from "@/lib/format";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 
 export default function ManagePage() {
   const [catDrill, setCatDrill] = useState<{ id: string; name: string; icon: string } | null>(null);
@@ -517,10 +515,10 @@ function People() {
   const meId = balanceData?.currentUserId ?? null;
   const myPids = balanceData?.myPersonIds ?? [];
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<any>(null);
   const [q, setQ] = useState("");
-  const [scanOpen, setScanOpen] = useState(false);
 
   const del = useMutation({
     mutationFn: async (id: string) => {
@@ -554,7 +552,7 @@ function People() {
           setEdit(null);
           setOpen(true);
         }}
-        onScan={() => setScanOpen(true)}
+        onScan={() => navigate("/settings/qr")}
       />
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
         {filtered.length === 0 && (
@@ -603,11 +601,6 @@ function People() {
         })}
       </div>
       <AddPersonDialog open={open} onOpenChange={setOpen} edit={edit} />
-      <QrScannerDialog
-        open={scanOpen}
-        onOpenChange={setScanOpen}
-        onScan={(t) => connectViaQr(t, qc)}
-      />
     </div>
   );
 }
