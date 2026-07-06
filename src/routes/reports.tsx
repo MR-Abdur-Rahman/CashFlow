@@ -269,8 +269,16 @@ function IncomeRow({ t }: { t: any }) {
   );
 }
 
-function SettlementIncomeRow({ s }: { s: any }) {
-  const payerName = (s.split_shares as any)?.person_name ?? "Unknown";
+// `name` is the drill person (the payer for an income-person drill). For a bin settlement
+// split_share_id is null, so `split_shares?.person_name` is absent — fall back to the person/creator
+// join so the payer never renders as "Unknown".
+function SettlementIncomeRow({ s, name }: { s: any; name?: string }) {
+  const payerName =
+    name ??
+    (s.split_shares as any)?.person_name ??
+    (s.person as any)?.name ??
+    s.creator?.full_name ??
+    "Unknown";
   const account = s.accounts
     ? [s.accounts.institution, s.accounts.label].filter(Boolean).join(" · ")
     : "";
@@ -893,7 +901,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
                 >
-                  <SettlementIncomeRow s={item} />
+                  <SettlementIncomeRow s={item} name={drillItem.name} />
                 </SwipeRow>
               );
             if (item._type === "set-exp")
