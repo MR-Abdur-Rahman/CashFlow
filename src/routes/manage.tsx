@@ -5,6 +5,7 @@ import {
   peopleQuery,
   groupsQuery,
   splitBalancesQuery,
+  accountsQuery,
 } from "@/lib/queries";
 import { bilateralBalance } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
@@ -26,6 +27,8 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
+import { AddAccountSheet } from "@/components/AddAccountSheet";
+import { AccountIcon } from "@/components/AccountIcon";
 import { SwipeRow } from "@/components/SwipeRow";
 import { ListToolbar } from "@/components/ListToolbar";
 import { QrScannerDialog } from "@/components/QrScannerDialog";
@@ -49,13 +52,17 @@ export default function ManagePage() {
     <div className="px-4 pt-6 pb-24 space-y-5">
       <h1 className="text-xl font-semibold">Manage</h1>
       <Tabs value={tab} onValueChange={(v) => setSearchParams({ tab: v }, { replace: true })}>
-        <TabsList className="grid grid-cols-3 w-full">
+        <TabsList className="grid grid-cols-4 w-full">
           <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="accounts">Accounts</TabsTrigger>
           <TabsTrigger value="people">People</TabsTrigger>
           <TabsTrigger value="groups">Groups</TabsTrigger>
         </TabsList>
         <TabsContent value="categories">
           <Categories onSelectCat={setCatDrill} />
+        </TabsContent>
+        <TabsContent value="accounts">
+          <Accounts />
         </TabsContent>
         <TabsContent value="people">
           <People />
@@ -417,6 +424,91 @@ function CategoryDialog({
 }
 
 // ─── People ────────────────────────────────────────────────────────────────
+// ─── Accounts ────────────────────────────────────────────────────────────────
+function Accounts() {
+  const { data: accounts = [] } = useQuery(accountsQuery());
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [edit, setEdit] = useState<any>(null);
+  const [q, setQ] = useState("");
+
+  const del = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("accounts").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+      toast.success("Deleted");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const filtered = (accounts as any[]).filter(
+    (a) =>
+      !q.trim() ||
+      [a.label, a.institution]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(q.trim().toLowerCase()),
+  );
+
+  return (
+    <div className="space-y-3 mt-4">
+      <ListToolbar
+        query={q}
+        onQuery={setQ}
+        placeholder="Search accounts"
+        onAdd={() => {
+          setEdit(null);
+          setOpen(true);
+        }}
+      />
+      <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
+        {filtered.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-8">
+            {q ? "No accounts found" : "No accounts yet"}
+          </p>
+        )}
+        {filtered.map((a) => (
+          <SwipeRow
+            key={a.id}
+            onEdit={() => {
+              setEdit(a);
+              setOpen(true);
+            }}
+            onDelete={() => {
+              if (confirm("Delete account?")) del.mutate(a.id);
+            }}
+          >
+            <Link
+              to={`/accounts/${a.id}`}
+              className="flex items-center gap-3 p-3 bg-card active:bg-secondary/40"
+            >
+              <AccountIcon
+                iconType={a.icon_type}
+                iconName={a.icon_name}
+                iconColor={a.icon_color}
+                iconUrl={a.icon_url}
+                size={36}
+              />
+              <p className="flex-1 min-w-0 text-sm font-medium truncate">
+                {[a.institution, a.label].filter(Boolean).join(" · ") || a.label}
+              </p>
+              <span className="font-mono text-sm font-semibold shrink-0">
+                {formatMoney(a.current_balance)}
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            </Link>
+          </SwipeRow>
+        ))}
+      </div>
+      <AddAccountSheet open={open} onOpenChange={setOpen} edit={edit} />
+    </div>
+  );
+}
+
 function People() {
   const { data: people = [] } = useQuery(peopleQuery());
   const { data: balanceData } = useQuery(splitBalancesQuery());
