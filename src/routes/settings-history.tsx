@@ -60,6 +60,14 @@ import {
   formatAnchorLabel,
 } from "@/lib/period";
 
+// Settlements only carry a UTC `created_at` timestamp (no local date/time columns like txns/splits).
+// SettlementRow renders it in LOCAL time, so the section grouping/filtering must use the LOCAL date —
+// slicing the raw UTC string bucketed a late-evening-UTC settlement under the previous local day.
+const settlementLocalDate = (s: any) =>
+  s?.created_at ? format(new Date(s.created_at), "yyyy-MM-dd") : "";
+const settlementLocalTime = (s: any) =>
+  s?.created_at ? format(new Date(s.created_at), "HH:mm:ss") : "";
+
 export default function HistoryPage() {
   const [searchParams] = useSearchParams();
   const { data: txns = [] } = useQuery(transactionsQuery());
@@ -203,7 +211,7 @@ export default function HistoryPage() {
     return (settlements as any[]).filter((s) => {
       if (type === "expense" && !settlementDirection(s, s._uid).iPaid) return false;
       if (type === "income" && settlementDirection(s, s._uid).iPaid) return false;
-      const day = String(s.created_at ?? "").slice(0, 10);
+      const day = settlementLocalDate(s);
       if (day < fromStr || day > toStr) return false;
       if (!q) return true;
       const hay = [
@@ -236,12 +244,12 @@ export default function HistoryPage() {
     for (const t of filteredTxns) push(t.date, { ...t, _kind: "txn" });
     for (const s of filteredSplits) push(s.date, { ...s, _kind: "split" });
     for (const s of filteredSettlements)
-      push(String(s.created_at ?? "").slice(0, 10), { ...s, _kind: "settlement" });
+      push(settlementLocalDate(s), { ...s, _kind: "settlement" });
     // Sort within each date: time DESC, then created_at DESC (most recently created first).
     // Settlements have no `time` column, so derive their time from created_at to interleave correctly.
     const timeOf = (x: any) =>
       x._kind === "settlement"
-        ? String(x.created_at ?? "").slice(11, 19)
+        ? settlementLocalTime(x)
         : String(x.time ?? "00:00:00").slice(0, 8);
     for (const arr of map.values())
       arr.sort((a, b) => {
