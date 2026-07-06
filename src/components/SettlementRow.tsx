@@ -58,7 +58,7 @@ export function SettlementRow({
             </p>
             <p
               className={`text-sm font-mono font-semibold shrink-0 ${
-                iconAvatar ? "text-[#10B981]" : iPaid ? "text-[#EF4444]" : "text-[#22C55E]"
+                iconAvatar ? "text-settled" : iPaid ? "text-expense" : "text-income"
               }`}
             >
               {formatMoney(amount)}
@@ -70,7 +70,7 @@ export function SettlementRow({
           <div className="flex items-center justify-between gap-2 mt-0.5">
             {netAfter !== undefined ? (
               Math.abs(netAfter) < 0.005 ? (
-                <p className="text-[12px] font-medium text-[#10B981]">Fully settled</p>
+                <p className="text-[12px] font-medium text-settled">Fully settled</p>
               ) : (
                 <>
                   <p className="text-[12px] text-muted-foreground">
@@ -82,7 +82,7 @@ export function SettlementRow({
                 </>
               )
             ) : fullySettled ? (
-              <p className="text-[12px] font-medium text-[#10B981]">Fully settled</p>
+              <p className="text-[12px] font-medium text-settled">Fully settled</p>
             ) : (
               <>
                 <p className="text-[12px] text-muted-foreground">

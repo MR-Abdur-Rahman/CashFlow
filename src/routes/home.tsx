@@ -707,7 +707,7 @@ function SplitRowContent({ t }: { t: any }) {
     return (
       <div
         className="flex items-center gap-3 p-4 bg-card"
-        style={{ borderLeft: "3px solid #F59E0B" }}
+        style={{ borderLeft: "3px solid var(--split)" }}
       >
         <div className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--color-split-bg)] text-split shrink-0">
           <Users className="h-5 w-5" />
@@ -715,7 +715,7 @@ function SplitRowContent({ t }: { t: any }) {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium">Split expense</p>
         </div>
-        <p className="text-sm font-mono font-semibold text-[#F59E0B]">-{formatMoney(t.amount)}</p>
+        <p className="text-sm font-mono font-semibold text-split">-{formatMoney(t.amount)}</p>
       </div>
     );
   }
@@ -750,12 +750,12 @@ function SplitRowContent({ t }: { t: any }) {
   const perShare = shareCount > 0 ? total / shareCount : 0;
 
   return (
-    <div className="bg-card" style={{ borderLeft: "3px solid #F59E0B" }}>
+    <div className="bg-card" style={{ borderLeft: "3px solid var(--split)" }}>
       <div className="px-4 py-3">
         {/* Line 1: description + total */}
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium truncate flex-1">{description}</p>
-          <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">
+          <p className="text-sm font-mono font-semibold text-split shrink-0">
             {formatMoney(total)}
           </p>
         </div>
@@ -766,11 +766,11 @@ function SplitRowContent({ t }: { t: any }) {
             <p className="text-[12px] text-muted-foreground truncate flex-1">{personName}</p>
             <div className="text-right shrink-0">
               {isMePaid ? (
-                <p className="text-[12px] font-mono font-semibold text-[#10B981]">
+                <p className="text-[12px] font-mono font-semibold text-settled">
                   You lent {formatMoney(totalShares)}
                 </p>
               ) : (
-                <p className="text-[12px] font-mono font-semibold text-[#F59E0B]">
+                <p className="text-[12px] font-mono font-semibold text-split">
                   You owe {formatMoney(myShare)}
                 </p>
               )}
@@ -794,7 +794,7 @@ function SplitRowContent({ t }: { t: any }) {
                 {isMePaid ? "Paid by You" : `Paid by ${s.paid_by}`}
               </p>
               <p
-                className={`text-[12px] font-mono font-semibold shrink-0 ${isMePaid ? "text-[#10B981]" : "text-[#F59E0B]"}`}
+                className={`text-[12px] font-mono font-semibold shrink-0 ${isMePaid ? "text-settled" : "text-split"}`}
               >
                 {isMePaid
                   ? `You lent ${formatMoney(totalShares)}`
@@ -914,7 +914,7 @@ export function SplitDirectRow({
           {/* Line 1: description + total */}
           <div className="flex items-start justify-between gap-2">
             <p className="text-sm font-medium text-foreground truncate flex-1">{description}</p>
-            <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">
+            <p className="text-sm font-mono font-semibold text-split shrink-0">
               {formatMoney(total)}
             </p>
           </div>
@@ -925,11 +925,11 @@ export function SplitDirectRow({
               <div className="flex items-center justify-between gap-2 mt-0.5">
                 <p className="text-[12px] text-muted-foreground truncate flex-1">{line2Name}</p>
                 {isMePaid ? (
-                  <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
+                  <p className="text-[12px] font-mono font-semibold text-settled shrink-0">
                     You lent {formatMoney(youLent)}
                   </p>
                 ) : (
-                  <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">
+                  <p className="text-[12px] font-mono font-semibold text-split shrink-0">
                     You owe {formatMoney(youOwe)}
                   </p>
                 )}
@@ -963,13 +963,13 @@ export function SplitDirectRow({
                   <p className="text-[12px] text-muted-foreground truncate flex-1">
                     {accountLabel}
                   </p>
-                  <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
+                  <p className="text-[12px] font-mono font-semibold text-settled shrink-0">
                     You lent {formatMoney(lentOweOverride ?? youLent)}
                   </p>
                 </div>
               ) : (
                 <div className="flex items-center justify-end gap-2 mt-0.5">
-                  <p className="text-[12px] font-mono font-semibold text-[#F59E0B] shrink-0">
+                  <p className="text-[12px] font-mono font-semibold text-split shrink-0">
                     You owe {formatMoney(lentOweOverride ?? youOwe)}
                   </p>
                 </div>
@@ -1230,7 +1230,7 @@ export function EditSplitSheet({
                 value={amount}
                 placeholder="0.00"
                 onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
-                className="w-full bg-transparent text-center text-5xl font-mono font-semibold outline-none text-[#F59E0B]"
+                className="w-full bg-transparent text-center text-5xl font-mono font-semibold outline-none text-split"
               />
               <p className="text-xs text-muted-foreground mt-1 font-mono">LKR</p>
             </div>

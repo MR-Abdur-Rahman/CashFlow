@@ -207,7 +207,7 @@ export default function GroupDetail() {
                 {Math.abs(m.balance) >= 0.005 ? (
                   <span
                     className="font-mono font-semibold"
-                    style={{ color: m.balance > 0 ? "#22C55E" : "#EF4444" }}
+                    style={{ color: m.balance > 0 ? "var(--income)" : "var(--expense)" }}
                   >
                     {m.balance > 0 ? "+" : "-"}
                     {formatMoney(Math.abs(m.balance))}
@@ -223,7 +223,7 @@ export default function GroupDetail() {
       )}
 
       {isMixedGroup && (
-        <div className="rounded-xl border border-[#F59E0B]/40 bg-[#F59E0B]/10 px-3 py-2.5 text-xs text-[#F59E0B]">
+        <div className="rounded-xl border border-split/40 bg-split/10 px-3 py-2.5 text-xs text-split">
           This group has both local and linked members. Splits may not work correctly.
         </div>
       )}

@@ -143,7 +143,7 @@ export default function SplitPage() {
                       {Math.abs(bal) >= 0.005 && (
                         <span
                           className="text-sm font-mono font-semibold"
-                          style={{ color: bal > 0 ? "#22C55E" : "#EF4444" }}
+                          style={{ color: bal > 0 ? "var(--income)" : "var(--expense)" }}
                         >
                           {bal > 0 ? "+" : "-"}
                           {formatMoney(Math.abs(bal))}

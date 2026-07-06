@@ -454,7 +454,7 @@ function TxRow({ t }: { t: any }) {
   const isIncome = t.type === "income";
   const isTransfer = t.type === "transfer";
 
-  const colorClass = isIncome ? "text-[#22C55E]" : isTransfer ? "text-[#3B82F6]" : "text-[#EF4444]";
+  const colorClass = isIncome ? "text-income" : isTransfer ? "text-transfer" : "text-expense";
 
   const bgClass = isIncome
     ? "bg-[var(--color-income-bg)]"
@@ -550,14 +550,14 @@ function SplitRow({ s }: { s: any }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <p className="text-sm font-medium truncate flex-1">{description}</p>
-            <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">
+            <p className="text-sm font-mono font-semibold text-split shrink-0">
               {formatMoney(total)}
             </p>
           </div>
           {isPerson && (
             <div className="flex items-center justify-between gap-2 mt-0.5">
               <p className="text-[12px] text-muted-foreground truncate flex-1">{personName}</p>
-              <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
+              <p className="text-[12px] font-mono font-semibold text-settled shrink-0">
                 You lent {formatMoney(totalShares)}
               </p>
             </div>
@@ -574,7 +574,7 @@ function SplitRow({ s }: { s: any }) {
               </div>
               <div className="flex items-center justify-between gap-2 mt-0.5">
                 <p className="text-[12px] text-muted-foreground">Paid by You</p>
-                <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
+                <p className="text-[12px] font-mono font-semibold text-settled shrink-0">
                   You lent {formatMoney(totalShares)}
                 </p>
               </div>

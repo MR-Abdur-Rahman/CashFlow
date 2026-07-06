@@ -140,11 +140,11 @@ function ExpenseRow({ t }: { t: any }) {
   return (
     <div className="flex items-start justify-between px-4 py-3 bg-card">
       <div className="flex-1 min-w-0 pr-3">
-        <p className="text-sm text-[#EF4444] font-medium truncate">{catLabel}</p>
+        <p className="text-sm text-expense font-medium truncate">{catLabel}</p>
         <p className="text-[12px] text-muted-foreground truncate mt-0.5">{account}</p>
       </div>
       <div className="text-right shrink-0">
-        <p className="text-sm font-mono font-semibold text-[#EF4444]">{formatMoney(t.amount)}</p>
+        <p className="text-sm font-mono font-semibold text-expense">{formatMoney(t.amount)}</p>
         <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
           {fmtDT(t.date, t.time)}
         </p>
@@ -196,7 +196,7 @@ function SplitItemRow({ s, highlightPerson }: { s: any; highlightPerson?: string
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <p className="text-sm font-medium truncate flex-1">{description}</p>
-            <p className="text-sm font-mono font-semibold text-[#F59E0B] shrink-0">
+            <p className="text-sm font-mono font-semibold text-split shrink-0">
               {formatMoney(total)}
             </p>
           </div>
@@ -206,7 +206,7 @@ function SplitItemRow({ s, highlightPerson }: { s: any; highlightPerson?: string
                 <p className="text-[12px] text-muted-foreground truncate flex-1">
                   {shares[0]?.person_name ?? ""}
                 </p>
-                <p className="text-[12px] font-mono text-[#10B981] shrink-0">
+                <p className="text-[12px] font-mono text-settled shrink-0">
                   You lent {formatMoney(totalShares)}
                 </p>
               </div>
@@ -226,7 +226,7 @@ function SplitItemRow({ s, highlightPerson }: { s: any; highlightPerson?: string
               </div>
               <div className="flex items-center justify-between gap-2 mt-0.5">
                 <p className="text-[12px] text-muted-foreground truncate flex-1">{account}</p>
-                <p className="text-[12px] font-mono text-[#10B981] shrink-0">
+                <p className="text-[12px] font-mono text-settled shrink-0">
                   You lent {formatMoney(totalShares)}
                 </p>
               </div>
@@ -253,7 +253,7 @@ function IncomeRow({ t }: { t: any }) {
         <p className="text-[12px] text-muted-foreground truncate mt-0.5">{account}</p>
       </div>
       <div className="text-right shrink-0">
-        <p className="text-sm font-mono font-semibold text-[#22C55E]">+{formatMoney(t.amount)}</p>
+        <p className="text-sm font-mono font-semibold text-income">+{formatMoney(t.amount)}</p>
         <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
           {fmtDT(t.date, t.time)}
         </p>
@@ -268,11 +268,11 @@ function SettlementIncomeRow({ s }: { s: any }) {
     ? [s.accounts.institution, s.accounts.label].filter(Boolean).join(" · ")
     : "";
   return (
-    <div className="bg-card" style={{ borderLeft: "3px solid #10B981" }}>
+    <div className="bg-card" style={{ borderLeft: "3px solid var(--settled)" }}>
       <div className="px-4 py-3">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium">{payerName} → You</p>
-          <p className="text-sm font-mono font-semibold text-[#22C55E] shrink-0">
+          <p className="text-sm font-mono font-semibold text-income shrink-0">
             +{formatMoney(s.amount)}
           </p>
         </div>
