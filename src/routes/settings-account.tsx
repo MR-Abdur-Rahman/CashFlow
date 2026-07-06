@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ChevronLeft, Camera, Image as ImageIcon, Trash2, Loader2 } from "lucide-react";
+import { Camera, Image as ImageIcon, Trash2, Loader2 } from "lucide-react";
+import { SettingsHeader } from "@/components/SettingsRows";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 
-export default function ProfileEditPage() {
+export default function AccountPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [userId, setUserId] = useState<string | undefined>();
@@ -140,12 +141,7 @@ export default function ProfileEditPage() {
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-6">
-      <button
-        onClick={() => navigate("/settings")}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground -ml-1"
-      >
-        <ChevronLeft className="h-4 w-4" /> Back
-      </button>
+      <SettingsHeader title="Account" />
 
       <div className="flex flex-col items-center gap-3">
         <DropdownMenu>

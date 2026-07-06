@@ -14,9 +14,14 @@ import Auth from "./routes/auth";
 import AccountDetail from "./routes/account-detail";
 import SplitPerson from "./routes/split-person";
 import SplitGroup from "./routes/split-group";
-import SettingsProfile from "./routes/settings-profile";
+import SettingsAccount from "./routes/settings-account";
 import SettingsHistory from "./routes/settings-history";
 import SettingsNotifications from "./routes/settings-notifications";
+import SettingsNotificationHistory from "./routes/settings-notification-history";
+import SettingsQr from "./routes/settings-qr";
+import SettingsAppearance from "./routes/settings-appearance";
+import SettingsCurrency from "./routes/settings-currency";
+import SettingsData from "./routes/settings-data";
 import { BottomNav } from "./components/BottomNav";
 import { supabase } from "./integrations/supabase/client";
 
@@ -87,16 +92,33 @@ function App() {
           <Route path="/manage" element={session ? <Manage /> : <Navigate to="/auth" />} />
           <Route path="/settings" element={session ? <Settings /> : <Navigate to="/auth" />} />
           <Route
-            path="/settings/profile"
-            element={session ? <SettingsProfile /> : <Navigate to="/auth" />}
+            path="/settings/account"
+            element={session ? <SettingsAccount /> : <Navigate to="/auth" />}
+          />
+          <Route path="/settings/qr" element={session ? <SettingsQr /> : <Navigate to="/auth" />} />
+          <Route
+            path="/settings/appearance"
+            element={session ? <SettingsAppearance /> : <Navigate to="/auth" />}
           />
           <Route
-            path="/settings/history"
-            element={session ? <SettingsHistory /> : <Navigate to="/auth" />}
+            path="/settings/currency"
+            element={session ? <SettingsCurrency /> : <Navigate to="/auth" />}
           />
           <Route
             path="/settings/notifications"
             element={session ? <SettingsNotifications /> : <Navigate to="/auth" />}
+          />
+          <Route
+            path="/settings/notifications/history"
+            element={session ? <SettingsNotificationHistory /> : <Navigate to="/auth" />}
+          />
+          <Route
+            path="/settings/data"
+            element={session ? <SettingsData /> : <Navigate to="/auth" />}
+          />
+          <Route
+            path="/settings/history"
+            element={session ? <SettingsHistory /> : <Navigate to="/auth" />}
           />
         </Routes>
         {session && <GlobalFab />}

@@ -1924,7 +1924,7 @@ function NotificationSheet({
           type="button"
           onClick={() => {
             onOpenChange(false);
-            onNavigate("/settings/notifications");
+            onNavigate("/settings/notifications/history");
           }}
           className="text-center text-sm font-medium"
           style={{ padding: "12px 16px", borderTop: "1px solid #2A2A2A", color: "#7C3AED" }}
