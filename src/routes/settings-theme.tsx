@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Sun, Moon } from "lucide-react";
 import { SettingsHeader, Section, ThemeChoice } from "@/components/SettingsRows";
 
-export default function AppearancePage() {
+export default function ThemePage() {
   const qc = useQueryClient();
   const [userId, setUserId] = useState<string | undefined>();
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function AppearancePage() {
 
   return (
     <div className="px-4 pt-6 pb-24 space-y-6">
-      <SettingsHeader title="Appearance" />
+      <SettingsHeader title="Theme" />
       <Section label="Theme">
         <div className="p-3 grid grid-cols-2 gap-2">
           <ThemeChoice

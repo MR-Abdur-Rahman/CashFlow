@@ -19,8 +19,8 @@ import SettingsHistory from "./routes/settings-history";
 import SettingsNotifications from "./routes/settings-notifications";
 import SettingsNotificationHistory from "./routes/settings-notification-history";
 import SettingsQr from "./routes/settings-qr";
-import SettingsAppearance from "./routes/settings-appearance";
-import SettingsCurrency from "./routes/settings-currency";
+import SettingsTheme from "./routes/settings-theme";
+import SettingsPreferences from "./routes/settings-preferences";
 import SettingsData from "./routes/settings-data";
 import { BottomNav } from "./components/BottomNav";
 import { supabase } from "./integrations/supabase/client";
@@ -97,12 +97,12 @@ function App() {
           />
           <Route path="/settings/qr" element={session ? <SettingsQr /> : <Navigate to="/auth" />} />
           <Route
-            path="/settings/appearance"
-            element={session ? <SettingsAppearance /> : <Navigate to="/auth" />}
+            path="/settings/theme"
+            element={session ? <SettingsTheme /> : <Navigate to="/auth" />}
           />
           <Route
-            path="/settings/currency"
-            element={session ? <SettingsCurrency /> : <Navigate to="/auth" />}
+            path="/settings/preferences"
+            element={session ? <SettingsPreferences /> : <Navigate to="/auth" />}
           />
           <Route
             path="/settings/notifications"

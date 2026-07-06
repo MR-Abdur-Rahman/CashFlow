@@ -4,22 +4,33 @@ import { supabase } from "@/integrations/supabase/client";
 import { profileQuery } from "@/lib/queries";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronRight, QrCode, User, Palette, Coins, Bell, Database, LogOut } from "lucide-react";
+import {
+  ChevronRight,
+  QrCode,
+  User,
+  Palette,
+  SlidersHorizontal,
+  Bell,
+  Database,
+  History,
+  LogOut,
+} from "lucide-react";
 
-const ROWS = [
+type Item = { to: string; icon: typeof User; title: string; subtitle: string };
+
+const MAIN: Item[] = [
   {
     to: "/settings/account",
     icon: User,
     title: "Account",
     subtitle: "Profile, phone number, Google account",
   },
-  { to: "/settings/qr", icon: QrCode, title: "QR Code", subtitle: "My code, scan code" },
-  { to: "/settings/appearance", icon: Palette, title: "Appearance", subtitle: "Dark, light mode" },
+  { to: "/settings/theme", icon: Palette, title: "Theme", subtitle: "Dark, light mode" },
   {
-    to: "/settings/currency",
-    icon: Coins,
-    title: "Currency",
-    subtitle: "Display format, separators, decimals",
+    to: "/settings/preferences",
+    icon: SlidersHorizontal,
+    title: "Preferences",
+    subtitle: "Currency, format, customization",
   },
   {
     to: "/settings/notifications",
@@ -27,13 +38,36 @@ const ROWS = [
     title: "Notifications",
     subtitle: "Reminders, alerts, toast messages",
   },
+  { to: "/settings/data", icon: Database, title: "Data & Backup", subtitle: "Export, import" },
+];
+
+const HISTORY: Item[] = [
   {
-    to: "/settings/data",
-    icon: Database,
-    title: "Data & Backup",
-    subtitle: "History, export, import",
+    to: "/settings/notifications/history",
+    icon: Bell,
+    title: "Notification History",
+    subtitle: "Alerts you've received",
+  },
+  {
+    to: "/settings/history",
+    icon: History,
+    title: "Transaction History",
+    subtitle: "All your transactions",
   },
 ];
+
+function RowLink({ to, icon: Icon, title, subtitle }: Item) {
+  return (
+    <Link to={to} className="flex items-center gap-3 p-4 active:bg-secondary/40">
+      <Icon className="h-5 w-5 text-muted-foreground shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
+      </div>
+      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+    </Link>
+  );
+}
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -81,19 +115,24 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Category rows */}
+      {/* Main category rows */}
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
-        {ROWS.map(({ to, icon: Icon, title, subtitle }) => (
-          <Link key={to} to={to} className="flex items-center gap-3 p-4 active:bg-secondary/40">
-            <Icon className="h-5 w-5 text-muted-foreground shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">{title}</p>
-              <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
-            </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-          </Link>
+        {MAIN.map((item) => (
+          <RowLink key={item.to} {...item} />
         ))}
       </div>
+
+      {/* History */}
+      <section>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1 font-medium">
+          History
+        </p>
+        <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
+          {HISTORY.map((item) => (
+            <RowLink key={item.to} {...item} />
+          ))}
+        </div>
+      </section>
 
       {/* Sign out — separated, destructive */}
       <button

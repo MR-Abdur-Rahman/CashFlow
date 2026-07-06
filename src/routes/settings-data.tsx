@@ -1,8 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ChevronRight, Download, Upload } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Download, Upload } from "lucide-react";
 import { SettingsHeader, Section, Row } from "@/components/SettingsRows";
 
 function download(name: string, content: string, mime: string) {
@@ -97,9 +96,6 @@ export default function DataPage() {
     <div className="px-4 pt-6 pb-24 space-y-6">
       <SettingsHeader title="Data & Backup" />
       <Section label="Data & backup">
-        <Link to="/settings/history">
-          <Row icon={<ChevronRight className="h-4 w-4" />} label="Transaction history" />
-        </Link>
         <Row
           icon={<Download className="h-4 w-4" />}
           label="Export transactions (CSV)"

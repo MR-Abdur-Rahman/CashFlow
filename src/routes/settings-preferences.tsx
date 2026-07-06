@@ -14,7 +14,7 @@ import {
 import { CURRENCY_PRESETS, setMoneyFormat } from "@/lib/format";
 import { SettingsHeader, Section } from "@/components/SettingsRows";
 
-export default function CurrencyPage() {
+export default function PreferencesPage() {
   const qc = useQueryClient();
   const [userId, setUserId] = useState<string | undefined>();
   useEffect(() => {
@@ -56,7 +56,7 @@ export default function CurrencyPage() {
 
   return (
     <div className="px-4 pt-6 pb-24 space-y-6">
-      <SettingsHeader title="Currency" />
+      <SettingsHeader title="Preferences" />
       <Section label="Currency format">
         <div className="p-4 space-y-4">
           <div className="space-y-1.5">

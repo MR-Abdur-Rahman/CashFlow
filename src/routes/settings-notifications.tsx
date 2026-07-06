@@ -6,9 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Bell } from "lucide-react";
-import { Link } from "react-router-dom";
-import { SettingsHeader, Section, Row, ToggleRow } from "@/components/SettingsRows";
+import { SettingsHeader, Section, ToggleRow } from "@/components/SettingsRows";
 
 export default function NotificationSettingsPage() {
   const qc = useQueryClient();
@@ -71,9 +69,6 @@ export default function NotificationSettingsPage() {
       <SettingsHeader title="Notifications" />
 
       <Section label="Notifications">
-        <Link to="/settings/notifications/history">
-          <Row icon={<Bell className="h-4 w-4" />} label="Notification history" />
-        </Link>
         <ToggleRow
           label="Split notifications"
           checked={prefs?.split_notifications ?? false}
