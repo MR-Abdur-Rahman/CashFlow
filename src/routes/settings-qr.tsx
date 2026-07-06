@@ -4,17 +4,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { profileQuery } from "@/lib/queries";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
-import { ScanLine } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { QrScannerDialog } from "@/components/QrScannerDialog";
+import { cn } from "@/lib/utils";
+import { QrScannerInline } from "@/components/QrScannerInline";
 import { SettingsHeader, Section } from "@/components/SettingsRows";
 
 export default function QrPage() {
   const qc = useQueryClient();
+  const [view, setView] = useState<"code" | "scan">("code");
   const [userId, setUserId] = useState<string | undefined>();
   const userIdRef = useRef<string | undefined>();
   const profileRef = useRef<any>(null);
-  const [scanOpen, setScanOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -70,36 +69,59 @@ export default function QrPage() {
     toast.success(`Connected with ${scannedName || "friend"} 🔗`);
     qc.invalidateQueries({ queryKey: ["people"] });
     qc.invalidateQueries({ queryKey: ["splits"] });
+    setView("code"); // return to My code after a successful scan
   }
 
   return (
     <div className="px-4 pt-6 pb-24 space-y-6">
       <SettingsHeader title="QR Code" />
 
-      <Section label="My code">
-        <div className="flex flex-col items-center gap-3 p-5">
-          <div className="bg-white p-4 rounded-xl">
-            <QRCodeSVG
-              value={JSON.stringify({
-                app: "cashflow",
-                id: userId,
-                name: fullName,
-                phone: phone || "",
-              })}
-              size={200}
-            />
+      {/* My code / Scan code toggle — same style as Reports income/expense */}
+      <div className="flex rounded-xl bg-secondary p-1 gap-1">
+        <button
+          type="button"
+          onClick={() => setView("code")}
+          className={cn(
+            "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
+            view === "code" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+          )}
+        >
+          My Code
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("scan")}
+          className={cn(
+            "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
+            view === "scan" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+          )}
+        >
+          Scan Code
+        </button>
+      </div>
+
+      {view === "code" ? (
+        <Section label="My code">
+          <div className="flex flex-col items-center gap-3 p-5">
+            <div className="bg-white p-4 rounded-xl">
+              <QRCodeSVG
+                value={JSON.stringify({
+                  app: "cashflow",
+                  id: userId,
+                  name: fullName,
+                  phone: phone || "",
+                })}
+                size={200}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              Have a friend scan this to add you as a contact.
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground text-center">
-            Have a friend scan this to add you as a contact.
-          </p>
-        </div>
-      </Section>
-
-      <Button className="w-full" onClick={() => setScanOpen(true)}>
-        <ScanLine className="h-4 w-4 mr-2" /> Scan code
-      </Button>
-
-      <QrScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScannedQr} />
+        </Section>
+      ) : (
+        <QrScannerInline active={view === "scan"} onScan={handleScannedQr} />
+      )}
     </div>
   );
 }

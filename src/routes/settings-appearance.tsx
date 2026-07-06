@@ -28,6 +28,16 @@ export default function AppearancePage() {
     onError: (e) => toast.error(e.message),
   });
 
+  // Apply the theme to <html> immediately (global, instant) so it doesn't wait on the profile
+  // refetch; the mutation persists it and PrefsApplier re-confirms on next load.
+  function choose(next: "dark" | "light") {
+    const root = document.documentElement;
+    root.classList.toggle("dark", next === "dark");
+    root.classList.toggle("light", next === "light");
+    root.style.colorScheme = next;
+    updateProfile.mutate({ theme: next });
+  }
+
   return (
     <div className="px-4 pt-6 pb-24 space-y-6">
       <SettingsHeader title="Appearance" />
@@ -37,13 +47,13 @@ export default function AppearancePage() {
             active={theme === "dark"}
             icon={<Moon className="h-4 w-4" />}
             label="Dark"
-            onClick={() => updateProfile.mutate({ theme: "dark" })}
+            onClick={() => choose("dark")}
           />
           <ThemeChoice
             active={theme === "light"}
             icon={<Sun className="h-4 w-4" />}
             label="Light"
-            onClick={() => updateProfile.mutate({ theme: "light" })}
+            onClick={() => choose("light")}
           />
         </div>
       </Section>
