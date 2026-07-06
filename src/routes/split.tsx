@@ -85,7 +85,7 @@ export default function SplitPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Split</h1>
         <Link
-          to="/settings/history?filter=split"
+          to="/settings/history/transactions?filter=split"
           className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground"
         >
           <History className="h-5 w-5" />

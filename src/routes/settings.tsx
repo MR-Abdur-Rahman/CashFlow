@@ -39,20 +39,11 @@ const MAIN: Item[] = [
     subtitle: "Reminders, alerts, toast messages",
   },
   { to: "/settings/data", icon: Database, title: "Data & Backup", subtitle: "Export, import" },
-];
-
-const HISTORY: Item[] = [
-  {
-    to: "/settings/notifications/history",
-    icon: Bell,
-    title: "Notification History",
-    subtitle: "Alerts you've received",
-  },
   {
     to: "/settings/history",
     icon: History,
-    title: "Transaction History",
-    subtitle: "All your transactions",
+    title: "History",
+    subtitle: "Notification and transaction history",
   },
 ];
 
@@ -121,18 +112,6 @@ export default function SettingsPage() {
           <RowLink key={item.to} {...item} />
         ))}
       </div>
-
-      {/* History */}
-      <section>
-        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1 font-medium">
-          History
-        </p>
-        <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
-          {HISTORY.map((item) => (
-            <RowLink key={item.to} {...item} />
-          ))}
-        </div>
-      </section>
 
       {/* Sign out — separated, destructive */}
       <button

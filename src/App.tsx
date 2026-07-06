@@ -22,6 +22,7 @@ import SettingsQr from "./routes/settings-qr";
 import SettingsTheme from "./routes/settings-theme";
 import SettingsPreferences from "./routes/settings-preferences";
 import SettingsData from "./routes/settings-data";
+import SettingsHistoryHub from "./routes/settings-history-hub";
 import { BottomNav } from "./components/BottomNav";
 import { supabase } from "./integrations/supabase/client";
 
@@ -118,6 +119,10 @@ function App() {
           />
           <Route
             path="/settings/history"
+            element={session ? <SettingsHistoryHub /> : <Navigate to="/auth" />}
+          />
+          <Route
+            path="/settings/history/transactions"
             element={session ? <SettingsHistory /> : <Navigate to="/auth" />}
           />
         </Routes>
