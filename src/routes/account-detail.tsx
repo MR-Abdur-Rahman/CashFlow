@@ -5,7 +5,6 @@ import { AccountIcon } from "@/components/AccountIcon";
 import { UserAvatar } from "@/components/UserAvatar";
 import { splitRowAvatar } from "@/lib/people";
 import { formatMoney } from "@/lib/format";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
@@ -18,8 +17,6 @@ import { AddAccountSheet } from "@/components/AddAccountSheet";
 import { SwipeRow } from "@/components/SwipeRow";
 import {
   ArrowLeft,
-  Pencil,
-  Trash2,
   ArrowDownLeft,
   ArrowUpRight,
   ArrowLeftRight,
@@ -37,7 +34,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useNavigate, useParams } from "react-router-dom";
 import { EditSplitSheet, EditTxSheet } from "@/routes/home";
@@ -178,6 +174,8 @@ export default function AccountDetail() {
     );
   }, [txns, splits, settlements, userId, netSplits, netSettlements, netMeId, netMyPids]);
 
+  // Delete handler kept for future re-wiring; its trigger button was removed from the UI.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const delAccount = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("accounts").delete().eq("id", accountId!);
@@ -228,36 +226,6 @@ export default function AccountDetail() {
         <p className="text-xs text-muted-foreground mt-1">
           Opening: {formatMoney(account.opening_balance)}
         </p>
-      </div>
-
-      {/* Edit / Delete */}
-      <div className="grid grid-cols-2 gap-3">
-        <Button variant="outline" onClick={() => setEdit(true)}>
-          <Pencil className="h-4 w-4 mr-2" /> Edit
-        </Button>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="outline" className="text-expense">
-              <Trash2 className="h-4 w-4 mr-2" /> Delete
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete account?</AlertDialogTitle>
-              <AlertDialogDescription>
-                {txns.length > 0
-                  ? `This account has ${txns.length} transactions and cannot be deleted.`
-                  : "This cannot be undone."}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction disabled={txns.length > 0} onClick={() => delAccount.mutate()}>
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
 
       {/* Date navigation */}

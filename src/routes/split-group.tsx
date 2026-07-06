@@ -2,17 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { groupQuery, splitBalancesQuery, peopleQuery } from "@/lib/queries";
 import { bilateralBalance } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
-import {
-  ArrowLeft,
-  Archive,
-  Pencil,
-  Trash2,
-  Plus,
-  Users,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-} from "lucide-react";
+import { ArrowLeft, Plus, Users, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { SwipeRow } from "@/components/SwipeRow";
@@ -70,6 +60,8 @@ export default function GroupDetail() {
   const [deleteSplit, setDeleteSplit] = useState<any | null>(null);
   const [editSplit, setEditSplit] = useState<any | null>(null);
 
+  // Archive/delete handlers kept for future re-wiring; their trigger buttons were removed from the UI.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const archive = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
@@ -84,6 +76,7 @@ export default function GroupDetail() {
     },
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const del = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("groups").delete().eq("id", groupId!);
@@ -235,28 +228,14 @@ export default function GroupDetail() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        <Button variant="outline" disabled={isMixedGroup} onClick={() => setAddSplitOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" /> Add Split
-        </Button>
-        <Button variant="outline" onClick={() => setEdit(true)}>
-          <Pencil className="h-4 w-4 mr-2" /> Edit
-        </Button>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <Button variant="outline" onClick={() => archive.mutate()}>
-          <Archive className="h-4 w-4 mr-2" /> {group.is_archived ? "Unarchive" : "Archive"}
-        </Button>
-        <Button
-          variant="outline"
-          className="text-expense"
-          onClick={() => {
-            if (confirm("Delete group?")) del.mutate();
-          }}
-        >
-          <Trash2 className="h-4 w-4 mr-2" /> Delete
-        </Button>
-      </div>
+      <Button
+        variant="outline"
+        className="w-full"
+        disabled={isMixedGroup}
+        onClick={() => setAddSplitOpen(true)}
+      >
+        <Plus className="h-4 w-4 mr-2" /> Add Split
+      </Button>
 
       <div>
         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3 px-1">History</p>
