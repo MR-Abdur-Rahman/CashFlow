@@ -5,7 +5,7 @@ const toastStyles: Record<string, { background: string; border: string }> = {
   split_added: { background: "#78350F", border: "1px solid #F59E0B" },
   split_deleted: { background: "#7F1D1D", border: "1px solid #EF4444" },
   settlement_created: { background: "#064E3B", border: "1px solid #10B981" },
-  delete_attempt: { background: "#374151", border: "1px solid #6B7280" },
+  delete_attempt: { background: "var(--muted)", border: "1px solid var(--muted-foreground)" },
   account_selection: { background: "#78350F", border: "1px solid #F59E0B" },
   settlement_account_selection: { background: "#064E3B", border: "1px solid #10B981" },
 };
@@ -32,8 +32,8 @@ function getToastIcon(type: string) {
 
 export function notifyToast(type: string, message: string, description?: string) {
   const { background, border } = toastStyles[type] ?? {
-    background: "#1A1A1A",
-    border: "1px solid #2A2A2A",
+    background: "var(--card)",
+    border: "1px solid var(--border)",
   };
 
   toast.custom(

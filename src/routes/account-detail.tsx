@@ -588,7 +588,7 @@ function SplitRow({ s }: { s: any }) {
           </div>
           {isPerson && (
             <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{personName}</p>
+              <p className="text-[12px] text-muted-foreground truncate flex-1">{personName}</p>
               <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
                 You lent {formatMoney(totalShares)}
               </p>
@@ -597,15 +597,15 @@ function SplitRow({ s }: { s: any }) {
           {(isMulti || isGroup) && (
             <>
               <div className="flex items-center justify-between gap-2 mt-0.5">
-                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
+                <p className="text-[12px] text-muted-foreground truncate flex-1">
                   {isGroup ? groupName : peopleName}
                 </p>
-                <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+                <p className="text-[12px] font-mono text-muted-foreground shrink-0">
                   {shares.length} × {formatMoney(perShare)}
                 </p>
               </div>
               <div className="flex items-center justify-between gap-2 mt-0.5">
-                <p className="text-[12px] text-[#9CA3AF]">Paid by You</p>
+                <p className="text-[12px] text-muted-foreground">Paid by You</p>
                 <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
                   You lent {formatMoney(totalShares)}
                 </p>

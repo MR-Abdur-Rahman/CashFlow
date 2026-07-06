@@ -84,9 +84,8 @@ export function SwipeRow({
             }}
             className={cn(
               "w-[72px] flex flex-col items-center justify-center text-xs",
-              canEdit && "bg-transfer text-white",
+              canEdit ? "bg-transfer text-white" : "bg-muted text-muted-foreground",
             )}
-            style={canEdit ? undefined : { background: "#374151", color: "#6B7280" }}
           >
             <Pencil className="h-4 w-4 mb-0.5" /> Edit
           </button>
@@ -102,9 +101,8 @@ export function SwipeRow({
             }}
             className={cn(
               "w-[72px] flex flex-col items-center justify-center text-xs",
-              canDelete && "bg-expense text-white",
+              canDelete ? "bg-expense text-white" : "bg-muted text-muted-foreground",
             )}
-            style={canDelete ? undefined : { background: "#374151", color: "#6B7280" }}
           >
             <Trash2 className="h-4 w-4 mb-0.5" /> Delete
           </button>

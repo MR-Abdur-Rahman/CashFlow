@@ -141,14 +141,14 @@ function getNotificationIcon(type: string) {
     case "settlement_created":
       return { bg: "#064E3B", color: "#10B981", Icon: Check };
     case "delete_attempt":
-      return { bg: "#374151", color: "#6B7280", Icon: ShieldAlert };
+      return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: ShieldAlert };
     case "account_selection":
       return { bg: "#78350F", color: "#F59E0B", Icon: Wallet };
     case "settlement_account_selection":
     case "settlement_account_needed":
       return { bg: "#064E3B", color: "#10B981", Icon: Wallet };
     default:
-      return { bg: "#374151", color: "#9CA3AF", Icon: Bell };
+      return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Bell };
   }
 }
 
@@ -799,7 +799,7 @@ function SplitRowContent({ t }: { t: any }) {
         {/* Person split: 2 lines */}
         {isPerson && (
           <div className="flex items-center justify-between gap-2 mt-0.5">
-            <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{personName}</p>
+            <p className="text-[12px] text-muted-foreground truncate flex-1">{personName}</p>
             <div className="text-right shrink-0">
               {isMePaid ? (
                 <p className="text-[12px] font-mono font-semibold text-[#10B981]">
@@ -818,15 +818,15 @@ function SplitRowContent({ t }: { t: any }) {
         {(isMulti || isGroup) && (
           <>
             <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
+              <p className="text-[12px] text-muted-foreground truncate flex-1">
                 {isGroup ? groupName : peopleName}
               </p>
-              <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+              <p className="text-[12px] font-mono text-muted-foreground shrink-0">
                 {isMePaid ? `${shares.length} × ${formatMoney(perShare)}` : formatMoney(perShare)}
               </p>
             </div>
             <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[12px] text-[#9CA3AF]">
+              <p className="text-[12px] text-muted-foreground">
                 {isMePaid ? "Paid by You" : `Paid by ${s.paid_by}`}
               </p>
               <p
@@ -924,7 +924,7 @@ export function SplitDirectRow({
   const accountLabel = isMePaid ? (s.accounts?.label ?? "No account selected") : null;
 
   const dateNode = (
-    <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5 text-right">
+    <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">
       {formatDateTime(s.date, s.time)}
     </p>
   );
@@ -959,7 +959,7 @@ export function SplitDirectRow({
           {isPerson && (
             <>
               <div className="flex items-center justify-between gap-2 mt-0.5">
-                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{line2Name}</p>
+                <p className="text-[12px] text-muted-foreground truncate flex-1">{line2Name}</p>
                 {isMePaid ? (
                   <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
                     You lent {formatMoney(youLent)}
@@ -972,7 +972,9 @@ export function SplitDirectRow({
               </div>
               {isMePaid ? (
                 <div className="flex items-center justify-between gap-2 mt-0.5">
-                  <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{accountLabel}</p>
+                  <p className="text-[12px] text-muted-foreground truncate flex-1">
+                    {accountLabel}
+                  </p>
                   {dateNode}
                 </div>
               ) : (
@@ -985,8 +987,8 @@ export function SplitDirectRow({
           {(isMulti || isGroup) && (
             <>
               <div className="flex items-center justify-between gap-2 mt-0.5">
-                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{line2Name}</p>
-                <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+                <p className="text-[12px] text-muted-foreground truncate flex-1">{line2Name}</p>
+                <p className="text-[12px] font-mono text-muted-foreground shrink-0">
                   {isMePaid
                     ? `${owersCount} × ${formatMoney(perShare)}`
                     : `${formatMoney(perShare)} per share`}
@@ -994,7 +996,9 @@ export function SplitDirectRow({
               </div>
               {isMePaid ? (
                 <div className="flex items-center justify-between gap-2 mt-0.5">
-                  <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{accountLabel}</p>
+                  <p className="text-[12px] text-muted-foreground truncate flex-1">
+                    {accountLabel}
+                  </p>
                   <p className="text-[12px] font-mono font-semibold text-[#10B981] shrink-0">
                     You lent {formatMoney(lentOweOverride ?? youLent)}
                   </p>
@@ -1275,8 +1279,7 @@ export function EditSplitSheet({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="e.g. Dinner, Groceries, Trip"
-                className="w-full text-sm text-white placeholder:text-muted-foreground outline-none px-3 py-2.5"
-                style={{ background: "#0A0A0A", border: "1px solid #2A2A2A", borderRadius: "8px" }}
+                className="w-full text-sm text-foreground placeholder:text-muted-foreground outline-none px-3 py-2.5 bg-secondary border border-border rounded-lg"
               />
             </div>
 
@@ -1852,8 +1855,8 @@ function NotificationSheet({
         side="bottom"
         className="border-0 p-0 max-h-[75dvh] flex flex-col"
         style={{
-          background: "#1A1A1A",
-          border: "1px solid #2A2A2A",
+          background: "var(--card)",
+          border: "1px solid var(--border)",
           borderRadius: "12px 12px 0 0",
         }}
       >
@@ -1862,14 +1865,14 @@ function NotificationSheet({
         {/* Header */}
         <div
           className="flex items-center justify-between"
-          style={{ padding: "12px 16px", borderBottom: "1px solid #2A2A2A" }}
+          style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)" }}
         >
-          <span className="font-semibold text-white">Notifications</span>
+          <span className="font-semibold text-foreground">Notifications</span>
           <button
             type="button"
             onClick={markAllRead}
             className="text-sm font-medium"
-            style={{ color: "#7C3AED" }}
+            style={{ color: "var(--primary)" }}
           >
             Mark all read
           </button>
@@ -1878,7 +1881,10 @@ function NotificationSheet({
         {/* List (max 10, scrollable to 400px) */}
         <div className="overflow-y-auto" style={{ maxHeight: 400 }}>
           {recent.length === 0 ? (
-            <p className="text-center" style={{ color: "#9CA3AF", padding: 40, fontSize: 14 }}>
+            <p
+              className="text-center"
+              style={{ color: "var(--muted-foreground)", padding: 40, fontSize: 14 }}
+            >
               No notifications yet
             </p>
           ) : (
@@ -1889,8 +1895,8 @@ function NotificationSheet({
                   key={n.id}
                   type="button"
                   onClick={() => handleTap(n)}
-                  className="w-full flex items-start text-left transition-colors hover:bg-[#2A2A2A] active:bg-[#2A2A2A]"
-                  style={{ gap: 12, padding: "12px 16px", borderBottom: "1px solid #2A2A2A" }}
+                  className="w-full flex items-start text-left transition-colors hover:bg-secondary active:bg-secondary"
+                  style={{ gap: 12, padding: "12px 16px", borderBottom: "1px solid var(--border)" }}
                 >
                   <div
                     className="shrink-0 rounded-full flex items-center justify-center"
@@ -1899,11 +1905,14 @@ function NotificationSheet({
                     <Icon style={{ width: 18, height: 18, color }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium text-sm">{n.title}</p>
-                    <p className="text-[13px] mt-0.5 line-clamp-2" style={{ color: "#9CA3AF" }}>
+                    <p className="text-foreground font-medium text-sm">{n.title}</p>
+                    <p
+                      className="text-[13px] mt-0.5 line-clamp-2"
+                      style={{ color: "var(--muted-foreground)" }}
+                    >
                       {n.message}
                     </p>
-                    <p className="text-[11px] mt-1" style={{ color: "#6B7280" }}>
+                    <p className="text-[11px] mt-1" style={{ color: "var(--muted-foreground)" }}>
                       {timeAgo(n.created_at)}
                     </p>
                   </div>
@@ -1927,7 +1936,11 @@ function NotificationSheet({
             onNavigate("/settings/notifications/history");
           }}
           className="text-center text-sm font-medium"
-          style={{ padding: "12px 16px", borderTop: "1px solid #2A2A2A", color: "#7C3AED" }}
+          style={{
+            padding: "12px 16px",
+            borderTop: "1px solid var(--border)",
+            color: "var(--primary)",
+          }}
         >
           View all
         </button>

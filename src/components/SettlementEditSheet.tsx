@@ -111,12 +111,12 @@ export function SettlementEditSheet({
                     setMethod(m);
                     if (m !== "bank_transfer") setAccountId("");
                   }}
-                  className="flex-1 py-2 text-sm font-medium rounded-lg transition-colors"
-                  style={
+                  className={cn(
+                    "flex-1 py-2 text-sm font-medium rounded-lg transition-colors border",
                     method === m
-                      ? { background: "#1A1A1A", color: "white", border: "1px solid #7C3AED" }
-                      : { background: "#2A2A2A", color: "#9CA3AF", border: "1px solid transparent" }
-                  }
+                      ? "bg-secondary text-foreground border-primary"
+                      : "bg-muted text-muted-foreground border-transparent",
+                  )}
                 >
                   {m === "cash" ? "Cash" : "Bank Transfer"}
                 </button>

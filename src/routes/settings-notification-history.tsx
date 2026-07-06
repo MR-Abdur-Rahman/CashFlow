@@ -17,14 +17,14 @@ function getNotificationIcon(type: string) {
     case "settlement_created":
       return { bg: "#064E3B", color: "#10B981", Icon: Check };
     case "delete_attempt":
-      return { bg: "#374151", color: "#6B7280", Icon: ShieldAlert };
+      return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: ShieldAlert };
     case "account_selection":
       return { bg: "#78350F", color: "#F59E0B", Icon: Wallet };
     case "settlement_account_selection":
     case "settlement_account_needed":
       return { bg: "#064E3B", color: "#10B981", Icon: Wallet };
     default:
-      return { bg: "#374151", color: "#9CA3AF", Icon: Bell };
+      return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Bell };
   }
 }
 
@@ -131,13 +131,13 @@ export default function NotificationHistoryPage() {
   }
 
   return (
-    <div className="min-h-screen pb-24" style={{ background: "#0A0A0A" }}>
+    <div className="min-h-screen pb-24" style={{ background: "var(--background)" }}>
       {/* Header */}
       <div className="flex items-center justify-between" style={{ padding: "16px" }}>
         <Link
           to="/settings"
           className="inline-flex items-center text-sm"
-          style={{ color: "#9CA3AF" }}
+          style={{ color: "var(--muted-foreground)" }}
         >
           <ArrowLeft className="h-4 w-4 mr-1" /> Settings
         </Link>
@@ -145,13 +145,13 @@ export default function NotificationHistoryPage() {
           type="button"
           onClick={markAllRead}
           className="text-sm font-medium"
-          style={{ color: "#7C3AED" }}
+          style={{ color: "var(--primary)" }}
         >
           Mark all read
         </button>
       </div>
 
-      <h1 className="text-xl font-semibold text-white" style={{ padding: "0 16px 12px" }}>
+      <h1 className="text-xl font-semibold text-foreground" style={{ padding: "0 16px 12px" }}>
         Notification History
       </h1>
 
@@ -160,8 +160,8 @@ export default function NotificationHistoryPage() {
           className="flex flex-col items-center justify-center text-center"
           style={{ padding: "80px 16px", gap: 12 }}
         >
-          <Bell style={{ width: 48, height: 48, color: "#6B7280" }} />
-          <p style={{ color: "#9CA3AF", fontSize: 14 }}>No notifications yet</p>
+          <Bell style={{ width: 48, height: 48, color: "var(--muted-foreground)" }} />
+          <p style={{ color: "var(--muted-foreground)", fontSize: 14 }}>No notifications yet</p>
         </div>
       ) : (
         Object.entries(grouped).map(([label, items]) => (
@@ -169,12 +169,12 @@ export default function NotificationHistoryPage() {
             {/* Date section header */}
             <p
               style={{
-                color: "#6B7280",
+                color: "var(--muted-foreground)",
                 textTransform: "uppercase",
                 fontSize: 12,
                 letterSpacing: "0.06em",
                 padding: "12px 16px",
-                background: "#0A0A0A",
+                background: "var(--background)",
                 fontWeight: 600,
               }}
             >
@@ -185,8 +185,8 @@ export default function NotificationHistoryPage() {
             <div
               style={{
                 margin: "0 16px",
-                background: "#1A1A1A",
-                border: "1px solid #2A2A2A",
+                background: "var(--card)",
+                border: "1px solid var(--border)",
                 borderRadius: 12,
                 overflow: "hidden",
               }}
@@ -202,8 +202,8 @@ export default function NotificationHistoryPage() {
                     style={{
                       gap: 12,
                       padding: "12px 16px",
-                      background: n.is_read ? "#1A1A1A" : "#1E1E1E",
-                      borderTop: i === 0 ? "none" : "1px solid #2A2A2A",
+                      background: n.is_read ? "var(--card)" : "var(--secondary)",
+                      borderTop: i === 0 ? "none" : "1px solid var(--border)",
                     }}
                   >
                     <div
@@ -213,11 +213,14 @@ export default function NotificationHistoryPage() {
                       <Icon style={{ width: 18, height: 18, color }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-white font-medium text-sm">{n.title}</p>
-                      <p className="text-[13px] mt-0.5 line-clamp-3" style={{ color: "#9CA3AF" }}>
+                      <p className="text-foreground font-medium text-sm">{n.title}</p>
+                      <p
+                        className="text-[13px] mt-0.5 line-clamp-3"
+                        style={{ color: "var(--muted-foreground)" }}
+                      >
                         {n.message}
                       </p>
-                      <p className="text-[11px] mt-1" style={{ color: "#6B7280" }}>
+                      <p className="text-[11px] mt-1" style={{ color: "var(--muted-foreground)" }}>
                         {formatNotifTime(n.created_at)}
                       </p>
                     </div>

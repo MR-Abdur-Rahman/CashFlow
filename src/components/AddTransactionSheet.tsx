@@ -1590,8 +1590,7 @@ function SplitForm({ onClose }: { onClose: () => void }) {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="e.g. Dinner, Groceries, Trip"
-            className="w-full text-sm text-white placeholder:text-muted-foreground outline-none px-3 py-2.5"
-            style={{ background: "#0A0A0A", border: "1px solid #2A2A2A", borderRadius: "8px" }}
+            className="w-full text-sm text-foreground placeholder:text-muted-foreground outline-none px-3 py-2.5 bg-secondary border border-border rounded-lg"
           />
         </div>
 

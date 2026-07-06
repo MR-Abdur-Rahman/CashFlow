@@ -118,7 +118,7 @@ function PieLabel({ cx, cy, midAngle, outerRadius, name, percent }: any) {
     <text
       x={x}
       y={y}
-      fill="#9CA3AF"
+      fill="var(--muted-foreground)"
       textAnchor={x > cx ? "start" : "end"}
       dominantBaseline="central"
       fontSize={10}
@@ -141,11 +141,13 @@ function ExpenseRow({ t }: { t: any }) {
     <div className="flex items-start justify-between px-4 py-3 bg-card">
       <div className="flex-1 min-w-0 pr-3">
         <p className="text-sm text-[#EF4444] font-medium truncate">{catLabel}</p>
-        <p className="text-[12px] text-[#9CA3AF] truncate mt-0.5">{account}</p>
+        <p className="text-[12px] text-muted-foreground truncate mt-0.5">{account}</p>
       </div>
       <div className="text-right shrink-0">
         <p className="text-sm font-mono font-semibold text-[#EF4444]">{formatMoney(t.amount)}</p>
-        <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5">{fmtDT(t.date, t.time)}</p>
+        <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
+          {fmtDT(t.date, t.time)}
+        </p>
       </div>
     </div>
   );
@@ -201,7 +203,7 @@ function SplitItemRow({ s, highlightPerson }: { s: any; highlightPerson?: string
           {isPerson && (
             <>
               <div className="flex items-center justify-between gap-2 mt-0.5">
-                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
+                <p className="text-[12px] text-muted-foreground truncate flex-1">
                   {shares[0]?.person_name ?? ""}
                 </p>
                 <p className="text-[12px] font-mono text-[#10B981] shrink-0">
@@ -209,26 +211,28 @@ function SplitItemRow({ s, highlightPerson }: { s: any; highlightPerson?: string
                 </p>
               </div>
               <div className="flex items-center justify-between gap-2 mt-0.5">
-                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
-                <p className="text-[10px] text-[#9CA3AF] font-mono shrink-0">{dateStr}</p>
+                <p className="text-[12px] text-muted-foreground truncate flex-1">{account}</p>
+                <p className="text-[10px] text-muted-foreground font-mono shrink-0">{dateStr}</p>
               </div>
             </>
           )}
           {(isMulti || isGroup) && (
             <>
               <div className="flex items-center justify-between gap-2 mt-0.5">
-                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{peopleLine}</p>
-                <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+                <p className="text-[12px] text-muted-foreground truncate flex-1">{peopleLine}</p>
+                <p className="text-[12px] font-mono text-muted-foreground shrink-0">
                   {shares.length} × {formatMoney(perShare)}
                 </p>
               </div>
               <div className="flex items-center justify-between gap-2 mt-0.5">
-                <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
+                <p className="text-[12px] text-muted-foreground truncate flex-1">{account}</p>
                 <p className="text-[12px] font-mono text-[#10B981] shrink-0">
                   You lent {formatMoney(totalShares)}
                 </p>
               </div>
-              <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5 text-right">{dateStr}</p>
+              <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">
+                {dateStr}
+              </p>
             </>
           )}
         </div>
@@ -246,11 +250,13 @@ function IncomeRow({ t }: { t: any }) {
     <div className="flex items-start justify-between px-4 py-3 bg-card">
       <div className="flex-1 min-w-0 pr-3">
         <p className="text-sm font-medium truncate">{label}</p>
-        <p className="text-[12px] text-[#9CA3AF] truncate mt-0.5">{account}</p>
+        <p className="text-[12px] text-muted-foreground truncate mt-0.5">{account}</p>
       </div>
       <div className="text-right shrink-0">
         <p className="text-sm font-mono font-semibold text-[#22C55E]">+{formatMoney(t.amount)}</p>
-        <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5">{fmtDT(t.date, t.time)}</p>
+        <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
+          {fmtDT(t.date, t.time)}
+        </p>
       </div>
     </div>
   );
@@ -271,8 +277,10 @@ function SettlementIncomeRow({ s }: { s: any }) {
           </p>
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
-          <p className="text-[12px] text-[#9CA3AF] truncate flex-1">{account}</p>
-          <p className="text-[10px] text-[#9CA3AF] font-mono shrink-0">{fmtCAT(s.created_at)}</p>
+          <p className="text-[12px] text-muted-foreground truncate flex-1">{account}</p>
+          <p className="text-[10px] text-muted-foreground font-mono shrink-0">
+            {fmtCAT(s.created_at)}
+          </p>
         </div>
       </div>
     </div>
@@ -753,7 +761,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
           const pointPx = 50;
           const chartW = Math.max(chartBuckets.length * pointPx, 280);
           return (
-            <div className="mx-4 mb-4 rounded-xl overflow-hidden bg-[#0A0A0A]">
+            <div className="mx-4 mb-4 rounded-xl overflow-hidden bg-background">
               <div style={{ overflowX: "auto", touchAction: "pan-x" }}>
                 <div style={{ width: chartW, padding: "12px 8px 4px 0" }}>
                   <LineChart
@@ -762,27 +770,27 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
                     data={trendData}
                     margin={{ top: 4, right: 16, bottom: 0, left: 0 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis
                       dataKey="label"
-                      tick={{ fontSize: 10, fill: "#9CA3AF" }}
+                      tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                       axisLine={false}
                       tickLine={false}
                     />
                     <YAxis
-                      tick={{ fontSize: 10, fill: "#9CA3AF" }}
+                      tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                       width={44}
                       axisLine={false}
                       tickLine={false}
                     />
                     <Tooltip
                       contentStyle={{
-                        background: "#1A1A1A",
-                        border: "1px solid #2A2A2A",
+                        background: "var(--card)",
+                        border: "1px solid var(--border)",
                         fontSize: 11,
                         color: "#FFFFFF",
                       }}
-                      labelStyle={{ color: "#9CA3AF" }}
+                      labelStyle={{ color: "var(--muted-foreground)" }}
                       formatter={(v: any) => [formatMoney(v), ""]}
                     />
                     <Line

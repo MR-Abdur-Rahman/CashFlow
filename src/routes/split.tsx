@@ -243,10 +243,8 @@ function PendingTab({
         className="flex flex-col items-center justify-center text-center"
         style={{ padding: "60px 16px", gap: 12 }}
       >
-        <CheckCircle style={{ width: 48, height: 48, color: "#6B7280" }} />
-        <p className="text-sm" style={{ color: "#9CA3AF" }}>
-          No pending payments
-        </p>
+        <CheckCircle className="text-muted-foreground" style={{ width: 48, height: 48 }} />
+        <p className="text-sm text-muted-foreground">No pending payments</p>
       </div>
     );
   }

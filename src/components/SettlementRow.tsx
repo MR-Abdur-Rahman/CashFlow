@@ -53,7 +53,7 @@ export function SettlementRow({
           </p>
           {/* Line 2: payer → receiver + amount */}
           <div className="flex items-start justify-between gap-2 mt-0.5">
-            <p className="text-[12px] text-[#9CA3AF] truncate flex-1">
+            <p className="text-[12px] text-muted-foreground truncate flex-1">
               {iPaid ? `You → ${otherName}` : `${otherName} → You`}
             </p>
             <p
@@ -73,10 +73,10 @@ export function SettlementRow({
                 <p className="text-[12px] font-medium text-[#10B981]">Fully settled</p>
               ) : (
                 <>
-                  <p className="text-[12px] text-[#9CA3AF]">
+                  <p className="text-[12px] text-muted-foreground">
                     {netAfter > 0 ? "Still lent" : "Still owes"}
                   </p>
-                  <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+                  <p className="text-[12px] font-mono text-muted-foreground shrink-0">
                     {formatMoney(Math.abs(netAfter))}
                   </p>
                 </>
@@ -85,15 +85,17 @@ export function SettlementRow({
               <p className="text-[12px] font-medium text-[#10B981]">Fully settled</p>
             ) : (
               <>
-                <p className="text-[12px] text-[#9CA3AF]">{iPaid ? "Still owes" : "Still lent"}</p>
-                <p className="text-[12px] font-mono text-[#9CA3AF] shrink-0">
+                <p className="text-[12px] text-muted-foreground">
+                  {iPaid ? "Still owes" : "Still lent"}
+                </p>
+                <p className="text-[12px] font-mono text-muted-foreground shrink-0">
                   {formatMoney(remaining ?? 0)} remaining
                 </p>
               </>
             )}
           </div>
           {/* Line 4: date · time */}
-          <p className="text-[10px] text-[#9CA3AF] font-mono mt-0.5 text-right">{dateStr}</p>
+          <p className="text-[10px] text-muted-foreground font-mono mt-0.5 text-right">{dateStr}</p>
         </div>
       </div>
     </div>
