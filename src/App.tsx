@@ -19,7 +19,6 @@ import SettingsHistory from "./routes/settings-history";
 import SettingsNotifications from "./routes/settings-notifications";
 import SettingsNotificationHistory from "./routes/settings-notification-history";
 import SettingsQr from "./routes/settings-qr";
-import SettingsTheme from "./routes/settings-theme";
 import SettingsPreferences from "./routes/settings-preferences";
 import SettingsData from "./routes/settings-data";
 import SettingsHistoryHub from "./routes/settings-history-hub";
@@ -97,10 +96,6 @@ function App() {
             element={session ? <SettingsAccount /> : <Navigate to="/auth" />}
           />
           <Route path="/settings/qr" element={session ? <SettingsQr /> : <Navigate to="/auth" />} />
-          <Route
-            path="/settings/theme"
-            element={session ? <SettingsTheme /> : <Navigate to="/auth" />}
-          />
           <Route
             path="/settings/preferences"
             element={session ? <SettingsPreferences /> : <Navigate to="/auth" />}

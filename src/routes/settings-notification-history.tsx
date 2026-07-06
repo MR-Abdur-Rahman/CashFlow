@@ -135,11 +135,11 @@ export default function NotificationHistoryPage() {
       {/* Header */}
       <div className="flex items-center justify-between" style={{ padding: "16px" }}>
         <Link
-          to="/settings"
+          to="/settings/history"
           className="inline-flex items-center text-sm"
           style={{ color: "var(--muted-foreground)" }}
         >
-          <ArrowLeft className="h-4 w-4 mr-1" /> Settings
+          <ArrowLeft className="h-4 w-4 mr-1" /> History
         </Link>
         <button
           type="button"

@@ -20,7 +20,7 @@ export function PrefsApplier() {
   const { data: profile } = useQuery(profileQuery(userId));
 
   useEffect(() => {
-    const theme = (profile as any)?.theme ?? "dark";
+    const theme = (profile as any)?.theme ?? "light";
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
     root.classList.toggle("light", theme === "light");

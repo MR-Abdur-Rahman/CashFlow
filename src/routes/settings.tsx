@@ -9,11 +9,9 @@ import {
   ChevronRight,
   QrCode,
   User,
-  Palette,
   SlidersHorizontal,
   Bell,
   LayoutGrid,
-  Database,
   History,
   HelpCircle,
   Shield,
@@ -35,18 +33,11 @@ const MAIN: Item[] = [
     title: "Account",
     subtitle: "Profile, phone number, Google account",
   },
-  { to: "/settings/theme", icon: Palette, title: "Appearance", subtitle: "Theme" },
   {
-    to: "/settings/preferences",
-    icon: SlidersHorizontal,
-    title: "Preferences",
-    subtitle: "Currency, format, customization",
-  },
-  {
-    to: "/settings/notifications",
-    icon: Bell,
-    title: "Notifications",
-    subtitle: "Reminders, alerts, toast messages",
+    onClick: () => toast("Coming soon"),
+    icon: Shield,
+    title: "Privacy",
+    subtitle: "Privacy settings",
   },
   {
     to: "/manage",
@@ -54,7 +45,18 @@ const MAIN: Item[] = [
     title: "Manage",
     subtitle: "Categories, people, groups",
   },
-  { to: "/settings/data", icon: Database, title: "Data & Backup", subtitle: "Export, import" },
+  {
+    to: "/settings/preferences",
+    icon: SlidersHorizontal,
+    title: "Preferences",
+    subtitle: "Appearance, currency, format",
+  },
+  {
+    to: "/settings/notifications",
+    icon: Bell,
+    title: "Notifications",
+    subtitle: "Reminders, alerts, toast messages",
+  },
   {
     to: "/settings/history",
     icon: History,
@@ -66,12 +68,6 @@ const MAIN: Item[] = [
     icon: HelpCircle,
     title: "Help and feedback",
     subtitle: "Get help, send feedback",
-  },
-  {
-    onClick: () => toast("Coming soon"),
-    icon: Shield,
-    title: "Privacy",
-    subtitle: "Privacy settings",
   },
 ];
 
@@ -151,12 +147,12 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {/* Sign out — separated, destructive */}
+      {/* Sign out — small, centered */}
       <button
         onClick={signOut}
-        className="w-full rounded-2xl border border-border bg-card p-4 flex items-center gap-3 text-sm font-medium text-expense active:bg-secondary/40 shadow-sm"
+        className="mx-auto flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-expense active:bg-secondary/40"
       >
-        <LogOut className="h-5 w-5" /> Sign out
+        <LogOut className="h-4 w-4" /> Sign out
       </button>
     </div>
   );

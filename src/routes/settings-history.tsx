@@ -249,8 +249,11 @@ export default function HistoryPage() {
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-4">
-      <Link to="/settings" className="inline-flex items-center text-sm text-muted-foreground">
-        <ArrowLeft className="h-4 w-4 mr-1" /> Settings
+      <Link
+        to="/settings/history"
+        className="inline-flex items-center text-sm text-muted-foreground"
+      >
+        <ArrowLeft className="h-4 w-4 mr-1" /> History
       </Link>
       <h1 className="text-xl font-semibold">History</h1>
       <Input

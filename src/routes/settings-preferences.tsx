@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/select";
 import { CURRENCY_PRESETS, setMoneyFormat } from "@/lib/format";
 import { SettingsHeader, Section } from "@/components/SettingsRows";
+import { cn } from "@/lib/utils";
+import { Sun, Moon } from "lucide-react";
 
 export default function PreferencesPage() {
   const qc = useQueryClient();
@@ -21,6 +23,7 @@ export default function PreferencesPage() {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
   }, []);
   const { data: profile } = useQuery(profileQuery(userId));
+  const theme = (profile as any)?.theme ?? "light";
   const currencyCode = (profile as any)?.currency_code ?? "LKR";
   const thousand = (profile as any)?.thousand_separator ?? ",";
   const decimals = (profile as any)?.decimal_places ?? 2;
@@ -37,6 +40,15 @@ export default function PreferencesPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["profile"] }),
     onError: (e) => toast.error(e.message),
   });
+
+  // Apply the theme to <html> instantly (global) + persist; PrefsApplier re-confirms on load.
+  function chooseTheme(next: "dark" | "light") {
+    const root = document.documentElement;
+    root.classList.toggle("dark", next === "dark");
+    root.classList.toggle("light", next === "light");
+    root.style.colorScheme = next;
+    updateProfile.mutate({ theme: next });
+  }
 
   function pickCurrency(code: string) {
     const preset = CURRENCY_PRESETS.find((c) => c.code === code) ?? CURRENCY_PRESETS[0];
@@ -57,6 +69,36 @@ export default function PreferencesPage() {
   return (
     <div className="px-4 pt-6 pb-24 space-y-6">
       <SettingsHeader title="Preferences" />
+
+      {/* Appearance — Light | Dark segmented toggle */}
+      <div>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1 font-medium">
+          Appearance
+        </p>
+        <div className="flex rounded-xl bg-secondary p-1 gap-1">
+          <button
+            type="button"
+            onClick={() => chooseTheme("light")}
+            className={cn(
+              "flex-1 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2",
+              theme === "light" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+            )}
+          >
+            <Sun className="h-4 w-4" /> Light
+          </button>
+          <button
+            type="button"
+            onClick={() => chooseTheme("dark")}
+            className={cn(
+              "flex-1 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2",
+              theme === "dark" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+            )}
+          >
+            <Moon className="h-4 w-4" /> Dark
+          </button>
+        </div>
+      </div>
+
       <Section label="Currency format">
         <div className="p-4 space-y-4">
           <div className="space-y-1.5">

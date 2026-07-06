@@ -269,9 +269,9 @@ export default function AccountPage() {
         <AlertDialogTrigger asChild>
           <button
             type="button"
-            className="w-full rounded-2xl border border-border bg-card p-4 flex items-center gap-3 text-sm font-medium text-expense active:bg-secondary/40 shadow-sm"
+            className="mx-auto flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-expense active:bg-secondary/40"
           >
-            <Trash2 className="h-5 w-5" /> Delete account
+            <Trash2 className="h-4 w-4" /> Delete account
           </button>
         </AlertDialogTrigger>
         <AlertDialogContent>
