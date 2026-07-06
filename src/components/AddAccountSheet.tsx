@@ -232,7 +232,7 @@ export function AddAccountSheet({
                 required
                 value={a.label}
                 onChange={(e) => setA((s) => ({ ...s, label: e.target.value }))}
-                placeholder="e.g. Daily Card"
+                placeholder="e.g. HSBC"
               />
             </div>
 
@@ -241,7 +241,7 @@ export function AddAccountSheet({
               <Input
                 value={a.institution ?? ""}
                 onChange={(e) => setA((s) => ({ ...s, institution: e.target.value }))}
-                placeholder="e.g. HSBC"
+                placeholder="e.g. Saving account / Current Account"
               />
             </div>
 
@@ -255,7 +255,6 @@ export function AddAccountSheet({
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="bank">Bank</SelectItem>
                   <SelectItem value="e-wallet">E-wallet</SelectItem>
-                  <SelectItem value="savings">Savings</SelectItem>
                 </SelectContent>
               </Select>
             </div>
