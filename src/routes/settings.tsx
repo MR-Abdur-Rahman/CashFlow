@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { profileQuery } from "@/lib/queries";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   ChevronRight,
   QrCode,
@@ -11,12 +12,21 @@ import {
   Palette,
   SlidersHorizontal,
   Bell,
+  LayoutGrid,
   Database,
   History,
+  HelpCircle,
+  Shield,
   LogOut,
 } from "lucide-react";
 
-type Item = { to: string; icon: typeof User; title: string; subtitle: string };
+type Item = {
+  to?: string;
+  onClick?: () => void;
+  icon: typeof User;
+  title: string;
+  subtitle: string;
+};
 
 const MAIN: Item[] = [
   {
@@ -25,7 +35,7 @@ const MAIN: Item[] = [
     title: "Account",
     subtitle: "Profile, phone number, Google account",
   },
-  { to: "/settings/theme", icon: Palette, title: "Theme", subtitle: "Dark, light mode" },
+  { to: "/settings/theme", icon: Palette, title: "Appearance", subtitle: "Theme" },
   {
     to: "/settings/preferences",
     icon: SlidersHorizontal,
@@ -38,6 +48,12 @@ const MAIN: Item[] = [
     title: "Notifications",
     subtitle: "Reminders, alerts, toast messages",
   },
+  {
+    to: "/manage",
+    icon: LayoutGrid,
+    title: "Manage",
+    subtitle: "Categories, people, groups",
+  },
   { to: "/settings/data", icon: Database, title: "Data & Backup", subtitle: "Export, import" },
   {
     to: "/settings/history",
@@ -45,18 +61,40 @@ const MAIN: Item[] = [
     title: "History",
     subtitle: "Notification and transaction history",
   },
+  {
+    onClick: () => toast("Coming soon"),
+    icon: HelpCircle,
+    title: "Help and feedback",
+    subtitle: "Get help, send feedback",
+  },
+  {
+    onClick: () => toast("Coming soon"),
+    icon: Shield,
+    title: "Privacy",
+    subtitle: "Privacy settings",
+  },
 ];
 
-function RowLink({ to, icon: Icon, title, subtitle }: Item) {
-  return (
-    <Link to={to} className="flex items-center gap-3 p-4 active:bg-secondary/40">
+function RowLink({ to, onClick, icon: Icon, title, subtitle }: Item) {
+  const cls = "flex w-full items-center gap-3 p-4 text-left active:bg-secondary/40";
+  const inner = (
+    <>
       <Icon className="h-5 w-5 text-muted-foreground shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium">{title}</p>
         <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
       </div>
       <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+    </>
+  );
+  return to ? (
+    <Link to={to} className={cls}>
+      {inner}
     </Link>
+  ) : (
+    <button type="button" onClick={onClick} className={cls}>
+      {inner}
+    </button>
   );
 }
 
@@ -109,7 +147,7 @@ export default function SettingsPage() {
       {/* Main category rows */}
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
         {MAIN.map((item) => (
-          <RowLink key={item.to} {...item} />
+          <RowLink key={item.to ?? item.title} {...item} />
         ))}
       </div>
 

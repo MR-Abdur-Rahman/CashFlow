@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Wallet, Users, BarChart3, LayoutGrid, Settings } from "lucide-react";
+import { Home, Wallet, Users, BarChart3, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -7,7 +7,6 @@ const TABS = [
   { to: "/accounts", label: "Accounts", icon: Wallet },
   { to: "/split", label: "Split", icon: Users },
   { to: "/reports", label: "Reports", icon: BarChart3 },
-  { to: "/manage", label: "Manage", icon: LayoutGrid },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
@@ -19,7 +18,7 @@ export function BottomNav() {
       className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-40 border-t border-border bg-card"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="grid grid-cols-6">
+      <div className="grid grid-cols-5">
         {TABS.map((t) => {
           const active = pathname === t.to || pathname.startsWith(t.to + "/");
           const Icon = t.icon;

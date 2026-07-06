@@ -41,7 +41,7 @@ export default function ThemePage() {
 
   return (
     <div className="px-4 pt-6 pb-24 space-y-6">
-      <SettingsHeader title="Theme" />
+      <SettingsHeader title="Appearance" />
       {/* Dark | Light segmented toggle — same style as Reports income/expense */}
       <div className="flex rounded-xl bg-secondary p-1 gap-1">
         <button
