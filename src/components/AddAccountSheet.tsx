@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Plus } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,6 +52,7 @@ export function AddAccountSheet({
   });
   const [iconCropFile, setIconCropFile] = useState<File | null>(null);
   const [iconCropOpen, setIconCropOpen] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -149,52 +151,26 @@ export function AddAccountSheet({
                 size={64}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label>Type</Label>
-              <Select value={a.type} onValueChange={(v) => setA((s) => ({ ...s, type: v }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="bank">Bank</SelectItem>
-                  <SelectItem value="e-wallet">E-wallet</SelectItem>
-                  <SelectItem value="savings">Savings</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Institution (optional)</Label>
-              <Input
-                value={a.institution ?? ""}
-                onChange={(e) => setA((s) => ({ ...s, institution: e.target.value }))}
-                placeholder="e.g. HSBC"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Label</Label>
-              <Input
-                required
-                value={a.label}
-                onChange={(e) => setA((s) => ({ ...s, label: e.target.value }))}
-                placeholder="e.g. Daily Card"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>{edit ? "Current balance (read-only)" : "Opening balance"}</Label>
-              <Input
-                inputMode="decimal"
-                disabled={!!edit}
-                value={edit ? edit.current_balance : String(a.opening_balance)}
-                onChange={(e) =>
-                  setA((s) => ({ ...s, opening_balance: e.target.value.replace(/[^\d.-]/g, "") }))
-                }
-              />
-            </div>
 
+            {/* Upload an image / select an icon — [+] uploads, rest are presets */}
             <div className="space-y-2">
-              <Label>Icon</Label>
+              <Label>Upload an image / select icon</Label>
               <div className="grid grid-cols-8 gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  aria-label="Upload image"
+                  className={cn(
+                    "aspect-square rounded-lg border-2 border-dashed border-border grid place-items-center overflow-hidden",
+                    a.icon_type === "upload" && "ring-2 ring-primary border-solid",
+                  )}
+                >
+                  {a.icon_type === "upload" && a.icon_url ? (
+                    <img src={a.icon_url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <Plus className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </button>
                 {PRESET_ICONS.map((name) => (
                   <button
                     type="button"
@@ -216,6 +192,20 @@ export function AddAccountSheet({
                   </button>
                 ))}
               </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) {
+                    setIconCropFile(f);
+                    setIconCropOpen(true);
+                  }
+                }}
+              />
             </div>
 
             <div className="space-y-2">
@@ -237,18 +227,48 @@ export function AddAccountSheet({
             </div>
 
             <div className="space-y-1.5">
-              <Label>Or upload an image</Label>
+              <Label>Name</Label>
               <Input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (f) {
-                    setIconCropFile(f);
-                    setIconCropOpen(true);
-                  }
-                }}
+                required
+                value={a.label}
+                onChange={(e) => setA((s) => ({ ...s, label: e.target.value }))}
+                placeholder="e.g. Daily Card"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Institution (optional)</Label>
+              <Input
+                value={a.institution ?? ""}
+                onChange={(e) => setA((s) => ({ ...s, institution: e.target.value }))}
+                placeholder="e.g. HSBC"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <Select value={a.type} onValueChange={(v) => setA((s) => ({ ...s, type: v }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank">Bank</SelectItem>
+                  <SelectItem value="e-wallet">E-wallet</SelectItem>
+                  <SelectItem value="savings">Savings</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>{edit ? "Current balance (read-only)" : "Opening balance"}</Label>
+              <Input
+                inputMode="decimal"
+                disabled={!!edit}
+                value={edit ? edit.current_balance : String(a.opening_balance)}
+                onChange={(e) =>
+                  setA((s) => ({ ...s, opening_balance: e.target.value.replace(/[^\d.-]/g, "") }))
+                }
               />
             </div>
           </div>
