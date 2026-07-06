@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { profileQuery } from "@/lib/queries";
 import { toast } from "sonner";
 import { Sun, Moon } from "lucide-react";
-import { SettingsHeader, Section, ThemeChoice } from "@/components/SettingsRows";
+import { cn } from "@/lib/utils";
+import { SettingsHeader } from "@/components/SettingsRows";
 
 export default function ThemePage() {
   const qc = useQueryClient();
@@ -41,22 +42,29 @@ export default function ThemePage() {
   return (
     <div className="px-4 pt-6 pb-24 space-y-6">
       <SettingsHeader title="Theme" />
-      <Section label="Theme">
-        <div className="p-3 grid grid-cols-2 gap-2">
-          <ThemeChoice
-            active={theme === "dark"}
-            icon={<Moon className="h-4 w-4" />}
-            label="Dark"
-            onClick={() => choose("dark")}
-          />
-          <ThemeChoice
-            active={theme === "light"}
-            icon={<Sun className="h-4 w-4" />}
-            label="Light"
-            onClick={() => choose("light")}
-          />
-        </div>
-      </Section>
+      {/* Dark | Light segmented toggle — same style as Reports income/expense */}
+      <div className="flex rounded-xl bg-secondary p-1 gap-1">
+        <button
+          type="button"
+          onClick={() => choose("dark")}
+          className={cn(
+            "flex-1 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2",
+            theme === "dark" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+          )}
+        >
+          <Moon className="h-4 w-4" /> Dark
+        </button>
+        <button
+          type="button"
+          onClick={() => choose("light")}
+          className={cn(
+            "flex-1 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2",
+            theme === "light" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+          )}
+        >
+          <Sun className="h-4 w-4" /> Light
+        </button>
+      </div>
     </div>
   );
 }
