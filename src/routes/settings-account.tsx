@@ -6,9 +6,8 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Camera, Image as ImageIcon, Trash2, Loader2 } from "lucide-react";
+import { Camera, Image as ImageIcon, Trash2, Loader2, User, Phone, Mail } from "lucide-react";
 import { SettingsHeader } from "@/components/SettingsRows";
 import {
   AlertDialog,
@@ -49,6 +48,7 @@ export default function AccountPage() {
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [editing, setEditing] = useState<"name" | "phone" | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
@@ -200,35 +200,81 @@ export default function AccountPage() {
         onCropped={uploadPhoto}
       />
 
-      <div className="surface-card p-4 space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="name">Full name</Label>
-          <Input id="name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+      {/* Icon-led data rows (WhatsApp style). Tap a value to edit it inline. */}
+      <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
+        <div className="flex items-center gap-4 px-4 py-3">
+          <User className="h-6 w-6 text-muted-foreground shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground">Full name</p>
+            {editing === "name" ? (
+              <input
+                autoFocus
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                onBlur={() => setEditing(null)}
+                className="w-full bg-transparent text-base text-foreground outline-none mt-0.5"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditing("name")}
+                className="w-full text-left text-base text-foreground mt-0.5 truncate"
+              >
+                {fullName || <span className="text-muted-foreground">Add your name</span>}
+              </button>
+            )}
+          </div>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="phone">Phone number</Label>
-          <Input
-            id="phone"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+94..."
-          />
+
+        <div className="flex items-center gap-4 px-4 py-3">
+          <Phone className="h-6 w-6 text-muted-foreground shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground">Phone number</p>
+            {editing === "phone" ? (
+              <input
+                autoFocus
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                onBlur={() => setEditing(null)}
+                placeholder="+94..."
+                className="w-full bg-transparent text-base text-foreground outline-none mt-0.5 placeholder:text-muted-foreground"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditing("phone")}
+                className="w-full text-left text-base text-foreground mt-0.5 truncate"
+              >
+                {phone || <span className="text-muted-foreground">Add a phone number</span>}
+              </button>
+            )}
+          </div>
         </div>
-        <div className="space-y-1.5">
-          <Label>Google account</Label>
-          <p className="text-sm text-muted-foreground">{profile?.google_email ?? email ?? "—"}</p>
+
+        <div className="flex items-center gap-4 px-4 py-3">
+          <Mail className="h-6 w-6 text-muted-foreground shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground">Google account</p>
+            <p className="text-base text-foreground mt-0.5 truncate">
+              {profile?.google_email ?? email ?? "—"}
+            </p>
+          </div>
         </div>
-        <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>
-          Save changes
-        </Button>
       </div>
+
+      <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>
+        Save changes
+      </Button>
 
       <AlertDialog>
         <AlertDialogTrigger asChild>
-          <Button variant="outline" className="w-full text-expense">
-            <Trash2 className="h-4 w-4 mr-2" /> Delete account
-          </Button>
+          <button
+            type="button"
+            className="w-full rounded-2xl border border-border bg-card p-4 flex items-center gap-3 text-sm font-medium text-expense active:bg-secondary/40 shadow-sm"
+          >
+            <Trash2 className="h-5 w-5" /> Delete account
+          </button>
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
