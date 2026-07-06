@@ -35,10 +35,10 @@ const MAIN: Item[] = [
     subtitle: "Profile, phone number, Google account",
   },
   {
-    onClick: () => toast("Coming soon"),
+    to: "/settings/privacy",
     icon: Shield,
     title: "Privacy",
-    subtitle: "Privacy settings",
+    subtitle: "Delete account, privacy settings",
   },
   {
     to: "/manage",

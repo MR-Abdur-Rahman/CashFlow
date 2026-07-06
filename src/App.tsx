@@ -16,6 +16,7 @@ import SplitPerson from "./routes/split-person";
 import SplitGroup from "./routes/split-group";
 import SettingsAccount from "./routes/settings-account";
 import SettingsAccountEdit from "./routes/settings-account-edit";
+import SettingsPrivacy from "./routes/settings-privacy";
 import SettingsHistory from "./routes/settings-history";
 import SettingsNotifications from "./routes/settings-notifications";
 import SettingsNotificationHistory from "./routes/settings-notification-history";
@@ -99,6 +100,10 @@ function App() {
           <Route
             path="/settings/account/edit"
             element={session ? <SettingsAccountEdit /> : <Navigate to="/auth" />}
+          />
+          <Route
+            path="/settings/privacy"
+            element={session ? <SettingsPrivacy /> : <Navigate to="/auth" />}
           />
           <Route path="/settings/qr" element={session ? <SettingsQr /> : <Navigate to="/auth" />} />
           <Route
