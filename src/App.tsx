@@ -146,7 +146,7 @@ function App() {
         {session && <GlobalFab />}
         {session && <BottomNav />}
         {session && <PermissionsOnboarding />}
-        <NativeUpdateModal />
+        {session && <NativeUpdateModal />}
         <UpdatePrompt />
       </div>
     </BrowserRouter>
