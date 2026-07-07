@@ -27,12 +27,12 @@ export function BottomNav() {
               key={t.to}
               to={t.to}
               className={cn(
-                "relative flex flex-col items-center justify-center gap-1 py-3 text-[11px] transition-colors",
+                "relative flex items-center justify-center py-4 transition-colors",
                 active ? "text-primary" : "text-muted-foreground hover:text-foreground",
               )}
+              aria-label={t.label}
             >
-              <Icon className="h-6 w-6" />
-              <span>{t.label}</span>
+              <Icon className="h-7 w-7" />
               {active && <span className="absolute -bottom-px h-0.5 w-9 rounded-full bg-primary" />}
             </Link>
           );
