@@ -28,6 +28,7 @@ import SettingsInvite from "./routes/settings-invite";
 import SettingsHistoryHub from "./routes/settings-history-hub";
 import { BottomNav } from "./components/BottomNav";
 import { UpdatePrompt } from "./components/UpdatePrompt";
+import { NativeUpdateModal } from "./components/NativeUpdateModal";
 import { PermissionsOnboarding } from "./components/PermissionsOnboarding";
 import { supabase } from "./integrations/supabase/client";
 
@@ -145,6 +146,7 @@ function App() {
         {session && <GlobalFab />}
         {session && <BottomNav />}
         {session && <PermissionsOnboarding />}
+        <NativeUpdateModal />
         <UpdatePrompt />
       </div>
     </BrowserRouter>
