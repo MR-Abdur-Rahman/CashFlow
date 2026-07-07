@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { StatusBar, Style } from "@capacitor/status-bar";
 import { useRealtimeSplits } from "./hooks/useRealtimeSplits";
 import { Fab } from "./components/Fab";
 import { AddTransactionSheet } from "./components/AddTransactionSheet";
@@ -50,6 +52,13 @@ function App() {
   useRealtimeSplits();
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Native only: paint the reserved status-bar strip to match the app background, with light icons.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+    StatusBar.setBackgroundColor({ color: "#0A0A0A" }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
