@@ -1,5 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { personQuery, personSplitsQuery, splitBalancesQuery } from "@/lib/queries";
+import {
+  personQuery,
+  personSplitsQuery,
+  splitBalancesQuery,
+  contactPhonesQuery,
+} from "@/lib/queries";
 import { settlementNetAfter, bilateralBalance } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -60,6 +65,12 @@ export default function PersonDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: person } = useQuery(personQuery(personId!));
+  // Linked contacts show their CURRENT profile phone (privacy-enforced via contact_phones); local
+  // contacts fall back to the number saved on the contact row.
+  const { data: contactPhones } = useQuery(contactPhonesQuery([person?.linked_user_id]));
+  const contactPhone = person?.linked_user_id
+    ? (contactPhones?.get(person.linked_user_id) ?? null)
+    : (person?.phone_number ?? null);
   const { data: splits = [] } = useQuery(personSplitsQuery(personId!));
   // Full own+incoming splits — used to compute each settlement row's running net (shared with all pages).
   const { data: balanceData } = useQuery(splitBalancesQuery());
@@ -177,7 +188,7 @@ export default function PersonDetail() {
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-semibold truncate">{personName}</h1>
           <p className="text-xs text-muted-foreground">
-            {person.phone_number ?? "no phone"}
+            {contactPhone ?? "no phone"}
             {person.linked_user_id && " · 🔗 linked"}
           </p>
         </div>
@@ -317,7 +328,7 @@ export default function PersonDetail() {
         person={{
           id: person.id,
           name: personName,
-          phone_number: person.phone_number,
+          phone_number: contactPhone,
           linked_user_id: person.linked_user_id,
         }}
         splitId={(splits[0] as any)?.id}

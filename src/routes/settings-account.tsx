@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { profileQuery } from "@/lib/queries";
+import { profileQuery, myPhoneQuery } from "@/lib/queries";
 import { UserAvatar } from "@/components/UserAvatar";
 import { PhotoPreviewDialog } from "@/components/PhotoPreviewDialog";
 import { User, Phone, Mail, Pencil } from "lucide-react";
@@ -18,8 +18,9 @@ export default function AccountPage() {
     });
   }, []);
   const { data: profile } = useQuery(profileQuery(userId));
+  const { data: myPhone } = useQuery(myPhoneQuery());
   const fullName = profile?.full_name ?? "";
-  const phone = profile?.phone_number ?? "";
+  const phone = myPhone ?? "";
   const google = profile?.google_email ?? email ?? "—";
   const [previewOpen, setPreviewOpen] = useState(false);
 

@@ -26,14 +26,16 @@ export async function connectViaQr(text: string, qc: QueryClient) {
 
   const { data: me } = await supabase
     .from("profiles")
-    .select("full_name, phone_number")
+    .select("full_name")
     .eq("id", u.user.id)
     .maybeSingle();
 
+  // Phone is no longer snapshotted into the contact row — linked contacts resolve the current
+  // number through contact_phones() (privacy-enforced), so we pass null here.
   const { error } = await supabase.rpc("create_mutual_connection", {
     scanner_user_id: u.user.id,
     scanner_name: me?.full_name || "Friend",
-    scanner_phone: me?.phone_number || null,
+    scanner_phone: null,
     scanned_user_id: scannedUserId,
     scanned_name: scannedName || "Friend",
     scanned_phone: scannedPhone,

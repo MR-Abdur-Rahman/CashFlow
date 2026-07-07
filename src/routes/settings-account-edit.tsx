@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { profileQuery } from "@/lib/queries";
+import { profileQuery, myPhoneQuery } from "@/lib/queries";
 import { UserAvatar } from "@/components/UserAvatar";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
 import { PhotoPreviewDialog } from "@/components/PhotoPreviewDialog";
@@ -30,14 +30,15 @@ export default function AccountEditPage() {
   }, []);
 
   const { data: profile } = useQuery(profileQuery(userId));
+  const { data: myPhone } = useQuery(myPhoneQuery());
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   useEffect(() => {
-    if (profile) {
-      setFullName(profile.full_name ?? "");
-      setPhone(profile.phone_number ?? "");
-    }
+    if (profile) setFullName(profile.full_name ?? "");
   }, [profile]);
+  useEffect(() => {
+    if (myPhone !== undefined) setPhone(myPhone ?? "");
+  }, [myPhone]);
   const google = profile?.google_email ?? email ?? "—";
 
   const [busy, setBusy] = useState(false);
@@ -60,6 +61,7 @@ export default function AccountEditPage() {
     onSuccess: () => {
       toast.success("Saved");
       qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["my-phone"] });
       navigate("/settings/account");
     },
     onError: (e) => toast.error(e.message),

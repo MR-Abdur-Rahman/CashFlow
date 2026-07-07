@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Search, Share2 } from "lucide-react";
 import { toast } from "sonner";
-import { peopleQuery } from "@/lib/queries";
+import { peopleQuery, contactPhonesQuery } from "@/lib/queries";
 import { contactDisplay } from "@/lib/people";
 import { UserAvatar } from "@/components/UserAvatar";
 
@@ -32,6 +32,9 @@ async function shareInvite(text: string, title = "Join me on CashFlow") {
 
 export default function SettingsInvite() {
   const { data: people = [] } = useQuery(peopleQuery());
+  const { data: contactPhones } = useQuery(
+    contactPhonesQuery((people as any[]).map((p) => p.linked_user_id)),
+  );
   const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {
@@ -101,14 +104,13 @@ export default function SettingsInvite() {
         <div className="divide-y divide-border border-y border-border">
           {filtered.map(({ p, display }) => {
             const linked = !!p.linked_user_id;
+            const phone = linked ? (contactPhones?.get(p.linked_user_id) ?? null) : p.phone_number;
             return (
               <div key={p.id} className="flex items-center gap-3 px-4 py-3">
                 <UserAvatar url={display.avatarUrl} name={display.name} size={40} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">{display.name}</p>
-                  {p.phone_number && (
-                    <p className="truncate text-xs text-muted-foreground">{p.phone_number}</p>
-                  )}
+                  {phone && <p className="truncate text-xs text-muted-foreground">{phone}</p>}
                 </div>
                 {linked ? (
                   <span className="shrink-0 text-xs text-muted-foreground">Already on CashFlow</span>

@@ -505,3 +505,37 @@ export const profileQuery = (userId: string | undefined) =>
     },
     enabled: !!userId,
   });
+
+// The current user's own phone number. Read via the my_phone() RPC because raw SELECT on
+// profiles.phone_number is revoked (privacy: the column is only reachable through the
+// SECURITY DEFINER functions). Returns "" when unset.
+export const myPhoneQuery = () =>
+  queryOptions({
+    queryKey: ["my-phone"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("my_phone");
+      if (error) throw error;
+      return (data as string | null) ?? "";
+    },
+  });
+
+// Phone numbers for a set of linked contacts (their profile user ids), resolved through the
+// privacy-enforcing contact_phones() RPC — only numbers the owner shares with the current viewer
+// come back. Returns a Map<user_id, phone>. Unlisted ids simply aren't in the map.
+export const contactPhonesQuery = (userIds: (string | null | undefined)[]) => {
+  const ids = [...new Set(userIds.filter((x): x is string => !!x))].sort();
+  return queryOptions({
+    queryKey: ["contact-phones", ids],
+    queryFn: async () => {
+      const map = new Map<string, string>();
+      if (ids.length === 0) return map;
+      const { data, error } = await supabase.rpc("contact_phones", { target_ids: ids });
+      if (error) throw error;
+      for (const row of (data ?? []) as { user_id: string; phone_number: string }[]) {
+        if (row.phone_number) map.set(row.user_id, row.phone_number);
+      }
+      return map;
+    },
+    enabled: ids.length > 0,
+  });
+};
