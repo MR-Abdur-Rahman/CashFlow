@@ -33,7 +33,7 @@ export function BottomNav() {
             >
               <Icon className="h-6 w-6" />
               <span>{t.label}</span>
-              {active && <span className="absolute -bottom-px h-0.5 w-9 rounded-full bg-primary" />}
+              {active && <span className="absolute top-0 h-0.5 w-9 rounded-full bg-primary" />}
             </Link>
           );
         })}

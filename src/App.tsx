@@ -24,7 +24,6 @@ import SettingsNotifications from "./routes/settings-notifications";
 import SettingsNotificationHistory from "./routes/settings-notification-history";
 import SettingsQr from "./routes/settings-qr";
 import SettingsPreferences from "./routes/settings-preferences";
-import SettingsData from "./routes/settings-data";
 import SettingsInvite from "./routes/settings-invite";
 import SettingsHistoryHub from "./routes/settings-history-hub";
 import { BottomNav } from "./components/BottomNav";
@@ -129,10 +128,6 @@ function App() {
           <Route
             path="/settings/notifications/history"
             element={session ? <SettingsNotificationHistory /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/settings/data"
-            element={session ? <SettingsData /> : <Navigate to="/auth" />}
           />
           <Route
             path="/settings/invite"

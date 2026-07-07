@@ -52,7 +52,7 @@ export function AddTransactionSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="bg-card border-border rounded-t-3xl p-0 h-[88dvh] max-h-[88dvh] flex flex-col"
+        className="bg-card border-border rounded-t-3xl p-0 h-[74dvh] max-h-[74dvh] flex flex-col"
       >
         <SheetTitle className="sr-only">Add transaction</SheetTitle>
         <Tabs

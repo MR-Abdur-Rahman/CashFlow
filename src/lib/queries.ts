@@ -39,7 +39,7 @@ export const transactionsQuery = (opts?: {
       let q = supabase
         .from("transactions")
         .select(
-          "*, accounts:account_id(label,institution,icon_name,icon_color,icon_url,icon_type), to_account:to_account_id(label,institution), categories:category_id(name,icon), sub_categories:sub_category_id(name), split:split_id(total_amount,paid_by,type,description,split_shares(share_amount,person_name,person_id),people:person_id(name),groups:group_id(name))",
+          "*, accounts:account_id(label,institution,icon_name,icon_color,icon_url,icon_type), to_account:to_account_id(label,institution), categories:category_id(name,icon), sub_categories:sub_category_id(name,icon), split:split_id(total_amount,paid_by,type,description,split_shares(share_amount,person_name,person_id),people:person_id(name),groups:group_id(name))",
         )
         .order("date", { ascending: false })
         .order("time", { ascending: false })

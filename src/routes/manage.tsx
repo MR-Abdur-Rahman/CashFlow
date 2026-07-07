@@ -83,6 +83,7 @@ function Categories({
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<any>(null);
+  const [q, setQ] = useState("");
 
   const del = useMutation({
     mutationFn: async (id: string) => {
@@ -96,22 +97,26 @@ function Categories({
     onError: (e) => toast.error(e.message),
   });
 
-  // Group by type
-  const expenseCats = (cats as any[]).filter((c) => c.type === "expense" || c.type === "both");
-  const incomeCats = (cats as any[]).filter((c) => c.type === "income" || c.type === "both");
+  // Group by type, filtered by the search box
+  const match = (c: any) => c.name.toLowerCase().includes(q.trim().toLowerCase());
+  const expenseCats = (cats as any[]).filter(
+    (c) => (c.type === "expense" || c.type === "both") && match(c),
+  );
+  const incomeCats = (cats as any[]).filter(
+    (c) => (c.type === "income" || c.type === "both") && match(c),
+  );
 
   return (
     <div className="space-y-4 mt-4">
-      <Button
-        className="w-full"
-        variant="outline"
-        onClick={() => {
+      <ListToolbar
+        query={q}
+        onQuery={setQ}
+        placeholder="Search categories"
+        onAdd={() => {
           setEdit(null);
           setOpen(true);
         }}
-      >
-        <Plus className="h-4 w-4 mr-2" /> New category
-      </Button>
+      />
 
       {/* Expense categories */}
       <div>
@@ -244,6 +249,7 @@ function SubCategoryPage({
             onDelete={() => del.mutate(s.id)}
           >
             <div className="flex items-center gap-3 p-3 bg-card">
+              <span className="text-lg w-7 text-center">{s.icon ?? "📦"}</span>
               <span className="flex-1 text-sm">{s.name}</span>
             </div>
           </SwipeRow>
@@ -274,18 +280,22 @@ function SubCategoryDialog({
 }) {
   const qc = useQueryClient();
   const [name, setName] = useState(edit?.name ?? "");
+  const [icon, setIcon] = useState(edit?.icon ?? "📦");
 
   const m = useMutation({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
       if (edit?.id) {
-        const { error } = await supabase.from("sub_categories").update({ name }).eq("id", edit.id);
+        const { error } = await supabase
+          .from("sub_categories")
+          .update({ name, icon } as any)
+          .eq("id", edit.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("sub_categories")
-          .insert({ name, category_id: categoryId, user_id: u.user.id, is_default: false });
+          .insert({ name, icon, category_id: categoryId, user_id: u.user.id, is_default: false } as any);
         if (error) throw error;
       }
     },
@@ -294,6 +304,7 @@ function SubCategoryDialog({
       qc.invalidateQueries({ queryKey: ["sub_categories_all"] });
       toast.success("Saved");
       setName("");
+      setIcon("📦");
       onOpenChange(false);
     },
     onError: (e) => toast.error(e.message),
@@ -303,7 +314,10 @@ function SubCategoryDialog({
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        if (!o) setName(edit?.name ?? "");
+        if (!o) {
+          setName(edit?.name ?? "");
+          setIcon(edit?.icon ?? "📦");
+        }
         onOpenChange(o);
       }}
       key={edit?.id ?? "new"}
@@ -317,14 +331,25 @@ function SubCategoryDialog({
           }}
           className="space-y-3"
         >
-          <div className="space-y-1.5">
-            <Label>Name</Label>
-            <Input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Breakfast"
-            />
+          <div className="flex gap-2">
+            <div className="space-y-1.5 w-20">
+              <Label>Icon</Label>
+              <Input
+                value={icon}
+                onChange={(e) => setIcon(e.target.value)}
+                maxLength={4}
+                className="text-center text-lg"
+              />
+            </div>
+            <div className="space-y-1.5 flex-1">
+              <Label>Name</Label>
+              <Input
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Breakfast"
+              />
+            </div>
           </div>
           <Button type="submit" className="w-full" disabled={m.isPending}>
             Save

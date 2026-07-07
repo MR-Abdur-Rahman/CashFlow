@@ -460,7 +460,7 @@ function TxRow({ t }: { t: any }) {
   const sign = isIncome ? "+" : isTransfer ? "" : "-";
 
   const title = t.categories
-    ? `${t.categories.icon ?? ""} ${t.categories.name}${t.sub_categories ? " · " + t.sub_categories.name : ""}`
+    ? `${t.sub_categories?.icon ?? t.categories.icon ?? ""} ${t.categories.name}${t.sub_categories ? " · " + t.sub_categories.name : ""}`
     : isIncome
       ? (t.income_source_text ?? "Income")
       : isTransfer
