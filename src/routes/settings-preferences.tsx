@@ -14,7 +14,7 @@ import {
 import { CURRENCY_PRESETS, setMoneyFormat } from "@/lib/format";
 import { SettingsHeader, Section } from "@/components/SettingsRows";
 import { cn } from "@/lib/utils";
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, Check } from "lucide-react";
 
 export default function PreferencesPage() {
   const qc = useQueryClient();
@@ -27,7 +27,14 @@ export default function PreferencesPage() {
   const currencyCode = (profile as any)?.currency_code ?? "LKR";
   const thousand = (profile as any)?.thousand_separator ?? ",";
   const decimals = (profile as any)?.decimal_places ?? 2;
-  const reminderMethod = (profile as any)?.reminder_method ?? "cashflow";
+  const reminderMethods = ((profile as any)?.reminder_methods ?? ["cashflow"]) as string[];
+
+  function toggleReminderMethod(m: string) {
+    const set = new Set(reminderMethods);
+    if (set.has(m)) set.delete(m);
+    else set.add(m);
+    updateProfile.mutate({ reminder_methods: [...set] });
+  }
 
   const updateProfile = useMutation({
     mutationFn: async (patch: Record<string, any>) => {
@@ -162,22 +169,36 @@ export default function PreferencesPage() {
       </Section>
 
       <Section label="Reminders">
-        <div className="p-4 space-y-1.5">
+        <div className="p-4 space-y-3">
           <Label>Send reminders via</Label>
-          <Select
-            value={reminderMethod}
-            onValueChange={(v) => updateProfile.mutate({ reminder_method: v })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="cashflow">CashFlow notification</SelectItem>
-              <SelectItem value="whatsapp">WhatsApp message</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="space-y-1">
+            {[
+              { m: "cashflow", label: "CashFlow notification" },
+              { m: "whatsapp", label: "WhatsApp message" },
+            ].map(({ m, label }) => {
+              const on = reminderMethods.includes(m);
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => toggleReminderMethod(m)}
+                  className="flex w-full items-center gap-3 py-2 text-left"
+                >
+                  <span className="flex-1 text-sm">{label}</span>
+                  <span
+                    className={cn(
+                      "grid h-5 w-5 place-items-center rounded-md border",
+                      on ? "bg-primary border-primary text-white" : "border-border",
+                    )}
+                  >
+                    {on && <Check className="h-3.5 w-3.5" />}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
           <p className="text-xs text-muted-foreground">
-            How the “Send reminder” button delivers reminders to your contacts.
+            Choose one or both — the “Send reminder” button delivers through every channel you pick.
           </p>
         </div>
       </Section>

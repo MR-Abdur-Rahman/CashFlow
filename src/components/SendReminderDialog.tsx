@@ -51,7 +51,7 @@ export function SendReminderDialog({
     supabase.auth.getUser().then(({ data }) => setUid(data.user?.id));
   }, []);
   const { data: profile } = useQuery(profileQuery(uid));
-  const method = ((profile as any)?.reminder_method ?? "cashflow") as "cashflow" | "whatsapp";
+  const methods = ((profile as any)?.reminder_methods ?? ["cashflow"]) as string[];
 
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -76,21 +76,24 @@ export function SendReminderDialog({
     qc.invalidateQueries({ queryKey: ["reminders"] });
   }
 
-  const canSend = method === "whatsapp" ? !!person.phone_number : !!person.linked_user_id;
-  const unavailableHint =
-    method === "whatsapp"
-      ? "This contact has no phone number for WhatsApp — change the method in Preferences or add a number."
-      : "This contact isn't a linked CashFlow user — switch to WhatsApp in Preferences.";
+  // A chosen channel can only fire if the contact supports it.
+  const doWhatsApp = methods.includes("whatsapp") && !!person.phone_number;
+  const doCashflow = methods.includes("cashflow") && !!person.linked_user_id;
+  const canSend = doWhatsApp || doCashflow;
+  const unavailableHint = methods.includes("whatsapp")
+    ? "This contact has no phone number for WhatsApp — add one or pick CashFlow in Preferences."
+    : "This contact isn't a linked CashFlow user — enable WhatsApp in Preferences.";
 
   async function send() {
     if (!canSend) return toast.error(unavailableHint);
+    // Open WhatsApp first so it stays inside the click gesture (avoids popup blocking after awaits).
+    if (doWhatsApp) {
+      const phone = person.phone_number!.replace(/[^\d]/g, "");
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+    }
     setBusy(true);
     try {
-      if (method === "whatsapp") {
-        await log("whatsapp");
-        const phone = person.phone_number!.replace(/[^\d]/g, "");
-        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
-      } else {
+      if (doCashflow) {
         const { error } = await supabase.from("notifications").insert({
           user_id: person.linked_user_id,
           type: "reminder",
@@ -99,9 +102,10 @@ export function SendReminderDialog({
           related_split_id: splitId ?? null,
         });
         if (error) throw error;
-        await log("in_app");
-        toast.success("Reminder sent");
       }
+      if (doWhatsApp) await log("whatsapp");
+      if (doCashflow) await log("in_app");
+      toast.success("Reminder sent");
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e.message);
@@ -120,8 +124,7 @@ export function SendReminderDialog({
             <Textarea rows={5} value={message} onChange={(e) => setMessage(e.target.value)} />
           </div>
           <Button className="w-full" disabled={busy || !canSend} onClick={send}>
-            <Send className="h-4 w-4 mr-2" />
-            {method === "whatsapp" ? "Send via WhatsApp" : "Send"}
+            <Send className="h-4 w-4 mr-2" /> Send
           </Button>
           {!canSend && <p className="text-xs text-muted-foreground">{unavailableHint}</p>}
         </div>
