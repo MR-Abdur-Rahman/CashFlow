@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CURRENCY_PRESETS, setMoneyFormat } from "@/lib/format";
+import { CurrencyPicker } from "@/components/CurrencyPicker";
 import { SettingsHeader, Section } from "@/components/SettingsRows";
 import { cn } from "@/lib/utils";
 import { Sun, Moon, Check, ChevronRight } from "lucide-react";
@@ -84,8 +85,7 @@ export default function PreferencesPage() {
     updateProfile.mutate({ theme: next });
   }
 
-  function pickCurrency(code: string) {
-    const preset = CURRENCY_PRESETS.find((c) => c.code === code) ?? CURRENCY_PRESETS[0];
+  function pickCurrency(preset: (typeof CURRENCY_PRESETS)[number]) {
     const patch = {
       currency_code: preset.code,
       currency_symbol: preset.symbol,
@@ -137,18 +137,7 @@ export default function PreferencesPage() {
         <div className="p-4 space-y-4">
           <div className="space-y-1.5">
             <Label>Currency</Label>
-            <Select value={currencyCode} onValueChange={pickCurrency}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CURRENCY_PRESETS.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>
-                    {c.code} — {c.symbol}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CurrencyPicker value={currencyCode} onSelect={pickCurrency} />
           </div>
           <div className="space-y-1.5">
             <Label>Thousand separator</Label>
