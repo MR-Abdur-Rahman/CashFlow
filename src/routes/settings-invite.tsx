@@ -3,10 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Search, Share2, Contact } from "lucide-react";
 import { toast } from "sonner";
+import { Capacitor } from "@capacitor/core";
 import { peopleQuery, contactPhonesQuery } from "@/lib/queries";
 import { INVITE_URL } from "@/lib/config";
 import { contactDisplay } from "@/lib/people";
 import { UserAvatar } from "@/components/UserAvatar";
+import { DeviceContactsInvite } from "@/components/DeviceContactsInvite";
 
 // Read-only invite screen built on the existing People list. No device-contact access, no writes
 // to people/linking. Invites point at the canonical app URL's auth screen (see lib/config).
@@ -110,20 +112,25 @@ export default function SettingsInvite() {
         </button>
       </div>
 
-      {/* Pick someone from your phone's contacts (Chrome for Android) */}
-      {contactPickerSupported && (
-        <div className="px-4 pt-3">
-          <button
-            type="button"
-            onClick={pickFromContacts}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-secondary py-2.5 text-sm font-medium active:opacity-80"
-          >
-            <Contact className="h-4 w-4" /> Pick from contacts
-          </button>
-        </div>
-      )}
+      {Capacitor.isNativePlatform() ? (
+        // Native app: the full device contact list, each with a per-contact send window.
+        <DeviceContactsInvite query={q} />
+      ) : (
+        <>
+          {/* Web: pick from contacts (Chrome for Android) is on-demand; else the app People list. */}
+          {contactPickerSupported && (
+            <div className="px-4 pt-3">
+              <button
+                type="button"
+                onClick={pickFromContacts}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-secondary py-2.5 text-sm font-medium active:opacity-80"
+              >
+                <Contact className="h-4 w-4" /> Pick from contacts
+              </button>
+            </div>
+          )}
 
-      {/* Your people */}
+          {/* Your people */}
       <p className="px-4 pt-6 pb-2 text-xs uppercase tracking-wider text-muted-foreground">
         Your people
       </p>
@@ -171,6 +178,8 @@ export default function SettingsInvite() {
             );
           })}
         </div>
+          )}
+        </>
       )}
     </div>
   );

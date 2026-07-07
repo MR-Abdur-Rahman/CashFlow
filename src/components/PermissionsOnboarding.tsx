@@ -1,34 +1,47 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Bell, Camera } from "lucide-react";
+import { Bell, Camera, Users } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { Contacts } from "@capacitor-community/contacts";
 import { cn } from "@/lib/utils";
 
 // One-at-a-time permission prompts, shown once per device to any signed-in user (new + existing;
-// gated by a localStorage flag since browser permissions are per-device). Only the permissions a web
-// app can actually request are here — Notifications and Camera. SMS/Contacts are handled elsewhere
-// (Contacts via the on-demand Contact Picker; SMS deferred until an SMS provider is purchased).
+// gated by a localStorage flag since browser permissions are per-device). On the native app a third
+// step requests real Contacts access; on the web only Notifications + Camera are grantable.
 const SEEN_KEY = "cashflow_permissions_v2";
-
-const STEPS = [
-  {
-    key: "notifications" as const,
-    icon: Bell,
-    title: "Notifications",
-    desc: "Get alerts for splits, settlements and payment reminders.",
-  },
-  {
-    key: "camera" as const,
-    icon: Camera,
-    title: "Camera",
-    desc: "Scan a friend's QR code to connect instantly.",
-  },
-];
 
 export function PermissionsOnboarding() {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
+
+  const steps = useMemo(() => {
+    type Step = { key: "notifications" | "camera" | "contacts"; icon: typeof Bell; title: string; desc: string };
+    const base: Step[] = [
+      {
+        key: "notifications",
+        icon: Bell,
+        title: "Notifications",
+        desc: "Get alerts for splits, settlements and payment reminders.",
+      },
+      {
+        key: "camera",
+        icon: Camera,
+        title: "Camera",
+        desc: "Scan a friend's QR code to connect instantly.",
+      },
+    ];
+    if (Capacitor.isNativePlatform()) {
+      base.push({
+        key: "contacts",
+        icon: Users,
+        title: "Contacts",
+        desc: "Invite friends straight from your phone's contacts.",
+      });
+    }
+    return base;
+  }, []);
 
   useEffect(() => {
     if (!localStorage.getItem(SEEN_KEY)) setOpen(true);
@@ -39,19 +52,21 @@ export function PermissionsOnboarding() {
     setOpen(false);
   }
   function next() {
-    if (step < STEPS.length - 1) setStep((s) => s + 1);
+    if (step < steps.length - 1) setStep((s) => s + 1);
     else finish();
   }
 
   async function allow() {
     setBusy(true);
     try {
-      const key = STEPS[step].key;
+      const key = steps[step].key;
       if (key === "notifications" && "Notification" in window) {
         await Notification.requestPermission();
       } else if (key === "camera" && navigator.mediaDevices?.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         stream.getTracks().forEach((t) => t.stop()); // prime the grant, then release the camera
+      } else if (key === "contacts") {
+        await Contacts.requestPermissions();
       }
     } catch {
       /* denied / unsupported — move on either way */
@@ -61,7 +76,7 @@ export function PermissionsOnboarding() {
     }
   }
 
-  const current = STEPS[step];
+  const current = steps[step];
   const Icon = current.icon;
 
   return (
@@ -69,7 +84,7 @@ export function PermissionsOnboarding() {
       <DialogContent className="max-w-xs text-center">
         {/* Progress dots */}
         <div className="flex justify-center gap-1.5">
-          {STEPS.map((s, i) => (
+          {steps.map((s, i) => (
             <span
               key={s.key}
               className={cn(
