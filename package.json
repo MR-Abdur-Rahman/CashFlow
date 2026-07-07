@@ -13,6 +13,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor-community/contacts": "^7.2.0",
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
     "@radix-ui/react-accordion": "^1.2.14",
     "@radix-ui/react-alert-dialog": "^1.1.17",
     "@radix-ui/react-aspect-ratio": "^1.1.10",
@@ -66,6 +69,7 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.4.1",
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.9.3",
     "@types/react": "^19.2.14",
