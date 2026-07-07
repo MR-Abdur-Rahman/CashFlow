@@ -11,10 +11,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CURRENCY_PRESETS, setMoneyFormat } from "@/lib/format";
 import { SettingsHeader, Section } from "@/components/SettingsRows";
 import { cn } from "@/lib/utils";
-import { Sun, Moon, Check } from "lucide-react";
+import { Sun, Moon, Check, ChevronRight } from "lucide-react";
+
+const REMINDER_METHODS = [
+  { m: "cashflow", label: "CashFlow notification" },
+  { m: "whatsapp", label: "WhatsApp message" },
+] as const;
 
 export default function PreferencesPage() {
   const qc = useQueryClient();
@@ -28,12 +35,31 @@ export default function PreferencesPage() {
   const thousand = (profile as any)?.thousand_separator ?? ",";
   const decimals = (profile as any)?.decimal_places ?? 2;
   const reminderMethods = ((profile as any)?.reminder_methods ?? ["cashflow"]) as string[];
+  const reminderSummary =
+    REMINDER_METHODS.filter((o) => reminderMethods.includes(o.m))
+      .map((o) => o.label)
+      .join(", ") || "None selected";
 
-  function toggleReminderMethod(m: string) {
-    const set = new Set(reminderMethods);
-    if (set.has(m)) set.delete(m);
-    else set.add(m);
-    updateProfile.mutate({ reminder_methods: [...set] });
+  // Row → sheet pattern (mirrors the phone "Except these people" picker). Selection is staged in
+  // `methodDraft` and only committed on Save.
+  const [methodSheet, setMethodSheet] = useState(false);
+  const [methodDraft, setMethodDraft] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (methodSheet) setMethodDraft(new Set(reminderMethods));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [methodSheet]);
+
+  function toggleDraft(m: string) {
+    setMethodDraft((prev) => {
+      const next = new Set(prev);
+      if (next.has(m)) next.delete(m);
+      else next.add(m);
+      return next;
+    });
+  }
+  function saveMethods() {
+    updateProfile.mutate({ reminder_methods: [...methodDraft] });
+    setMethodSheet(false);
   }
 
   const updateProfile = useMutation({
@@ -169,22 +195,35 @@ export default function PreferencesPage() {
       </Section>
 
       <Section label="Reminders">
-        <div className="p-4 space-y-3">
-          <Label>Send reminders via</Label>
-          <div className="space-y-1">
-            {[
-              { m: "cashflow", label: "CashFlow notification" },
-              { m: "whatsapp", label: "WhatsApp message" },
-            ].map(({ m, label }) => {
-              const on = reminderMethods.includes(m);
+        <button
+          type="button"
+          onClick={() => setMethodSheet(true)}
+          className="flex w-full items-center gap-4 p-4 text-left active:bg-secondary/40"
+        >
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">Send reminders via</p>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">{reminderSummary}</p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+        </button>
+      </Section>
+
+      <Sheet open={methodSheet} onOpenChange={setMethodSheet}>
+        <SheetContent side="bottom" className="flex flex-col">
+          <SheetHeader>
+            <SheetTitle>Send reminders via</SheetTitle>
+          </SheetHeader>
+          <div className="mt-3 -mx-6">
+            {REMINDER_METHODS.map(({ m, label }) => {
+              const on = methodDraft.has(m);
               return (
                 <button
                   key={m}
                   type="button"
-                  onClick={() => toggleReminderMethod(m)}
-                  className="flex w-full items-center gap-3 py-2 text-left"
+                  onClick={() => toggleDraft(m)}
+                  className="flex w-full items-center gap-3 px-6 py-3 active:bg-secondary/40"
                 >
-                  <span className="flex-1 text-sm">{label}</span>
+                  <span className="flex-1 text-left text-sm">{label}</span>
                   <span
                     className={cn(
                       "grid h-5 w-5 place-items-center rounded-md border",
@@ -197,11 +236,16 @@ export default function PreferencesPage() {
               );
             })}
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="px-0 pt-2 text-xs text-muted-foreground">
             Choose one or both — the “Send reminder” button delivers through every channel you pick.
           </p>
-        </div>
-      </Section>
+          <div className="pt-3">
+            <Button className="w-full" onClick={saveMethods}>
+              Save
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
