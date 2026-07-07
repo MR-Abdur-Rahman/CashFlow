@@ -16,7 +16,7 @@ export default function NotificationSettingsPage() {
   }, []);
 
   const [pendingToggle, setPendingToggle] = useState<{
-    key: string;
+    key: string[];
     newValue: boolean;
     label: string;
     description: string;
@@ -104,53 +104,43 @@ export default function NotificationSettingsPage() {
         {(
           [
             {
-              col: "toast_split_added",
+              cols: ["toast_split_added"],
               label: "Split added",
               description: "someone adds a split with you",
             },
             {
-              col: "toast_split_deleted",
+              cols: ["toast_split_deleted"],
               label: "Split deleted",
               description: "a split you're part of is deleted",
             },
             {
-              col: "toast_settlement_cash",
-              label: "Settlement — Cash",
-              description: "someone settles with cash",
+              cols: ["toast_settlement_cash", "toast_settlement_bank", "toast_settlement_ewallet"],
+              label: "Settlement",
+              description: "someone settles up with you",
             },
             {
-              col: "toast_settlement_bank",
-              label: "Settlement — Bank Transfer",
-              description: "someone settles via bank transfer",
-            },
-            {
-              col: "toast_settlement_ewallet",
-              label: "Settlement — E-wallet",
-              description: "someone settles via e-wallet",
-            },
-            {
-              col: "toast_delete_attempt",
+              cols: ["toast_delete_attempt"],
               label: "Delete attempt",
               description: "someone tries to delete your split",
             },
             {
-              col: "toast_account_selection",
+              cols: ["toast_account_selection"],
               label: "Account selection needed",
               description: "you need to select an account for a received settlement",
             },
             {
-              col: "toast_payment_reminder",
+              cols: ["toast_payment_reminder"],
               label: "Payment reminder received",
               description: "someone sends you a payment reminder",
             },
-          ] as const
-        ).map(({ col, label, description }) => (
-          <div key={col} className="flex items-center justify-between p-4">
+          ] as { cols: string[]; label: string; description: string }[]
+        ).map(({ cols, label, description }) => (
+          <div key={label} className="flex items-center justify-between p-4">
             <span className="text-sm">{label}</span>
             <Switch
-              checked={!!prefs?.[col]}
+              checked={cols.every((c) => !!prefs?.[c])}
               onCheckedChange={(newValue) =>
-                setPendingToggle({ key: col, newValue, label, description })
+                setPendingToggle({ key: cols, newValue, label, description })
               }
             />
           </div>
@@ -175,7 +165,9 @@ export default function NotificationSettingsPage() {
             <Button
               onClick={() => {
                 if (!pendingToggle || !userId) return;
-                updatePrefs.mutate({ [pendingToggle.key]: pendingToggle.newValue });
+                updatePrefs.mutate(
+                  Object.fromEntries(pendingToggle.key.map((k) => [k, pendingToggle.newValue])),
+                );
                 setPendingToggle(null);
               }}
             >

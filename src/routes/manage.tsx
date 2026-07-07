@@ -631,7 +631,6 @@ function People() {
                     {name}
                     {p.linked_user_id && " 🔗"}
                   </p>
-                  <p className="text-xs text-muted-foreground">{p.phone_number ?? "no phone"}</p>
                 </div>
                 {bal !== 0 && (
                   <span

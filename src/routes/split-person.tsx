@@ -216,13 +216,13 @@ export default function PersonDetail() {
             {person.linked_user_id && " · 🔗 linked"}
           </p>
         </div>
-        {/* Reminder replaces the old edit button — edit/delete a contact from the Manage page. */}
+        {/* Reminder replaces the old edit button — matches the home notification icon size. */}
         <button
           onClick={() => setReminderOpen(true)}
-          className="mr-2 p-2.5 rounded-full bg-secondary hover:bg-secondary/70 text-muted-foreground shrink-0"
+          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary"
           aria-label="Send reminder"
         >
-          <Bell className="h-4 w-4" />
+          <Bell className="h-5 w-5" />
         </button>
       </div>
 

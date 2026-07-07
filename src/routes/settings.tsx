@@ -163,7 +163,7 @@ export default function SettingsPage() {
       {/* Sign out — small, centered */}
       <button
         onClick={signOut}
-        className="mx-auto flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-expense active:bg-secondary/40"
+        className="mx-auto flex items-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-expense active:bg-secondary/70"
       >
         <LogOut className="h-4 w-4" /> Sign out
       </button>
