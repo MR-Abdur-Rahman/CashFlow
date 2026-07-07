@@ -56,16 +56,16 @@ export default function SettingsInvite() {
         <h1 className="text-xl font-bold text-foreground">Invite a friend</h1>
       </div>
 
-      {/* Search + share, one row */}
+      {/* Search + share, one row — matches the Split page ListToolbar (search + square button). */}
       <div className="flex items-center gap-2 px-4">
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search people"
             aria-label="Search people"
-            className="w-full rounded-full bg-card border border-border py-2.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg bg-secondary py-2 pl-9 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
         </div>
         <button
@@ -74,7 +74,7 @@ export default function SettingsInvite() {
             shareInvite("Track expenses and split bills with me on CashFlow", "Join me on CashFlow")
           }
           aria-label="Share invite link"
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary text-white active:opacity-80"
+          className="h-10 w-10 shrink-0 rounded-lg bg-primary text-white grid place-items-center active:opacity-80"
         >
           <Share2 className="h-5 w-5" />
         </button>
