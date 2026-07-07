@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   categoriesQuery,
   subCategoriesQuery,
+  allSubCategoriesQuery,
   peopleQuery,
   groupsQuery,
   splitBalancesQuery,
@@ -36,6 +37,7 @@ import { formatMoney } from "@/lib/format";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 
 export default function ManagePage() {
+  const navigate = useNavigate();
   const [catDrill, setCatDrill] = useState<{ id: string; name: string; icon: string } | null>(null);
   // Tab lives in the URL (?tab=) so navigating away and pressing Back restores the same tab.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -48,7 +50,16 @@ export default function ManagePage() {
 
   return (
     <div className="px-4 pt-6 pb-24 space-y-5">
-      <h1 className="text-xl font-semibold">Manage</h1>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => navigate(-1)}
+          aria-label="Back"
+          className="-ml-1 p-1 text-muted-foreground"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+        <h1 className="text-xl font-semibold">Manage</h1>
+      </div>
       <Tabs value={tab} onValueChange={(v) => setSearchParams({ tab: v }, { replace: true })}>
         <TabsList className="grid grid-cols-4 w-full">
           <TabsTrigger value="categories">Categories</TabsTrigger>
@@ -80,6 +91,7 @@ function Categories({
   onSelectCat: (cat: { id: string; name: string; icon: string }) => void;
 }) {
   const { data: cats = [] } = useQuery(categoriesQuery());
+  const { data: allSubs = [] } = useQuery(allSubCategoriesQuery());
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<any>(null);
@@ -97,8 +109,16 @@ function Categories({
     onError: (e) => toast.error(e.message),
   });
 
-  // Group by type, filtered by the search box
-  const match = (c: any) => c.name.toLowerCase().includes(q.trim().toLowerCase());
+  // Group by type, filtered by the search box — matches a category by its own name OR by any of its
+  // sub-category names.
+  const term = q.trim().toLowerCase();
+  const catIdsWithSubMatch = new Set(
+    (allSubs as any[])
+      .filter((s) => (s.name ?? "").toLowerCase().includes(term))
+      .map((s) => s.category_id),
+  );
+  const match = (c: any) =>
+    !term || c.name.toLowerCase().includes(term) || catIdsWithSubMatch.has(c.id);
   const expenseCats = (cats as any[]).filter(
     (c) => (c.type === "expense" || c.type === "both") && match(c),
   );

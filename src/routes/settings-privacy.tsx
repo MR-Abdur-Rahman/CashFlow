@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { SettingsHeader } from "@/components/SettingsRows";
 import { PhoneVisibilitySettings } from "@/components/PhoneVisibilitySettings";
+import { ProfileVisibilitySettings } from "@/components/ProfileVisibilitySettings";
 import { cn } from "@/lib/utils";
 
 export default function PrivacyPage() {
@@ -76,6 +77,11 @@ export default function PrivacyPage() {
   return (
     <div className="px-4 pt-6 pb-24 space-y-6">
       <SettingsHeader title="Privacy" />
+
+      <div className="space-y-2">
+        <p className="text-xs uppercase tracking-wider text-muted-foreground px-1">Profile</p>
+        <ProfileVisibilitySettings userId={userId} />
+      </div>
 
       <div className="space-y-2">
         <p className="text-xs uppercase tracking-wider text-muted-foreground px-1">Phone number</p>
