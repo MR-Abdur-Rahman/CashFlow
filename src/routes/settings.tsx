@@ -80,7 +80,7 @@ const MAIN: Item[] = [
     subtitle: "Get help, send feedback",
   },
   {
-    onClick: () => toast("Coming soon"),
+    to: "/settings/invite",
     icon: UserPlus,
     title: "Invite a friend",
     subtitle: "Share CashFlow with others",
