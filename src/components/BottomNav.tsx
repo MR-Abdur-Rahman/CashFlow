@@ -27,13 +27,13 @@ export function BottomNav() {
               key={t.to}
               to={t.to}
               className={cn(
-                "relative flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] transition-colors",
+                "relative flex flex-col items-center justify-center gap-1 py-3 text-[11px] transition-colors",
                 active ? "text-primary" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className="h-6 w-6" />
               <span>{t.label}</span>
-              {active && <span className="absolute -bottom-px h-0.5 w-8 rounded-full bg-primary" />}
+              {active && <span className="absolute -bottom-px h-0.5 w-9 rounded-full bg-primary" />}
             </Link>
           );
         })}

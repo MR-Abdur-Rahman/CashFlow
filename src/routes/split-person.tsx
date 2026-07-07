@@ -184,7 +184,7 @@ export default function PersonDetail() {
         {/* Reminder replaces the old edit button — edit/delete a contact from the Manage page. */}
         <button
           onClick={() => setReminderOpen(true)}
-          className="p-2 rounded-full hover:bg-secondary text-muted-foreground shrink-0"
+          className="mr-2 p-2.5 rounded-full bg-secondary hover:bg-secondary/70 text-muted-foreground shrink-0"
           aria-label="Send reminder"
         >
           <Bell className="h-4 w-4" />
