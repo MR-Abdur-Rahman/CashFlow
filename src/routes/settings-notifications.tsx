@@ -111,13 +111,8 @@ export default function NotificationSettingsPage() {
             },
             {
               cols: ["toast_account_selection"],
-              label: "Account selection needed",
-              description: "you need to select an account for a received settlement",
-            },
-            {
-              cols: ["toast_payment_reminder"],
-              label: "Payment reminder received",
-              description: "someone sends you a payment reminder",
+              label: "Account selection",
+              description: "a split or settlement needs you to pick an account",
             },
           ] as { cols: string[]; label: string; description: string }[]
         ).map(({ cols, label, description }) => (
