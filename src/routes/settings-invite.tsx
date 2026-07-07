@@ -4,13 +4,12 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Search, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { peopleQuery, contactPhonesQuery } from "@/lib/queries";
+import { INVITE_URL } from "@/lib/config";
 import { contactDisplay } from "@/lib/people";
 import { UserAvatar } from "@/components/UserAvatar";
 
 // Read-only invite screen built on the existing People list. No device-contact access, no writes
-// to people/linking. The invite target is the app's own origin (no dedicated invite URL exists yet).
-const INVITE_URL = typeof window !== "undefined" ? window.location.origin : "";
-
+// to people/linking. Invites point at the canonical app URL's auth screen (see lib/config).
 async function shareInvite(text: string, title = "Join me on CashFlow") {
   const data = { title, text, url: INVITE_URL };
   // Native share sheet where available (mobile); otherwise copy the link + toast.

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Html5Qrcode } from "html5-qrcode";
+import { APP_HOST } from "@/lib/config";
 
 export function QrScannerDialog({
   open,
@@ -122,7 +123,7 @@ export function QrScannerDialog({
             <p className="text-xs text-expense text-center">{error}</p>
             <p className="text-xs text-muted-foreground text-center">
               Make sure you're using the app at{" "}
-              <span className="text-primary">cash-flow-zrs8.vercel.app</span>
+              <span className="text-primary">{APP_HOST}</span>
             </p>
           </div>
         ) : hasPermission === null ? (

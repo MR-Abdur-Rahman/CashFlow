@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
+import { APP_HOST } from "@/lib/config";
 
 // Inline camera QR scanner (no dialog wrapper). Runs while `active` is true.
 export function QrScannerInline({
@@ -106,7 +107,7 @@ export function QrScannerInline({
           <p className="text-xs text-expense text-center">{error}</p>
           <p className="text-xs text-muted-foreground text-center">
             Make sure you're using the app at{" "}
-            <span className="text-primary">cash-flow-zrs8.vercel.app</span>
+            <span className="text-primary">{APP_HOST}</span>
           </p>
         </>
       ) : hasPermission === null ? (
