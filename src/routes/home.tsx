@@ -375,7 +375,7 @@ export default function Home() {
               </span>
             )}
           </button>
-          <Link to="/settings" aria-label="Profile">
+          <Link to="/settings/account" aria-label="Profile">
             <UserAvatar url={profile?.avatar_url} name={profile?.full_name} size={40} />
           </Link>
         </div>
