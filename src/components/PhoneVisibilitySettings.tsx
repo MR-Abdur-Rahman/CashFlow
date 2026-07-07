@@ -1,28 +1,19 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Phone, Search, ChevronRight, Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { profileQuery, peopleQuery } from "@/lib/queries";
 import { contactDisplay } from "@/lib/people";
 import { UserAvatar } from "@/components/UserAvatar";
 
-type Scope = "everyone" | "except" | "nobody";
-
-const SCOPES: { v: Scope; label: string; desc: string }[] = [
-  { v: "everyone", label: "Everyone", desc: "All your contacts can see your number" },
-  { v: "except", label: "Except these people", desc: "Visible to everyone except people you choose" },
-  { v: "nobody", label: "Nobody", desc: "Hidden from all your contacts" },
-];
-
 export function PhoneVisibilitySettings({ userId }: { userId?: string }) {
   const qc = useQueryClient();
   const { data: profile } = useQuery(profileQuery(userId));
   const enabled = profile?.phone_share_enabled ?? true;
-  const scope = (profile?.phone_share_scope ?? "everyone") as Scope;
 
   const { data: exceptions = [] } = useQuery({
     queryKey: ["phone-exceptions", userId],
@@ -39,12 +30,14 @@ export function PhoneVisibilitySettings({ userId }: { userId?: string }) {
 
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  async function patchProfile(patch: Record<string, unknown>) {
+  async function setEnabled(v: boolean) {
     if (!userId) return;
-    const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ phone_share_enabled: v })
+      .eq("id", userId);
     if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["profile"] });
-    // What contacts can see depends on these settings — refresh any resolved contact phones.
     qc.invalidateQueries({ queryKey: ["contact-phones"] });
   }
 
@@ -57,50 +50,26 @@ export function PhoneVisibilitySettings({ userId }: { userId?: string }) {
           <p className="text-sm font-medium">Show my phone number</p>
           <p className="text-xs text-muted-foreground mt-0.5">Let your contacts see your number</p>
         </div>
-        <Switch
-          checked={enabled}
-          onCheckedChange={(v) => patchProfile({ phone_share_enabled: v })}
-        />
+        <Switch checked={enabled} onCheckedChange={setEnabled} />
       </div>
 
-      {/* Who can see it */}
+      {/* Hide from specific people */}
       {enabled && (
-        <div className="border-t border-border p-4">
-          <RadioGroup
-            value={scope}
-            onValueChange={(v) => patchProfile({ phone_share_scope: v })}
-            className="gap-0"
-          >
-            {SCOPES.map((o) => (
-              <label
-                key={o.v}
-                htmlFor={`scope-${o.v}`}
-                className="flex items-start gap-3 py-2 cursor-pointer"
-              >
-                <RadioGroupItem value={o.v} id={`scope-${o.v}`} className="mt-0.5" />
-                <div className="min-w-0">
-                  <p className="text-sm">{o.label}</p>
-                  <p className="text-xs text-muted-foreground">{o.desc}</p>
-                </div>
-              </label>
-            ))}
-          </RadioGroup>
-
-          {scope === "except" && (
-            <button
-              type="button"
-              onClick={() => setPickerOpen(true)}
-              className="mt-2 flex w-full items-center gap-2 rounded-lg bg-secondary px-3 py-2.5 text-sm active:opacity-80"
-            >
-              <span className="flex-1 text-left">
-                {exceptions.length
-                  ? `Hidden from ${exceptions.length} ${exceptions.length === 1 ? "person" : "people"}`
-                  : "Choose people to hide from"}
-              </span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-            </button>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="flex w-full items-center gap-4 border-t border-border p-4 text-left active:bg-secondary/40"
+        >
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">Except these people</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {exceptions.length
+                ? `Hidden from ${exceptions.length} ${exceptions.length === 1 ? "person" : "people"}`
+                : "Everyone can see it — tap to hide from specific people"}
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+        </button>
       )}
 
       <HidePhonePeopleSheet
@@ -127,6 +96,13 @@ function HidePhonePeopleSheet({
   const qc = useQueryClient();
   const { data: people = [] } = useQuery(peopleQuery());
   const [q, setQ] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+
+  // Stage the current selection each time the sheet opens; changes are only committed on Save.
+  useEffect(() => {
+    if (open) setSelected(new Set(exceptions));
+  }, [open, exceptions]);
 
   // Phone sharing only applies to linked CashFlow users, so only they can be excepted.
   const linkedPeople = useMemo(
@@ -140,22 +116,49 @@ function HidePhonePeopleSheet({
     return rows.filter(({ d }) => d.name.toLowerCase().includes(term));
   }, [linkedPeople, q]);
 
-  const hiddenSet = new Set(exceptions);
+  function toggle(uid: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(uid)) next.delete(uid);
+      else next.add(uid);
+      return next;
+    });
+  }
 
-  async function toggle(excludedUserId: string, currentlyHidden: boolean) {
+  async function save() {
     if (!userId) return;
-    const table = supabase.from("phone_visibility_exceptions");
-    const { error } = currentlyHidden
-      ? await table.delete().eq("owner_id", userId).eq("excluded_user_id", excludedUserId)
-      : await table.insert({ owner_id: userId, excluded_user_id: excludedUserId });
-    if (error) return toast.error(error.message);
-    qc.invalidateQueries({ queryKey: ["phone-exceptions", userId] });
-    qc.invalidateQueries({ queryKey: ["contact-phones"] });
+    const current = new Set(exceptions);
+    const toAdd = [...selected].filter((id) => !current.has(id));
+    const toRemove = [...current].filter((id) => !selected.has(id));
+    setSaving(true);
+    try {
+      if (toRemove.length) {
+        const { error } = await supabase
+          .from("phone_visibility_exceptions")
+          .delete()
+          .eq("owner_id", userId)
+          .in("excluded_user_id", toRemove);
+        if (error) throw error;
+      }
+      if (toAdd.length) {
+        const { error } = await supabase
+          .from("phone_visibility_exceptions")
+          .insert(toAdd.map((id) => ({ owner_id: userId, excluded_user_id: id })));
+        if (error) throw error;
+      }
+      qc.invalidateQueries({ queryKey: ["phone-exceptions", userId] });
+      qc.invalidateQueries({ queryKey: ["contact-phones"] });
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[80vh] flex flex-col">
+      <SheetContent side="bottom" className="h-[80vh] flex flex-col rounded-t-2xl">
         <SheetHeader>
           <SheetTitle>Hide number from</SheetTitle>
         </SheetHeader>
@@ -179,27 +182,33 @@ function HidePhonePeopleSheet({
             </p>
           ) : (
             filtered.map(({ p, d }) => {
-              const hidden = hiddenSet.has(p.linked_user_id);
+              const on = selected.has(p.linked_user_id);
               return (
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => toggle(p.linked_user_id, hidden)}
+                  onClick={() => toggle(p.linked_user_id)}
                   className="flex w-full items-center gap-3 px-6 py-3 active:bg-secondary/40"
                 >
                   <UserAvatar url={d.avatarUrl} name={d.name} size={36} />
                   <span className="flex-1 text-left text-sm">{d.name}</span>
                   <span
                     className={`grid h-5 w-5 place-items-center rounded-md border ${
-                      hidden ? "bg-primary border-primary text-white" : "border-border"
+                      on ? "bg-primary border-primary text-white" : "border-border"
                     }`}
                   >
-                    {hidden && <Check className="h-3.5 w-3.5" />}
+                    {on && <Check className="h-3.5 w-3.5" />}
                   </span>
                 </button>
               );
             })
           )}
+        </div>
+
+        <div className="pt-3">
+          <Button className="w-full" onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
         </div>
       </SheetContent>
     </Sheet>
