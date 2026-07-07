@@ -27,6 +27,7 @@ export default function PreferencesPage() {
   const currencyCode = (profile as any)?.currency_code ?? "LKR";
   const thousand = (profile as any)?.thousand_separator ?? ",";
   const decimals = (profile as any)?.decimal_places ?? 2;
+  const reminderMethod = (profile as any)?.reminder_method ?? "cashflow";
 
   const updateProfile = useMutation({
     mutationFn: async (patch: Record<string, any>) => {
@@ -157,6 +158,27 @@ export default function PreferencesPage() {
               </SelectContent>
             </Select>
           </div>
+        </div>
+      </Section>
+
+      <Section label="Reminders">
+        <div className="p-4 space-y-1.5">
+          <Label>Send reminders via</Label>
+          <Select
+            value={reminderMethod}
+            onValueChange={(v) => updateProfile.mutate({ reminder_method: v })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cashflow">CashFlow notification</SelectItem>
+              <SelectItem value="whatsapp">WhatsApp message</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            How the “Send reminder” button delivers reminders to your contacts.
+          </p>
         </div>
       </Section>
     </div>

@@ -1,13 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { MessageCircle, Bell } from "lucide-react";
+import { Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { profileQuery } from "@/lib/queries";
+
+// Build the default reminder text. Direction flips with `iOwe`: when the viewer is the debtor the
+// message is a "settling up" note instead of a "you owe me" nudge. Lists every related description.
+function defaultMessage(name: string, amount: number, iOwe: boolean, descriptions: string[]) {
+  const list = descriptions.length ? ` for ${descriptions.join(", ")}` : "";
+  return iOwe
+    ? `Hi ${name}, just a note that I owe you ${formatMoney(amount)}${list}. I'll settle up soon!`
+    : `Hi ${name}, friendly reminder you owe ${formatMoney(amount)}${list}. Thanks!`;
+}
 
 export function SendReminderDialog({
   open,
@@ -16,7 +26,8 @@ export function SendReminderDialog({
   splitId,
   splitShareId,
   amount,
-  description,
+  iOwe = false,
+  descriptions = [],
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -29,21 +40,31 @@ export function SendReminderDialog({
   splitId?: string;
   splitShareId?: string;
   amount: number;
-  description?: string;
+  iOwe?: boolean;
+  descriptions?: string[];
 }) {
   const qc = useQueryClient();
-  const [message, setMessage] = useState(
-    `Hi ${person.name}, friendly reminder you owe ${formatMoney(amount)}${description ? ` for "${description}"` : ""}. Thanks!`,
-  );
+  const [uid, setUid] = useState<string | undefined>();
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUid(data.user?.id));
+  }, []);
+  const { data: profile } = useQuery(profileQuery(uid));
+  const method = ((profile as any)?.reminder_method ?? "cashflow") as "cashflow" | "whatsapp";
+
+  const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Reset the draft to the direction-aware default whenever the dialog (re)opens.
+  useEffect(() => {
+    if (open) setMessage(defaultMessage(person.name, amount, iOwe, descriptions));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   // settlement_reminders.split_id is NOT NULL, so we only log against a concrete split.
-  async function log(channel: "in_app" | "whatsapp" | "sms") {
-    if (!splitId) return;
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) throw new Error("Not signed in");
+  async function log(channel: "in_app" | "whatsapp") {
+    if (!splitId || !uid) return;
     await supabase.from("settlement_reminders").insert({
-      user_id: u.user.id,
+      user_id: uid,
       split_id: splitId,
       split_share_id: splitShareId ?? null,
       person_id: person.id,
@@ -53,38 +74,32 @@ export function SendReminderDialog({
     qc.invalidateQueries({ queryKey: ["reminders"] });
   }
 
-  // Deliver an in-app CashFlow notification to the linked contact's own account.
-  async function sendCashFlow() {
-    if (!person.linked_user_id) {
-      return toast.error("This contact isn't a linked CashFlow user");
-    }
-    setBusy(true);
-    try {
-      const { error } = await supabase.from("notifications").insert({
-        user_id: person.linked_user_id,
-        type: "reminder",
-        title: "Payment reminder",
-        message,
-        related_split_id: splitId ?? null,
-      });
-      if (error) throw error;
-      await log("in_app");
-      toast.success("Reminder sent");
-      onOpenChange(false);
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const canSend = method === "whatsapp" ? !!person.phone_number : !!person.linked_user_id;
+  const unavailableHint =
+    method === "whatsapp"
+      ? "This contact has no phone number for WhatsApp — change the method in Preferences or add a number."
+      : "This contact isn't a linked CashFlow user — switch to WhatsApp in Preferences.";
 
-  async function sendWhatsApp() {
-    if (!person.phone_number) return toast.error("No phone number on this person");
+  async function send() {
+    if (!canSend) return toast.error(unavailableHint);
     setBusy(true);
     try {
-      await log("whatsapp");
-      const phone = person.phone_number.replace(/[^\d]/g, "");
-      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+      if (method === "whatsapp") {
+        await log("whatsapp");
+        const phone = person.phone_number!.replace(/[^\d]/g, "");
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+      } else {
+        const { error } = await supabase.from("notifications").insert({
+          user_id: person.linked_user_id,
+          type: "reminder",
+          title: "Payment reminder",
+          message,
+          related_split_id: splitId ?? null,
+        });
+        if (error) throw error;
+        await log("in_app");
+        toast.success("Reminder sent");
+      }
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e.message);
@@ -100,31 +115,13 @@ export function SendReminderDialog({
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label>Message</Label>
-            <Textarea rows={4} value={message} onChange={(e) => setMessage(e.target.value)} />
+            <Textarea rows={5} value={message} onChange={(e) => setMessage(e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Button disabled={busy || !person.linked_user_id} onClick={sendCashFlow}>
-              <Bell className="h-4 w-4 mr-2" /> CashFlow
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={busy || !person.phone_number}
-              onClick={sendWhatsApp}
-              className="bg-[oklch(0.55_0.15_145)] text-white hover:bg-[oklch(0.5_0.15_145)]"
-            >
-              <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp
-            </Button>
-          </div>
-          {!person.linked_user_id && (
-            <p className="text-xs text-muted-foreground">
-              This contact isn't a linked CashFlow user — only WhatsApp is available.
-            </p>
-          )}
-          {!person.phone_number && (
-            <p className="text-xs text-muted-foreground">
-              Add a phone number to this person to send via WhatsApp.
-            </p>
-          )}
+          <Button className="w-full" disabled={busy || !canSend} onClick={send}>
+            <Send className="h-4 w-4 mr-2" />
+            {method === "whatsapp" ? "Send via WhatsApp" : "Send"}
+          </Button>
+          {!canSend && <p className="text-xs text-muted-foreground">{unavailableHint}</p>}
         </div>
       </DialogContent>
     </Dialog>

@@ -102,6 +102,16 @@ export default function PersonDetail() {
     [allSplits, allSettlements, personId, person, meId, myPids],
   );
 
+  // Every distinct split description between the two of us — listed in the reminder message.
+  const splitDescriptions = useMemo(
+    () => [
+      ...new Set(
+        (splits as any[]).map((s) => (s.description ?? "").trim()).filter(Boolean) as string[],
+      ),
+    ],
+    [splits],
+  );
+
   const { from: periodFrom, to: periodTo } = useMemo(
     () => getPeriodRange(period, anchor),
     [period, anchor],
@@ -332,8 +342,9 @@ export default function PersonDetail() {
           linked_user_id: person.linked_user_id,
         }}
         splitId={(splits[0] as any)?.id}
-        amount={balance}
-        description={(splits[0] as any)?.description}
+        amount={Math.abs(balance)}
+        iOwe={balance < 0}
+        descriptions={splitDescriptions}
       />
 
       <AddTransactionSheet open={addSplitOpen} onOpenChange={setAddSplitOpen} defaultTab="split" />
