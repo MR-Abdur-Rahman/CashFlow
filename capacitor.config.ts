@@ -12,6 +12,11 @@ const config: CapacitorConfig = {
     url: "https://cash-flow-six-beta.vercel.app",
     cleartext: false,
   },
+  plugins: {
+    StatusBar: {
+      overlaysWebView: false,
+    },
+  },
 };
 
 export default config;

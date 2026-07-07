@@ -134,6 +134,7 @@
   min-height: 100dvh;
   background-color: var(--color-background);
   position: relative;
+  padding-top: env(safe-area-inset-top);
 }
 
 @media (min-width: 768px) {
