@@ -281,6 +281,29 @@ export default function Home() {
   ]);
 
   const { data: profile } = useQuery(profileQuery(userId));
+  // Map a linked user's id → the viewer's own contact row id, so an incoming split's avatar can
+  // open the right Person detail page.
+  const { data: homePeople = [] } = useQuery(peopleQuery());
+  const peopleByLinkedUid = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of homePeople as any[]) if (p.linked_user_id) m.set(p.linked_user_id, p.id);
+    return m;
+  }, [homePeople]);
+
+  // Where a split-row avatar navigates: group split → Group detail; 1-to-1 person split → Person
+  // detail (own uses person_id; incoming resolves the viewer's contact for the creator). Multi-person
+  // splits have no single target.
+  function splitAvatarPath(item: any): string | null {
+    const shares = (item.split_shares ?? []) as any[];
+    if (item.type === "group") return item.group_id ? `/split/group/${item.group_id}` : null;
+    if (shares.length > 1) return null;
+    if (item._isIncoming) {
+      const pid = peopleByLinkedUid.get(item.created_by);
+      return pid ? `/split/person/${pid}` : null;
+    }
+    const pid = item.person_id ?? shares[0]?.person_id ?? null;
+    return pid ? `/split/person/${pid}` : null;
+  }
   const { data: notifications = [] } = useQuery(notificationsQuery());
   const unreadCount = (notifications as any[]).filter((n: any) => !n.is_read).length;
 
@@ -487,7 +510,14 @@ export default function Home() {
                     editDeniedMessage="Only the creator or payer can edit this split"
                     deleteDeniedMessage="Only the creator or payer can delete this split"
                   >
-                    <SplitDirectRow s={item} />
+                    <SplitDirectRow
+                      s={item}
+                      onAvatarClick={
+                        splitAvatarPath(item)
+                          ? () => navigate(splitAvatarPath(item)!)
+                          : undefined
+                      }
+                    />
                   </SwipeRow>
                 ) : (
                   <SwipeRow

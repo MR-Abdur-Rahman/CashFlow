@@ -9,10 +9,14 @@ export function SplitDirectRow({
   s,
   lentOweOverride,
   iconAvatar,
+  onAvatarClick,
 }: {
   s: any;
   lentOweOverride?: number;
   iconAvatar?: boolean;
+  // When set, the avatar becomes a button (tapping it opens the person/group detail) while the rest
+  // of the row keeps its own behavior.
+  onAvatarClick?: () => void;
 }) {
   const shares = (s.split_shares ?? []) as any[];
   const total = Number(s.total_amount);
@@ -97,7 +101,21 @@ export function SplitDirectRow({
   return (
     <div className="bg-card">
       <div className="px-4 py-3 flex gap-3">
-        {avatarNode}
+        {onAvatarClick ? (
+          <button
+            type="button"
+            aria-label="Open details"
+            className="shrink-0 rounded-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAvatarClick();
+            }}
+          >
+            {avatarNode}
+          </button>
+        ) : (
+          avatarNode
+        )}
         <div className="flex-1 min-w-0">
           {/* Line 1: description + total */}
           <div className="flex items-start justify-between gap-2">
