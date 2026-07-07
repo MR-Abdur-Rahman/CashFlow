@@ -68,7 +68,7 @@ const MAIN: Item[] = [
   {
     onClick: () => toast("Coming soon"),
     icon: GraduationCap,
-    title: "Tutorial & Backup",
+    title: "Tutorial & Update",
     subtitle: "Learn how to use CashFlow",
   },
   {
