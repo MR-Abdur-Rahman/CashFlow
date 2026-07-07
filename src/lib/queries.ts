@@ -495,9 +495,14 @@ export const profileQuery = (userId: string | undefined) =>
     queryKey: ["profile", userId],
     queryFn: async () => {
       if (!userId) return null;
+      // Explicit column list (everything except phone_number). A `select("*")` errors now that
+      // authenticated has only column-level SELECT on profiles with phone_number revoked — read the
+      // number via my_phone()/contact_phones() instead. See PhoneVisibilitySettings / myPhoneQuery.
       const { data, error } = await supabase
         .from("profiles")
-        .select("*")
+        .select(
+          "id, full_name, google_email, avatar_url, created_at, updated_at, theme, currency_code, currency_symbol, thousand_separator, decimal_places, notify_splits, notify_settlement, notify_daily, daily_reminder_time, notification_prefs, phone_share_enabled, phone_share_scope",
+        )
         .eq("id", userId)
         .maybeSingle();
       if (error) throw error;
