@@ -40,6 +40,7 @@ import { EditSplitSheet, EditTxSheet } from "@/routes/home";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import { SettlementRow } from "@/components/SettlementRow";
 import { settlementDirection, shareRemaining } from "@/lib/settlement";
+import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { format } from "date-fns";
 import {
   type Period,
@@ -73,6 +74,7 @@ export default function AccountDetail() {
   const [deleteSettlement, setDeleteSettlement] = useState<any | null>(null);
   const [editSettlement, setEditSettlement] = useState<any | null>(null);
   const [userId, setUserId] = useState<string | undefined>();
+  const vis = useContactVisibility();
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
   }, []);
@@ -148,7 +150,7 @@ export default function AccountDetail() {
       _sortKey: s.created_at ?? `${s.date}T${s.time ?? "00:00"}`,
     }));
     const settlementItems = (settlements as any[]).map((s) => {
-      const { iPaid, otherName, otherAvatar } = settlementDirection(s, userId);
+      const { iPaid, otherName, otherAvatar } = settlementDirection(s, userId, undefined, vis);
       const { remaining, fullySettled } = shareRemaining(s, settlements as any[]);
       return {
         ...s,
@@ -166,7 +168,7 @@ export default function AccountDetail() {
     return [...txnItems, ...splitItems, ...settlementItems].sort((a, b) =>
       b._sortKey.localeCompare(a._sortKey),
     );
-  }, [txns, splits, settlements, userId, netSplits, netSettlements, netMeId, netMyPids]);
+  }, [txns, splits, settlements, userId, netSplits, netSettlements, netMeId, netMyPids, vis]);
 
   // Delete handler kept for future re-wiring; its trigger button was removed from the UI.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

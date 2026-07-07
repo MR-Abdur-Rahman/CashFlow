@@ -11,6 +11,7 @@ import {
 } from "@/lib/queries";
 import { bilateralBalance } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
+import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Users, ChevronRight, Archive, History, CheckCircle } from "lucide-react";
 import { useState } from "react";
@@ -36,6 +37,7 @@ import { toast } from "sonner";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 
 export default function SplitPage() {
+  const vis = useContactVisibility();
   const { data: people = [] } = useQuery(peopleQuery());
   const { data: groups = [] } = useQuery(groupsQuery());
   const { data: balanceData } = useQuery(splitBalancesQuery());
@@ -126,7 +128,7 @@ export default function SplitPage() {
               <div className="divide-y divide-border">
                 {filteredPeople.map((p) => {
                   const bal = personBalance(p);
-                  const { name, avatarUrl } = contactDisplay(p);
+                  const { name, avatarUrl } = contactDisplay(p, vis);
                   return (
                     <Link
                       key={p.id}

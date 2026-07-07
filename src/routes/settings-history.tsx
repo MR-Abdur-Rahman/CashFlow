@@ -11,6 +11,7 @@ import { EditSplitSheet, EditTxSheet } from "./home";
 import { SplitDirectRow } from "@/components/SplitDirectRow";
 import { SettlementRow } from "@/components/SettlementRow";
 import { settlementDirection, shareRemaining } from "@/lib/settlement";
+import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import { formatMoney } from "@/lib/format";
 import { Input } from "@/components/ui/input";
@@ -507,7 +508,8 @@ export default function HistoryPage() {
 // Settlement history row — uses the shared SettlementRow with per-share remaining + viewer direction.
 function HistorySettlementRow({ s, all }: { s: any; all: any[] }) {
   const { data: balanceData } = useQuery(splitBalancesQuery());
-  const { iPaid, otherName, otherAvatar } = settlementDirection(s, s._uid);
+  const vis = useContactVisibility();
+  const { iPaid, otherName, otherAvatar } = settlementDirection(s, s._uid, undefined, vis);
   const { remaining, fullySettled } = shareRemaining(s, all);
   const netAfter =
     settlementNetAfter(

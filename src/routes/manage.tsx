@@ -10,6 +10,7 @@ import {
 } from "@/lib/queries";
 import { bilateralBalance } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
+import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { UserAvatar } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -553,6 +554,7 @@ function Accounts() {
 }
 
 function People() {
+  const vis = useContactVisibility();
   const { data: people = [] } = useQuery(peopleQuery());
   const { data: balanceData } = useQuery(splitBalancesQuery());
   const allSplits = balanceData?.splits ?? [];
@@ -607,7 +609,7 @@ function People() {
         )}
         {filtered.map((p) => {
           const bal = bilateralBalance(allSplits, allSettlements, p, meId, myPids);
-          const { name, avatarUrl } = contactDisplay(p);
+          const { name, avatarUrl } = contactDisplay(p, vis);
           return (
             <SwipeRow
               key={p.id}

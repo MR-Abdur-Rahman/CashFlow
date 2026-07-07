@@ -7,6 +7,7 @@ import { Capacitor } from "@capacitor/core";
 import { peopleQuery, contactPhonesQuery } from "@/lib/queries";
 import { INVITE_URL } from "@/lib/config";
 import { contactDisplay } from "@/lib/people";
+import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { UserAvatar } from "@/components/UserAvatar";
 import { DeviceContactsInvite } from "@/components/DeviceContactsInvite";
 
@@ -32,6 +33,7 @@ async function shareInvite(text: string, title = "Join me on CashFlow") {
 }
 
 export default function SettingsInvite() {
+  const vis = useContactVisibility();
   const { data: people = [] } = useQuery(peopleQuery());
   const { data: contactPhones } = useQuery(
     contactPhonesQuery((people as any[]).map((p) => p.linked_user_id)),
@@ -68,7 +70,7 @@ export default function SettingsInvite() {
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    const rows = (people as any[]).map((p) => ({ p, display: contactDisplay(p) }));
+    const rows = (people as any[]).map((p) => ({ p, display: contactDisplay(p, vis) }));
     if (!term) return rows;
     return rows.filter(
       ({ p, display }) =>
@@ -76,7 +78,7 @@ export default function SettingsInvite() {
         (p.name ?? "").toLowerCase().includes(term) ||
         (p.nickname ?? "").toLowerCase().includes(term),
     );
-  }, [people, q]);
+  }, [people, q, vis]);
 
   return (
     <div className="min-h-screen pb-24" style={{ background: "var(--background)" }}>

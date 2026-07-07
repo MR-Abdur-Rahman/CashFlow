@@ -544,3 +544,21 @@ export const contactPhonesQuery = (userIds: (string | null | undefined)[]) => {
     enabled: ids.length > 0,
   });
 };
+
+// Which of the given linked users allow the current viewer to see their synced profile. Returns a
+// Set of the ALLOWED user ids; any requested id not in the set is hiding their profile from you.
+export const contactProfilesQuery = (userIds: (string | null | undefined)[]) => {
+  const ids = [...new Set(userIds.filter((x): x is string => !!x))].sort();
+  return queryOptions({
+    queryKey: ["contact-profiles", ids],
+    queryFn: async () => {
+      const allowed = new Set<string>();
+      if (ids.length === 0) return allowed;
+      const { data, error } = await supabase.rpc("contact_profiles", { target_ids: ids });
+      if (error) throw error;
+      for (const row of (data ?? []) as { user_id: string }[]) allowed.add(row.user_id);
+      return allowed;
+    },
+    enabled: ids.length > 0,
+  });
+};

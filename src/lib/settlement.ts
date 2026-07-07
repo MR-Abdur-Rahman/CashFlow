@@ -1,5 +1,5 @@
 // Shared settlement row helpers (kept out of the component file so React Fast Refresh stays happy).
-import { contactDisplay } from "./people";
+import { contactDisplay, type ContactVis } from "./people";
 
 // Maps a settlement's payment `method` to the account `type` that can receive/send it.
 // Used to filter account dropdowns (SettleUpDialog + the Pending-tab settlement row) so a
@@ -40,6 +40,7 @@ export function settlementDirection(
   s: any,
   currentUserId: string | undefined,
   otherNameOverride?: string,
+  vis?: ContactVis,
 ): { iPaid: boolean; otherName: string; otherAvatar: string | null } {
   const share = s.split_shares as any;
   const split = s.splits as any;
@@ -49,9 +50,16 @@ export function settlementDirection(
   if (!split && !s.split_id) {
     const settlerIsMe = s.created_by === currentUserId;
     const iPaid = settlerIsMe ? !s.settler_is_creditor : !!s.settler_is_creditor;
+    // Recorder counterparty honors profile visibility (falls back to the local name when hidden).
+    const recorderHidden = !!s.created_by && !!vis?.hidden.has(s.created_by);
     const cp = settlerIsMe
-      ? contactDisplay(s.person)
-      : { name: s.creator?.full_name ?? "Someone", avatarUrl: s.creator?.avatar_url ?? null };
+      ? contactDisplay(s.person, vis)
+      : {
+          name: recorderHidden
+            ? (vis?.localName?.get(s.created_by) ?? "Someone")
+            : (s.creator?.full_name ?? "Someone"),
+          avatarUrl: recorderHidden ? null : (s.creator?.avatar_url ?? null),
+        };
     return { iPaid, otherName: otherNameOverride ?? cp.name, otherAvatar: cp.avatarUrl };
   }
   // Resolve the split's payer to an auth user id.
@@ -66,10 +74,12 @@ export function settlementDirection(
     : !!currentUserId && share?.person?.linked_user_id === currentUserId; // fallback: settled share owner
   // When the viewer paid (creditor), the other party is the settled share's person (the debtor).
   // When the viewer owes (debtor), the other party is whoever paid the split (creditor).
+  const splitCreatorHidden = !!split?.created_by && !!vis?.hidden.has(split.created_by);
+  const splitCreatorName = splitCreatorHidden
+    ? (vis?.localName?.get(split.created_by) ?? "Someone")
+    : (split?.creator?.full_name ?? "Someone");
   const creditorName =
-    split?.paid_by === "me"
-      ? (split?.creator?.full_name ?? "Someone")
-      : (split?.paid_by_person?.name ?? split?.creator?.full_name ?? "Someone");
+    split?.paid_by === "me" ? splitCreatorName : (split?.paid_by_person?.name ?? splitCreatorName);
   const otherName = otherNameOverride ?? (iPaid ? creditorName : (share?.person_name ?? "Someone"));
   return { iPaid, otherName, otherAvatar: null };
 }

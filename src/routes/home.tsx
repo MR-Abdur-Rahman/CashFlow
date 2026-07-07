@@ -17,6 +17,7 @@ import {
 import { settlementNetAfter } from "@/lib/balance";
 import { formatMoney, greeting, formatDateTime } from "@/lib/format";
 import { SplitDirectRow } from "@/components/SplitDirectRow";
+import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { AccountIcon } from "@/components/AccountIcon";
 import {
   ArrowDownLeft,
@@ -232,6 +233,7 @@ export default function Home() {
       );
   }, [ownSplits, incomingSplits, dateFrom, dateTo]);
 
+  const vis = useContactVisibility();
   // Unified activity feed (transactions + splits + settlements), narrowed by the History-style
   // type chip. "income/expense/transfer" → transactions only; "split"/"settlement" → those only.
   const feedItems = useMemo(() => {
@@ -250,7 +252,7 @@ export default function Home() {
     }));
 
     const settlementItems = (homeSettlements as any[]).map((s) => {
-      const { iPaid, otherName, otherAvatar } = settlementDirection(s, userId);
+      const { iPaid, otherName, otherAvatar } = settlementDirection(s, userId, undefined, vis);
       const { remaining, fullySettled } = shareRemaining(s, homeSettlements as any[]);
       return {
         ...s,
@@ -278,6 +280,7 @@ export default function Home() {
     netSettlements,
     netMeId,
     netMyPids,
+    vis,
   ]);
 
   const { data: profile } = useQuery(profileQuery(userId));

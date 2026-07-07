@@ -7,6 +7,7 @@ import {
 } from "@/lib/queries";
 import { settlementNetAfter, bilateralBalance, splitBilateralContribution } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
+import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { UserAvatar } from "@/components/UserAvatar";
 import {
   ArrowLeft,
@@ -64,6 +65,7 @@ export default function PersonDetail() {
   const { personId } = useParams<{ personId: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const vis = useContactVisibility();
   const { data: person } = useQuery(personQuery(personId!));
   // Linked contacts show their CURRENT profile phone (privacy-enforced via contact_phones); local
   // contacts fall back to the number saved on the contact row.
@@ -194,7 +196,7 @@ export default function PersonDetail() {
 
   if (!person) return <div className="p-6">Person not found</div>;
 
-  const { name: personName, avatarUrl: personAvatar } = contactDisplay(person);
+  const { name: personName, avatarUrl: personAvatar } = contactDisplay(person, vis);
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-5">

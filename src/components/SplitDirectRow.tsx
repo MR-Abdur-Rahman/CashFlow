@@ -1,6 +1,7 @@
 import { Users } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
-import { splitRowAvatar } from "@/lib/people";
+import { splitRowAvatar, creatorDisplayName } from "@/lib/people";
+import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { formatMoney, formatDateTime } from "@/lib/format";
 
 // A split rendered as a feed row (Home / Person / Group / Account / History). `iconAvatar` shows a
@@ -18,6 +19,7 @@ export function SplitDirectRow({
   // of the row keeps its own behavior.
   onAvatarClick?: () => void;
 }) {
+  const vis = useContactVisibility();
   const shares = (s.split_shares ?? []) as any[];
   const total = Number(s.total_amount);
   const totalShares = shares.reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
@@ -37,15 +39,17 @@ export function SplitDirectRow({
 
   // Counterpart label on line 2
   const groupName = s.groups?.name ?? "Unknown Group";
+  // The creator's shown name honors profile visibility (falls back to the local name when hidden).
+  const creatorName = creatorDisplayName(s, vis);
   const personLabel = isIncoming
-    ? (s.creator?.full_name ?? "")
+    ? creatorName
     : (s.people?.name ?? shares[0]?.person_name ?? "");
   // People split names. Own split: all share names (creator = viewer, excluded already).
   // Incoming split: creator's name + other participants, EXCLUDING the viewer's own share
   // (share person_name is from the creator's contact list, so it's the viewer's own name — skip it).
   const peopleNames: string[] = isIncoming
     ? [
-        s.creator?.full_name,
+        creatorName,
         ...shares
           .filter((sh: any) => sh.person_id !== s._myPersonId)
           .map((sh: any) => sh.person_name),
@@ -85,7 +89,7 @@ export function SplitDirectRow({
     </p>
   );
 
-  const rowAv = splitRowAvatar(s);
+  const rowAv = splitRowAvatar(s, vis);
   const avatarNode = iconAvatar ? (
     <div className="h-10 w-10 rounded-full flex items-center justify-center bg-[var(--color-split-bg)] text-split shrink-0">
       <Users className="h-5 w-5" />

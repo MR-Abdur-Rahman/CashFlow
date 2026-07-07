@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { groupQuery, splitBalancesQuery, peopleQuery } from "@/lib/queries";
 import { bilateralBalance } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
+import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { ArrowLeft, Plus, Users, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ export default function GroupDetail() {
   const allSettlements = balanceData?.settlements ?? [];
   const currentUserId = balanceData?.currentUserId ?? null;
   const myPersonIds = balanceData?.myPersonIds ?? [];
+  const vis = useContactVisibility();
   const [edit, setEdit] = useState(false);
   const [addSplitOpen, setAddSplitOpen] = useState(false);
   const [period, setPeriod] = useState<Period>("monthly");
@@ -112,7 +114,7 @@ export default function GroupDetail() {
       if (!uid || uid === currentUserId || seen.has(uid)) continue;
       seen.add(uid);
       const contact = (myContacts as any[]).find((c) => c.linked_user_id === uid);
-      const d = contactDisplay(contact ?? { linked_user_id: uid, name: "Member" });
+      const d = contactDisplay(contact ?? { linked_user_id: uid, name: "Member" }, vis);
       out.push({
         id: (contact?.id ?? uid) as string,
         name: d.name,
@@ -127,7 +129,7 @@ export default function GroupDetail() {
       });
     }
     return out;
-  }, [group, myContacts, allSplits, allSettlements, currentUserId, myPersonIds]);
+  }, [group, myContacts, allSplits, allSettlements, currentUserId, myPersonIds, vis]);
 
   const { from: periodFrom, to: periodTo } = useMemo(
     () => getPeriodRange(period, anchor),

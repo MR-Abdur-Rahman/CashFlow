@@ -8,6 +8,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { peopleQuery } from "@/lib/queries";
 import { contactDisplay } from "@/lib/people";
+import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { EntityAvatarUpload } from "./EntityAvatarUpload";
 import { toast } from "sonner";
 
@@ -21,6 +22,7 @@ export function AddGroupDialog({
   edit?: any;
 }) {
   const qc = useQueryClient();
+  const vis = useContactVisibility();
   const { data: people = [] } = useQuery(peopleQuery());
   const [name, setName] = useState("");
   const [members, setMembers] = useState<string[]>([]);
@@ -134,7 +136,7 @@ export function AddGroupDialog({
                       setMembers((s) => (c ? [...s, p.id] : s.filter((x) => x !== p.id)))
                     }
                   />
-                  <span className="text-sm">{contactDisplay(p).name}</span>
+                  <span className="text-sm">{contactDisplay(p, vis).name}</span>
                 </label>
               ))}
             </div>
