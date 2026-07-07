@@ -27,6 +27,7 @@ import SettingsInvite from "./routes/settings-invite";
 import SettingsHistoryHub from "./routes/settings-history-hub";
 import { BottomNav } from "./components/BottomNav";
 import { UpdatePrompt } from "./components/UpdatePrompt";
+import { PermissionsOnboarding } from "./components/PermissionsOnboarding";
 import { supabase } from "./integrations/supabase/client";
 
 // The add-transaction FAB lives on every main tab (Home / Accounts / Split / Reports / Manage /
@@ -139,6 +140,7 @@ function App() {
         </Routes>
         {session && <GlobalFab />}
         {session && <BottomNav />}
+        {session && <PermissionsOnboarding />}
         <UpdatePrompt />
       </div>
     </BrowserRouter>
