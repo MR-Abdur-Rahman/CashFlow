@@ -19,9 +19,18 @@ import { SettingsHeader, Section } from "@/components/SettingsRows";
 import { cn } from "@/lib/utils";
 import { Sun, Moon, Check, ChevronRight } from "lucide-react";
 
-const REMINDER_METHODS = [
-  { m: "cashflow", label: "CashFlow notification" },
-  { m: "whatsapp", label: "WhatsApp message" },
+const REMINDER_LABELS: Record<string, string> = {
+  cashflow: "CashFlow notification",
+  whatsapp: "WhatsApp message",
+  telegram: "Telegram message",
+  sms: "SMS message",
+};
+// One external channel can be paired with the CashFlow notification. SMS is disabled until an SMS
+// provider is set up.
+const REMINDER_EXTERNALS = [
+  { m: "whatsapp", label: "WhatsApp message", disabled: false },
+  { m: "telegram", label: "Telegram message", disabled: false },
+  { m: "sms", label: "SMS message", disabled: true },
 ] as const;
 
 export default function PreferencesPage() {
@@ -37,12 +46,10 @@ export default function PreferencesPage() {
   const decimals = (profile as any)?.decimal_places ?? 2;
   const reminderMethods = ((profile as any)?.reminder_methods ?? ["cashflow"]) as string[];
   const reminderSummary =
-    REMINDER_METHODS.filter((o) => reminderMethods.includes(o.m))
-      .map((o) => o.label)
-      .join(", ") || "None selected";
+    reminderMethods.map((m) => REMINDER_LABELS[m] ?? m).join(", ") || "None selected";
 
-  // Row → sheet pattern (mirrors the phone "Except these people" picker). Selection is staged in
-  // `methodDraft` and only committed on Save.
+  // Row → sheet pattern. CashFlow is independent; at most one external channel may be paired with it.
+  // Selection is staged in `methodDraft` and only committed on Save.
   const [methodSheet, setMethodSheet] = useState(false);
   const [methodDraft, setMethodDraft] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -50,11 +57,20 @@ export default function PreferencesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [methodSheet]);
 
-  function toggleDraft(m: string) {
+  function toggleCashflow() {
     setMethodDraft((prev) => {
       const next = new Set(prev);
-      if (next.has(m)) next.delete(m);
-      else next.add(m);
+      if (next.has("cashflow")) next.delete("cashflow");
+      else next.add("cashflow");
+      return next;
+    });
+  }
+  function selectExternal(m: string) {
+    setMethodDraft((prev) => {
+      const next = new Set(prev);
+      const wasOn = next.has(m);
+      for (const e of REMINDER_EXTERNALS) next.delete(e.m); // only one external at a time
+      if (!wasOn) next.add(m);
       return next;
     });
   }
@@ -203,19 +219,49 @@ export default function PreferencesPage() {
             <SheetTitle>Send reminders via</SheetTitle>
           </SheetHeader>
           <div className="mt-3 -mx-6">
-            {REMINDER_METHODS.map(({ m, label }) => {
-              const on = methodDraft.has(m);
+            {/* CashFlow notification — independent checkbox */}
+            <button
+              type="button"
+              onClick={toggleCashflow}
+              className="flex w-full items-center gap-3 px-6 py-3 active:bg-secondary/40"
+            >
+              <span className="flex-1 text-left text-sm">{REMINDER_LABELS.cashflow}</span>
+              <span
+                className={cn(
+                  "grid h-5 w-5 place-items-center rounded-md border",
+                  methodDraft.has("cashflow")
+                    ? "bg-primary border-primary text-white"
+                    : "border-border",
+                )}
+              >
+                {methodDraft.has("cashflow") && <Check className="h-3.5 w-3.5" />}
+              </span>
+            </button>
+
+            {/* One external channel (single-select) */}
+            <p className="px-6 pt-3 pb-1 text-[11px] uppercase tracking-wider text-muted-foreground">
+              Also reach them on (choose one)
+            </p>
+            {REMINDER_EXTERNALS.map((ext) => {
+              const on = methodDraft.has(ext.m);
               return (
                 <button
-                  key={m}
+                  key={ext.m}
                   type="button"
-                  onClick={() => toggleDraft(m)}
-                  className="flex w-full items-center gap-3 px-6 py-3 active:bg-secondary/40"
+                  disabled={ext.disabled}
+                  onClick={() => selectExternal(ext.m)}
+                  className={cn(
+                    "flex w-full items-center gap-3 px-6 py-3",
+                    ext.disabled ? "opacity-50" : "active:bg-secondary/40",
+                  )}
                 >
-                  <span className="flex-1 text-left text-sm">{label}</span>
+                  <span className="flex-1 text-left text-sm">
+                    {ext.label}
+                    {ext.disabled && <span className="text-muted-foreground"> · coming soon</span>}
+                  </span>
                   <span
                     className={cn(
-                      "grid h-5 w-5 place-items-center rounded-md border",
+                      "grid h-5 w-5 place-items-center rounded-full border",
                       on ? "bg-primary border-primary text-white" : "border-border",
                     )}
                   >
@@ -226,7 +272,7 @@ export default function PreferencesPage() {
             })}
           </div>
           <p className="px-0 pt-2 text-xs text-muted-foreground">
-            Choose one or both — the “Send reminder” button delivers through every channel you pick.
+            Pick the CashFlow notification and, optionally, one outside channel to also send through.
           </p>
           <div className="pt-3">
             <Button className="w-full" onClick={saveMethods}>

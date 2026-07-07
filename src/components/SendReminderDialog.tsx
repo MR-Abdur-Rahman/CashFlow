@@ -63,7 +63,7 @@ export function SendReminderDialog({
   }, [open]);
 
   // settlement_reminders.split_id is NOT NULL, so we only log against a concrete split.
-  async function log(channel: "in_app" | "whatsapp") {
+  async function log(channel: "in_app" | "whatsapp" | "telegram") {
     if (!splitId || !uid) return;
     await supabase.from("settlement_reminders").insert({
       user_id: uid,
@@ -76,20 +76,25 @@ export function SendReminderDialog({
     qc.invalidateQueries({ queryKey: ["reminders"] });
   }
 
-  // A chosen channel can only fire if the contact supports it.
-  const doWhatsApp = methods.includes("whatsapp") && !!person.phone_number;
+  // CashFlow is independent; at most one external channel is paired with it (SMS not deliverable yet).
   const doCashflow = methods.includes("cashflow") && !!person.linked_user_id;
-  const canSend = doWhatsApp || doCashflow;
+  const doWhatsApp = methods.includes("whatsapp") && !!person.phone_number;
+  const doTelegram = methods.includes("telegram");
+  const canSend = doCashflow || doWhatsApp || doTelegram;
   const unavailableHint = methods.includes("whatsapp")
-    ? "This contact has no phone number for WhatsApp — add one or pick CashFlow in Preferences."
-    : "This contact isn't a linked CashFlow user — enable WhatsApp in Preferences.";
+    ? "This contact has no phone number for WhatsApp — add one, or pick CashFlow in Preferences."
+    : methods.includes("sms")
+      ? "SMS reminders aren't available yet — pick another channel in Preferences."
+      : "This contact isn't a linked CashFlow user — enable an outside channel in Preferences.";
 
   async function send() {
     if (!canSend) return toast.error(unavailableHint);
-    // Open WhatsApp first so it stays inside the click gesture (avoids popup blocking after awaits).
+    // Open external apps first so they stay inside the click gesture (avoids popup blocking).
     if (doWhatsApp) {
       const phone = person.phone_number!.replace(/[^\d]/g, "");
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+    } else if (doTelegram) {
+      window.open(`https://t.me/share/url?url=${encodeURIComponent(message)}`, "_blank");
     }
     setBusy(true);
     try {
@@ -104,6 +109,7 @@ export function SendReminderDialog({
         if (error) throw error;
       }
       if (doWhatsApp) await log("whatsapp");
+      else if (doTelegram) await log("telegram");
       if (doCashflow) await log("in_app");
       toast.success("Reminder sent");
       onOpenChange(false);
