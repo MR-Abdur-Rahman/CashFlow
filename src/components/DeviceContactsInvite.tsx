@@ -26,8 +26,15 @@ export function DeviceContactsInvite({ query }: { query: string }) {
     retry: false,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<DeviceContact[]> => {
-      const perm = await Contacts.requestPermissions();
-      if (perm.contacts !== "granted") throw new Error("permission-denied");
+      let perm = await Contacts.checkPermissions();
+      if (perm.contacts !== "granted" && perm.contacts !== "limited") {
+        perm = await Contacts.requestPermissions();
+      }
+      if (perm.contacts !== "granted" && perm.contacts !== "limited") {
+        throw new Error(
+          "Contacts permission is off. Turn it on in Settings › Apps › CashFlow › Permissions, then retry.",
+        );
+      }
       const { contacts } = await Contacts.getContacts({
         projection: { name: true, phones: true },
       });
@@ -54,9 +61,12 @@ export function DeviceContactsInvite({ query }: { query: string }) {
     return (
       <div className="px-4 pt-6">
         <div className="space-y-3 rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-          <p>Allow contacts access to invite friends from your phone.</p>
+          <p className="font-medium text-foreground">Couldn't load your contacts</p>
+          <p className="break-words text-xs">
+            {(error as Error)?.message || "Unknown error"}
+          </p>
           <Button size="sm" disabled={isRefetching} onClick={() => refetch()}>
-            {isRefetching ? "Requesting…" : "Allow contacts"}
+            {isRefetching ? "Retrying…" : "Retry"}
           </Button>
         </div>
       </div>
