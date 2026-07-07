@@ -5,7 +5,7 @@ import {
   splitBalancesQuery,
   contactPhonesQuery,
 } from "@/lib/queries";
-import { settlementNetAfter, bilateralBalance } from "@/lib/balance";
+import { settlementNetAfter, bilateralBalance, splitBilateralContribution } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
 import { UserAvatar } from "@/components/UserAvatar";
 import {
@@ -102,15 +102,27 @@ export default function PersonDetail() {
     [allSplits, allSettlements, personId, person, meId, myPids],
   );
 
-  // Every distinct split description between the two of us — listed in the reminder message.
-  const splitDescriptions = useMemo(
-    () => [
-      ...new Set(
-        (splits as any[]).map((s) => (s.description ?? "").trim()).filter(Boolean) as string[],
-      ),
-    ],
-    [splits],
-  );
+  // Descriptions of only the splits that back the NET balance's direction (they-owe-me when net is
+  // positive, I-owe-them when negative) — so the reminder lists the splits behind the amount, not
+  // opposite-direction or already-offset ones.
+  const splitDescriptions = useMemo(() => {
+    if (Math.abs(balance) < 0.005) return [] as string[];
+    const target = { id: personId!, linked_user_id: person?.linked_user_id ?? null };
+    const wantPositive = balance > 0;
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const s of splits as any[]) {
+      const c = splitBilateralContribution(s, target, meId, myPids);
+      if (wantPositive ? c > 0 : c < 0) {
+        const d = (s.description ?? "").trim();
+        if (d && !seen.has(d)) {
+          seen.add(d);
+          out.push(d);
+        }
+      }
+    }
+    return out;
+  }, [splits, balance, personId, person, meId, myPids]);
 
   const { from: periodFrom, to: periodTo } = useMemo(
     () => getPeriodRange(period, anchor),

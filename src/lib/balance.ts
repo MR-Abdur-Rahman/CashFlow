@@ -20,6 +20,41 @@ export function getPayerAuthId(split: any): string | null {
   return null;
 }
 
+// One split's signed contribution to the bilateral balance with `target`:
+//   + = target owes me (I paid, they have a share) ; − = I owe target (they paid, I have a share).
+// Returns 0 for splits that don't involve the pair or were paid by a third party. This is the exact
+// per-split logic bilateralBalance sums, exposed so callers can tell which splits back the net.
+export function splitBilateralContribution(
+  s: any,
+  target: any,
+  currentUserId: string | null,
+  myPersonIds: string[],
+): number {
+  const targetLui = target.linked_user_id ?? null;
+  const shares = (s.split_shares ?? []) as any[];
+  const total = Number(s.total_amount);
+  const sumShares = shares.reduce((a: number, sh: any) => a + Number(sh.share_amount), 0);
+  const creatorIsTarget = !!targetLui && s.created_by === targetLui;
+  const targetShareEntry = shares.find(
+    (ss: any) =>
+      (targetLui && ss.person?.linked_user_id === targetLui) || ss.person_id === target.id,
+  );
+  if (!creatorIsTarget && !targetShareEntry) return 0;
+  const payerAuthId = getPayerAuthId(s);
+  const myShareEntry = shares.find(
+    (ss: any) =>
+      myPersonIds.includes(ss.person_id) || ss.person?.linked_user_id === currentUserId,
+  );
+  if (payerAuthId && payerAuthId === currentUserId) {
+    if (targetShareEntry) return Number(targetShareEntry.share_amount);
+    if (creatorIsTarget) return total - sumShares;
+  } else if (payerAuthId && targetLui && payerAuthId === targetLui) {
+    if (myShareEntry) return -Number(myShareEntry.share_amount);
+    if (s.created_by === currentUserId) return -(total - sumShares);
+  }
+  return 0;
+}
+
 // Bilateral net "bin" balance between the current user and a target contact:
 //   net = Σ (gross bilateral split debts) − Σ (settlements between us, signed by money direction).
 // Positive = target owes me; negative = I owe target. Third-party-paid splits are skipped.
@@ -39,30 +74,7 @@ export function bilateralBalance(
 
   // 1) GROSS bilateral split debts (no settlement subtraction — settlements are handled below).
   for (const s of splits) {
-    const shares = (s.split_shares ?? []) as any[];
-    const total = Number(s.total_amount);
-    const sumShares = shares.reduce((a: number, sh: any) => a + Number(sh.share_amount), 0);
-    const creatorIsTarget = !!targetLui && s.created_by === targetLui;
-    const targetShareEntry = shares.find(
-      (ss: any) =>
-        (targetLui && ss.person?.linked_user_id === targetLui) || ss.person_id === target.id,
-    );
-    if (!creatorIsTarget && !targetShareEntry) continue;
-    const payerAuthId = getPayerAuthId(s);
-    const myShareEntry = shares.find(
-      (ss: any) =>
-        myPersonIds.includes(ss.person_id) || ss.person?.linked_user_id === currentUserId,
-    );
-    if (payerAuthId && payerAuthId === currentUserId) {
-      // I paid → target owes me their gross share (or their implicit creator share).
-      if (targetShareEntry) net += Number(targetShareEntry.share_amount);
-      else if (creatorIsTarget) net += total - sumShares;
-    } else if (payerAuthId && targetLui && payerAuthId === targetLui) {
-      // Target paid → I owe my gross share (or my implicit creator share).
-      if (myShareEntry) net -= Number(myShareEntry.share_amount);
-      else if (s.created_by === currentUserId) net -= total - sumShares;
-    }
-    // Third party paid → skip
+    net += splitBilateralContribution(s, target, currentUserId, myPersonIds);
   }
 
   // 2) SETTLEMENTS between me and target (the bin's payments). Money flows debtor→creditor; a
