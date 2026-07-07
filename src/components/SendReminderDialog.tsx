@@ -20,8 +20,13 @@ export function SendReminderDialog({
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  person: { id: string; name: string; phone_number?: string | null };
-  splitId: string;
+  person: {
+    id: string;
+    name: string;
+    phone_number?: string | null;
+    linked_user_id?: string | null;
+  };
+  splitId?: string;
   splitShareId?: string;
   amount: number;
   description?: string;
@@ -32,7 +37,9 @@ export function SendReminderDialog({
   );
   const [busy, setBusy] = useState(false);
 
+  // settlement_reminders.split_id is NOT NULL, so we only log against a concrete split.
   async function log(channel: "in_app" | "whatsapp" | "sms") {
+    if (!splitId) return;
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) throw new Error("Not signed in");
     await supabase.from("settlement_reminders").insert({
@@ -46,11 +53,23 @@ export function SendReminderDialog({
     qc.invalidateQueries({ queryKey: ["reminders"] });
   }
 
-  async function sendInApp() {
+  // Deliver an in-app CashFlow notification to the linked contact's own account.
+  async function sendCashFlow() {
+    if (!person.linked_user_id) {
+      return toast.error("This contact isn't a linked CashFlow user");
+    }
     setBusy(true);
     try {
+      const { error } = await supabase.from("notifications").insert({
+        user_id: person.linked_user_id,
+        type: "reminder",
+        title: "Payment reminder",
+        message,
+        related_split_id: splitId ?? null,
+      });
+      if (error) throw error;
       await log("in_app");
-      toast.success("Reminder logged");
+      toast.success("Reminder sent");
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e.message);
@@ -84,17 +103,23 @@ export function SendReminderDialog({
             <Textarea rows={4} value={message} onChange={(e) => setMessage(e.target.value)} />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Button variant="secondary" disabled={busy} onClick={sendInApp}>
-              <Bell className="h-4 w-4 mr-2" /> Log only
+            <Button disabled={busy || !person.linked_user_id} onClick={sendCashFlow}>
+              <Bell className="h-4 w-4 mr-2" /> CashFlow
             </Button>
             <Button
+              variant="secondary"
               disabled={busy || !person.phone_number}
               onClick={sendWhatsApp}
-              className="bg-[oklch(0.55_0.15_145)]"
+              className="bg-[oklch(0.55_0.15_145)] text-white hover:bg-[oklch(0.5_0.15_145)]"
             >
               <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp
             </Button>
           </div>
+          {!person.linked_user_id && (
+            <p className="text-xs text-muted-foreground">
+              This contact isn't a linked CashFlow user — only WhatsApp is available.
+            </p>
+          )}
           {!person.phone_number && (
             <p className="text-xs text-muted-foreground">
               Add a phone number to this person to send via WhatsApp.

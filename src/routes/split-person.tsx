@@ -10,9 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  Pencil,
 } from "lucide-react";
-import { AddPersonDialog } from "@/components/AddPersonDialog";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { SendReminderDialog } from "@/components/SendReminderDialog";
@@ -74,7 +72,6 @@ export default function PersonDetail() {
   const [reminderOpen, setReminderOpen] = useState(false);
   const [addSplitOpen, setAddSplitOpen] = useState(false);
   const [settleOpen, setSettleOpen] = useState(false);
-  const [editPerson, setEditPerson] = useState(false);
   const [deleteSplit, setDeleteSplit] = useState<any | null>(null);
   const [editSplit, setEditSplit] = useState<any | null>(null);
   const [editSettlement, setEditSettlement] = useState<any | null>(null);
@@ -184,12 +181,13 @@ export default function PersonDetail() {
             {person.linked_user_id && " · 🔗 linked"}
           </p>
         </div>
+        {/* Reminder replaces the old edit button — edit/delete a contact from the Manage page. */}
         <button
-          onClick={() => setEditPerson(true)}
+          onClick={() => setReminderOpen(true)}
           className="p-2 rounded-full hover:bg-secondary text-muted-foreground shrink-0"
-          aria-label="Edit contact"
+          aria-label="Send reminder"
         >
-          <Pencil className="h-4 w-4" />
+          <Bell className="h-4 w-4" />
         </button>
       </div>
 
@@ -220,12 +218,6 @@ export default function PersonDetail() {
           </Button>
         )}
       </div>
-
-      {balance > 0 && (
-        <Button variant="outline" className="w-full" onClick={() => setReminderOpen(true)}>
-          <Bell className="h-4 w-4 mr-2" /> Send reminder
-        </Button>
-      )}
 
       {/* History list */}
       <div>
@@ -319,20 +311,21 @@ export default function PersonDetail() {
         )}
       </div>
 
-      {splits[0] && (
-        <SendReminderDialog
-          open={reminderOpen}
-          onOpenChange={setReminderOpen}
-          person={{ id: person.id, name: personName, phone_number: person.phone_number }}
-          splitId={(splits[0] as any).id}
-          amount={balance}
-          description={(splits[0] as any).description}
-        />
-      )}
+      <SendReminderDialog
+        open={reminderOpen}
+        onOpenChange={setReminderOpen}
+        person={{
+          id: person.id,
+          name: personName,
+          phone_number: person.phone_number,
+          linked_user_id: person.linked_user_id,
+        }}
+        splitId={(splits[0] as any)?.id}
+        amount={balance}
+        description={(splits[0] as any)?.description}
+      />
 
       <AddTransactionSheet open={addSplitOpen} onOpenChange={setAddSplitOpen} defaultTab="split" />
-
-      <AddPersonDialog open={editPerson} onOpenChange={setEditPerson} edit={person} />
 
       {Math.abs(balance) > 0.005 && (
         <SettleUpDialog
