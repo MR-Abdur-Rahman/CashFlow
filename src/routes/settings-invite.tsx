@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Search, Share2 } from "lucide-react";
+import { ArrowLeft, Search, Share2, Contact } from "lucide-react";
 import { toast } from "sonner";
 import { peopleQuery, contactPhonesQuery } from "@/lib/queries";
 import { INVITE_URL } from "@/lib/config";
@@ -35,6 +35,34 @@ export default function SettingsInvite() {
     contactPhonesQuery((people as any[]).map((p) => p.linked_user_id)),
   );
   const [q, setQ] = useState("");
+
+  // Browser Contact Picker — on-demand (Chrome for Android). No standing permission; the OS shows
+  // its own picker each time. Lets you invite someone from your phone book who isn't in the app yet.
+  const contactPickerSupported =
+    typeof navigator !== "undefined" &&
+    "contacts" in navigator &&
+    "select" in (navigator as any).contacts;
+
+  async function pickFromContacts() {
+    try {
+      const picked = await (navigator as any).contacts.select(["name", "tel"], { multiple: false });
+      const c = picked?.[0];
+      if (!c) return;
+      const name = ((c.name?.[0] as string) ?? "").trim() || "there";
+      const tel = ((c.tel?.[0] as string) ?? "").replace(/[^\d]/g, "");
+      const text = `Hi ${name}, join me on CashFlow so we can track expenses and split bills together.`;
+      if (tel) {
+        window.open(
+          `https://wa.me/${tel}?text=${encodeURIComponent(`${text} ${INVITE_URL}`)}`,
+          "_blank",
+        );
+      } else {
+        shareInvite(text);
+      }
+    } catch {
+      // Cancelled or blocked — nothing to do.
+    }
+  }
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -81,6 +109,19 @@ export default function SettingsInvite() {
           <Share2 className="h-5 w-5" />
         </button>
       </div>
+
+      {/* Pick someone from your phone's contacts (Chrome for Android) */}
+      {contactPickerSupported && (
+        <div className="px-4 pt-3">
+          <button
+            type="button"
+            onClick={pickFromContacts}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-secondary py-2.5 text-sm font-medium active:opacity-80"
+          >
+            <Contact className="h-4 w-4" /> Pick from contacts
+          </button>
+        </div>
+      )}
 
       {/* Your people */}
       <p className="px-4 pt-6 pb-2 text-xs uppercase tracking-wider text-muted-foreground">
