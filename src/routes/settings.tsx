@@ -16,6 +16,8 @@ import {
   History,
   HelpCircle,
   Shield,
+  GraduationCap,
+  UserPlus,
   LogOut,
 } from "lucide-react";
 
@@ -67,9 +69,21 @@ const MAIN: Item[] = [
   { to: "/settings/data", icon: Database, title: "Data & Backup", subtitle: "Export, import" },
   {
     onClick: () => toast("Coming soon"),
+    icon: GraduationCap,
+    title: "Tutorial",
+    subtitle: "Learn how to use CashFlow",
+  },
+  {
+    onClick: () => toast("Coming soon"),
     icon: HelpCircle,
     title: "Help and feedback",
     subtitle: "Get help, send feedback",
+  },
+  {
+    onClick: () => toast("Coming soon"),
+    icon: UserPlus,
+    title: "Invite a friend",
+    subtitle: "Share CashFlow with others",
   },
 ];
 
