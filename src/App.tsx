@@ -26,6 +26,9 @@ import SettingsQr from "./routes/settings-qr";
 import SettingsPreferences from "./routes/settings-preferences";
 import SettingsInvite from "./routes/settings-invite";
 import SettingsHistoryHub from "./routes/settings-history-hub";
+import SettingsHelp from "./routes/settings-help";
+import SettingsFeedback from "./routes/settings-feedback";
+import SettingsAppInfo from "./routes/settings-app-info";
 import { BottomNav } from "./components/BottomNav";
 import { UpdatePrompt } from "./components/UpdatePrompt";
 import { NativeUpdateModal } from "./components/NativeUpdateModal";
@@ -137,6 +140,18 @@ function App() {
           <Route
             path="/settings/history"
             element={session ? <SettingsHistoryHub /> : <Navigate to="/auth" />}
+          />
+          <Route
+            path="/settings/help"
+            element={session ? <SettingsHelp /> : <Navigate to="/auth" />}
+          />
+          <Route
+            path="/settings/feedback"
+            element={session ? <SettingsFeedback /> : <Navigate to="/auth" />}
+          />
+          <Route
+            path="/settings/app-info"
+            element={session ? <SettingsAppInfo /> : <Navigate to="/auth" />}
           />
           <Route
             path="/settings/history/transactions"

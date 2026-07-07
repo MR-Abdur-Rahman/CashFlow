@@ -72,10 +72,10 @@ const MAIN: Item[] = [
     subtitle: "Learn how to use CashFlow",
   },
   {
-    onClick: () => toast("Coming soon"),
+    to: "/settings/help",
     icon: HelpCircle,
-    title: "Help and feedback",
-    subtitle: "Get help, send feedback",
+    title: "Help & Feedback",
+    subtitle: "Send feedback, app info",
   },
   {
     to: "/settings/invite",
