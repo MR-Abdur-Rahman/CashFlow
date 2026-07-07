@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { SettingsHeader, Section, ToggleRow } from "@/components/SettingsRows";
+import { TimePicker } from "@/components/TimePicker";
 
 export default function NotificationSettingsPage() {
   const qc = useQueryClient();
@@ -70,12 +71,12 @@ export default function NotificationSettingsPage() {
 
       <Section label="Notifications">
         <ToggleRow
-          label="Split notifications"
+          label="Split Notification"
           checked={prefs?.split_notifications ?? false}
           onChange={(v) => updatePrefs.mutate({ split_notifications: v })}
         />
         <ToggleRow
-          label="Settlement reminders"
+          label="Settlement Notification"
           checked={prefs?.settlement_reminders ?? false}
           onChange={(v) => updatePrefs.mutate({ settlement_reminders: v })}
         />
@@ -86,15 +87,10 @@ export default function NotificationSettingsPage() {
         />
         {prefs?.daily_expense_reminder && (
           <div className="p-4 flex items-center justify-between border-t border-border">
-            <Label htmlFor="daily-time" className="text-sm">
-              Reminder time
-            </Label>
-            <input
-              id="daily-time"
-              type="time"
+            <Label className="text-sm">Reminder time</Label>
+            <TimePicker
               value={String(prefs?.daily_expense_reminder_time ?? "08:00").slice(0, 5)}
-              onChange={(e) => updatePrefs.mutate({ daily_expense_reminder_time: e.target.value })}
-              className="bg-secondary text-foreground rounded-md px-3 py-1.5 text-sm font-mono"
+              onChange={(v) => updatePrefs.mutate({ daily_expense_reminder_time: v })}
             />
           </div>
         )}
@@ -104,24 +100,14 @@ export default function NotificationSettingsPage() {
         {(
           [
             {
-              cols: ["toast_split_added"],
-              label: "Split added",
-              description: "someone adds a split with you",
-            },
-            {
-              cols: ["toast_split_deleted"],
-              label: "Split deleted",
-              description: "a split you're part of is deleted",
+              cols: ["toast_split_added", "toast_split_deleted"],
+              label: "Split",
+              description: "someone adds, edits or deletes a split with you",
             },
             {
               cols: ["toast_settlement_cash", "toast_settlement_bank", "toast_settlement_ewallet"],
               label: "Settlement",
-              description: "someone settles up with you",
-            },
-            {
-              cols: ["toast_delete_attempt"],
-              label: "Delete attempt",
-              description: "someone tries to delete your split",
+              description: "someone adds, edits or deletes a settlement with you",
             },
             {
               cols: ["toast_account_selection"],
