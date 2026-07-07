@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { profileQuery } from "@/lib/queries";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Link, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import {
   ChevronRight,
   QrCode,
@@ -66,10 +65,10 @@ const MAIN: Item[] = [
     subtitle: "History, export and import",
   },
   {
-    onClick: () => toast("Coming soon"),
+    to: "/settings/tutorial",
     icon: GraduationCap,
     title: "Tutorial & Update",
-    subtitle: "Learn how to use CashFlow",
+    subtitle: "Learn how to use CashFlow, check for updates",
   },
   {
     to: "/settings/help",
