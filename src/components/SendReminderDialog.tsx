@@ -13,10 +13,12 @@ import { profileQuery } from "@/lib/queries";
 // Build the default reminder text. Direction flips with `iOwe`: when the viewer is the debtor the
 // message is a "settling up" note instead of a "you owe me" nudge. Lists every related description.
 function defaultMessage(name: string, amount: number, iOwe: boolean, descriptions: string[]) {
+  // Debtor-side note lists no split descriptions — only the creditor's reminder itemizes them.
+  if (iOwe) {
+    return `Hi ${name}, just a note that I owe you ${formatMoney(amount)}. I'll settle up soon!`;
+  }
   const list = descriptions.length ? ` for ${descriptions.join(", ")}` : "";
-  return iOwe
-    ? `Hi ${name}, just a note that I owe you ${formatMoney(amount)}${list}. I'll settle up soon!`
-    : `Hi ${name}, friendly reminder you owe ${formatMoney(amount)}${list}. Thanks!`;
+  return `Hi ${name}, friendly reminder you owe ${formatMoney(amount)}${list}. Thanks!`;
 }
 
 export function SendReminderDialog({
