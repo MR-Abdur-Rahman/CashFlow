@@ -14,6 +14,19 @@ export const accountsQuery = () =>
     },
   });
 
+export const scheduledTransactionsQuery = () =>
+  queryOptions({
+    queryKey: ["scheduled_transactions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("scheduled_transactions")
+        .select("*")
+        .order("day_of_month", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+  });
+
 export const accountQuery = (id: string) =>
   queryOptions({
     queryKey: ["accounts", id],

@@ -16,6 +16,7 @@ import {
   Shield,
   GraduationCap,
   UserPlus,
+  CalendarClock,
   LogOut,
 } from "lucide-react";
 
@@ -63,6 +64,12 @@ const MAIN: Item[] = [
     icon: History,
     title: "History & Backup",
     subtitle: "History, export and import",
+  },
+  {
+    to: "/settings/scheduled",
+    icon: CalendarClock,
+    title: "Scheduled transactions",
+    subtitle: "Recurring income, bills and transfers",
   },
   {
     to: "/settings/tutorial",

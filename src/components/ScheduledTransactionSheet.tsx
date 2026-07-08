@@ -1,0 +1,286 @@
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { TimePicker } from "@/components/TimePicker";
+import { accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
+import type { Scheduled } from "@/lib/scheduled";
+import { cn } from "@/lib/utils";
+
+type TxType = "income" | "expense" | "transfer";
+const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
+
+// Create or edit a scheduled (recurring monthly) transaction. On save it writes the template only —
+// it never posts a real transaction; that happens on confirmation when the schedule is due.
+export function ScheduledTransactionSheet({
+  open,
+  onOpenChange,
+  edit,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  edit?: Scheduled | null;
+}) {
+  const qc = useQueryClient();
+  const { data: accounts = [] } = useQuery(accountsQuery());
+
+  const [type, setType] = useState<TxType>("expense");
+  const [amount, setAmount] = useState("");
+  const [accountId, setAccountId] = useState("");
+  const [toAccountId, setToAccountId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [subCategoryId, setSubCategoryId] = useState("");
+  const [note, setNote] = useState("");
+  const [dayOfMonth, setDayOfMonth] = useState(1);
+  const [time, setTime] = useState("09:00");
+  const [saving, setSaving] = useState(false);
+
+  const { data: categories = [] } = useQuery(categoriesQuery("expense"));
+  const { data: subCategories = [] } = useQuery(subCategoriesQuery(categoryId || null));
+
+  useEffect(() => {
+    if (!open) return;
+    if (edit) {
+      setType(edit.type);
+      setAmount(String(edit.amount));
+      setAccountId(edit.account_id);
+      setToAccountId(edit.to_account_id ?? "");
+      setCategoryId(edit.category_id ?? "");
+      setSubCategoryId(edit.sub_category_id ?? "");
+      setNote(edit.note ?? "");
+      setDayOfMonth(edit.day_of_month);
+      setTime((edit.scheduled_time ?? "09:00").slice(0, 5));
+    } else {
+      setType("expense");
+      setAmount("");
+      setAccountId("");
+      setToAccountId("");
+      setCategoryId("");
+      setSubCategoryId("");
+      setNote("");
+      setDayOfMonth(1);
+      setTime("09:00");
+    }
+  }, [open, edit]);
+
+  const accountLabel = type === "income" ? "To account" : "From account";
+  const validSub = useMemo(
+    () => (subCategories as any[]).some((s) => s.id === subCategoryId),
+    [subCategories, subCategoryId],
+  );
+
+  async function save() {
+    const amt = Number(amount);
+    if (!amt || amt <= 0) return toast.error("Enter an amount");
+    if (!accountId) return toast.error(`Choose the ${accountLabel.toLowerCase()}`);
+    if (type === "transfer") {
+      if (!toAccountId) return toast.error("Choose the destination account");
+      if (toAccountId === accountId) return toast.error("Pick two different accounts");
+    }
+    setSaving(true);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) throw new Error("Not signed in");
+      const payload = {
+        user_id: u.user.id,
+        type,
+        amount: amt,
+        account_id: accountId,
+        to_account_id: type === "transfer" ? toAccountId : null,
+        category_id: type === "expense" ? categoryId || null : null,
+        sub_category_id: type === "expense" && validSub ? subCategoryId : null,
+        note: note.trim() || null,
+        day_of_month: dayOfMonth,
+        scheduled_time: `${time}:00`,
+      };
+      const { error } = edit
+        ? await supabase
+            .from("scheduled_transactions")
+            .update(payload as never)
+            .eq("id", edit.id)
+        : await supabase.from("scheduled_transactions").insert(payload as never);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["scheduled_transactions"] });
+      toast.success(edit ? "Schedule updated" : "Schedule created");
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-2xl">
+        <SheetHeader>
+          <SheetTitle>{edit ? "Edit scheduled transaction" : "New scheduled transaction"}</SheetTitle>
+        </SheetHeader>
+
+        <div className="mt-4 space-y-4">
+          {/* Type */}
+          <div className="grid grid-cols-3 gap-2">
+            {(["expense", "income", "transfer"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setType(t)}
+                className={cn(
+                  "rounded-lg py-2 text-sm font-medium capitalize transition-colors",
+                  type === t ? "bg-primary text-white" : "bg-secondary text-muted-foreground",
+                )}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Amount</Label>
+            <Input
+              type="number"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>{accountLabel}</Label>
+            <Select value={accountId} onValueChange={setAccountId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                {(accounts as any[]).map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {type === "transfer" && (
+            <div className="space-y-1.5">
+              <Label>To account</Label>
+              <Select value={toAccountId} onValueChange={setToAccountId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(accounts as any[])
+                    .filter((a) => a.id !== accountId)
+                    .map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.label}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {type === "expense" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Category</Label>
+                <Select
+                  value={categoryId}
+                  onValueChange={(v) => {
+                    setCategoryId(v);
+                    setSubCategoryId("");
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Optional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(categories as any[]).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.icon ? `${c.icon} ` : ""}
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Sub-category</Label>
+                <Select
+                  value={subCategoryId}
+                  onValueChange={setSubCategoryId}
+                  disabled={!categoryId || (subCategories as any[]).length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Optional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(subCategories as any[]).map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.icon ? `${s.icon} ` : ""}
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label>Note</Label>
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={type === "income" ? "e.g. Salary" : "Optional"}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-1.5">
+              <Label>Day of month</Label>
+              <Select value={String(dayOfMonth)} onValueChange={(v) => setDayOfMonth(Number(v))}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DAYS.map((d) => (
+                    <SelectItem key={d} value={String(d)}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Time</Label>
+              <div>
+                <TimePicker value={time} onChange={setTime} />
+              </div>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Runs on day {dayOfMonth} each month. Months without that day use their last day.
+          </p>
+
+          <Button className="w-full" onClick={save} disabled={saving}>
+            {saving ? "Saving…" : edit ? "Save changes" : "Create schedule"}
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}

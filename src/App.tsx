@@ -30,6 +30,8 @@ import SettingsHelp from "./routes/settings-help";
 import SettingsFeedback from "./routes/settings-feedback";
 import SettingsAppInfo from "./routes/settings-app-info";
 import SettingsTutorial from "./routes/settings-tutorial";
+import SettingsScheduled from "./routes/settings-scheduled";
+import { ScheduledDuePrompt } from "@/components/ScheduledDuePrompt";
 import { BottomNav } from "./components/BottomNav";
 import { UpdatePrompt } from "./components/UpdatePrompt";
 import { NativeUpdateModal } from "./components/NativeUpdateModal";
@@ -159,6 +161,10 @@ function App() {
             element={session ? <SettingsTutorial /> : <Navigate to="/auth" />}
           />
           <Route
+            path="/settings/scheduled"
+            element={session ? <SettingsScheduled /> : <Navigate to="/auth" />}
+          />
+          <Route
             path="/settings/history/transactions"
             element={session ? <SettingsHistory /> : <Navigate to="/auth" />}
           />
@@ -167,6 +173,7 @@ function App() {
         {session && <BottomNav />}
         {session && <PermissionsOnboarding />}
         {session && <NativeUpdateModal />}
+        {session && <ScheduledDuePrompt />}
         <UpdatePrompt />
       </div>
     </BrowserRouter>
