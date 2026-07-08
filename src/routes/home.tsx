@@ -13,8 +13,11 @@ import {
   categoriesQuery,
   subCategoriesQuery,
   splitBalancesQuery,
+  scheduledTransactionsQuery,
 } from "@/lib/queries";
 import { settlementNetAfter } from "@/lib/balance";
+import { isDue } from "@/lib/scheduled";
+import { openScheduledPrompt } from "@/lib/scheduledPrompt";
 import { formatMoney, greeting, formatDateTime } from "@/lib/format";
 import { SplitDirectRow } from "@/components/SplitDirectRow";
 import { useContactVisibility } from "@/hooks/useContactVisibility";
@@ -26,6 +29,7 @@ import {
   Users,
   ChevronDown,
   ChevronRight,
+  CalendarClock,
   Check,
   Bell,
   Trash2,
@@ -284,6 +288,8 @@ export default function Home() {
   ]);
 
   const { data: profile } = useQuery(profileQuery(userId));
+  const { data: scheduledList = [] } = useQuery(scheduledTransactionsQuery());
+  const scheduledDueCount = (scheduledList as any[]).filter((s) => isDue(s)).length;
   // Map a linked user's id → the viewer's own contact row id, so an incoming split's avatar can
   // open the right Person detail page.
   const { data: homePeople = [] } = useQuery(peopleQuery());
@@ -406,6 +412,24 @@ export default function Home() {
           </Link>
         </div>
       </div>
+
+      {/* Scheduled transactions due — reopens the confirm/skip prompt */}
+      {scheduledDueCount > 0 && (
+        <button
+          type="button"
+          onClick={openScheduledPrompt}
+          className="flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-left"
+        >
+          <CalendarClock className="h-5 w-5 shrink-0 text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">
+              {scheduledDueCount} scheduled transaction{scheduledDueCount > 1 ? "s" : ""} due
+            </p>
+            <p className="text-xs text-muted-foreground">Tap to review and confirm</p>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
+      )}
 
       {/* Balance Card */}
       <div className="balance-gradient rounded-2xl p-5 relative overflow-hidden">

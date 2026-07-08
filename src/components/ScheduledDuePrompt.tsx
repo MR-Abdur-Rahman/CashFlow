@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -11,6 +11,7 @@ import {
   currentCycleDueDate,
   type Scheduled,
 } from "@/lib/scheduled";
+import { subscribeScheduledPrompt } from "@/lib/scheduledPrompt";
 import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -21,11 +22,27 @@ export function ScheduledDuePrompt() {
   const qc = useQueryClient();
   const { data: list = [] } = useQuery(scheduledTransactionsQuery());
   const { data: accounts = [] } = useQuery(accountsQuery());
-  const [dismissed, setDismissed] = useState(false);
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const autoShownRef = useRef(false);
 
   const due = useMemo(() => (list as Scheduled[]).filter((s) => isDue(s)), [list]);
-  const open = !dismissed && due.length > 0;
+
+  // Auto-open once per session when something is due; the home badge can re-open it afterwards.
+  useEffect(() => {
+    if (due.length > 0 && !autoShownRef.current) {
+      autoShownRef.current = true;
+      setOpen(true);
+    }
+  }, [due.length]);
+
+  // Re-open on the badge signal.
+  useEffect(() => subscribeScheduledPrompt(() => setOpen(true)), []);
+
+  // Nothing left to confirm → close.
+  useEffect(() => {
+    if (due.length === 0) setOpen(false);
+  }, [due.length]);
 
   const accLabel = (id: string | null) =>
     (accounts as any[]).find((a) => a.id === id)?.label ?? "—";
@@ -58,7 +75,7 @@ export function ScheduledDuePrompt() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && setDismissed(true)}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-sm">
         <DialogTitle>Scheduled transactions due</DialogTitle>
         <DialogDescription>Confirm to record them, or skip this month.</DialogDescription>
