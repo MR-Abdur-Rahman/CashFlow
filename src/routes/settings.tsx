@@ -74,8 +74,8 @@ const MAIN: Item[] = [
   {
     to: "/settings/tutorial",
     icon: GraduationCap,
-    title: "Tutorial & Update",
-    subtitle: "Learn how to use CashFlow, check for updates",
+    title: "Tutorial",
+    subtitle: "Learn how to use CashFlow",
   },
   {
     to: "/settings/help",
