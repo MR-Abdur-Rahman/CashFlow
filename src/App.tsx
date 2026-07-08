@@ -37,6 +37,7 @@ import { UpdatePrompt } from "./components/UpdatePrompt";
 import { NativeUpdateModal } from "./components/NativeUpdateModal";
 import { PermissionsOnboarding } from "./components/PermissionsOnboarding";
 import { supabase } from "./integrations/supabase/client";
+import { syncGoogleEmail } from "@/lib/googleAuth";
 
 // The add-transaction FAB lives on every main tab (Home / Accounts / Split / Reports / Manage /
 // Settings), not detail pages. Kept here so a single sheet instance is shared across tabs.
@@ -73,8 +74,11 @@ function App() {
     });
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      // Backfill google_email for a Google-linked user (deferred to avoid the supabase-js
+      // in-callback deadlock). Covers the link case the handle_new_user trigger can't.
+      if (event === "SIGNED_IN") setTimeout(() => void syncGoogleEmail(), 0);
     });
     return () => subscription.unsubscribe();
   }, []);

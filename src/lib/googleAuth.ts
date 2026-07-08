@@ -3,6 +3,36 @@ import { supabase } from "@/integrations/supabase/client";
 
 const NATIVE_REDIRECT = "cashflow://auth-callback";
 
+// Ensure profiles.google_email is set for a Google-linked user. The handle_new_user trigger records
+// it only for brand-new signups, so an existing email/password user who links Google later would
+// otherwise keep a null google_email. Cheap: writes only when a google identity exists and the stored
+// value differs. Safe to call on every sign-in.
+export async function syncGoogleEmail(): Promise<void> {
+  const { data } = await supabase.auth.getUser();
+  const user = data.user;
+  if (!user) return;
+
+  const identities = user.identities ?? [];
+  const providers: string[] = (user.app_metadata as any)?.providers ?? [];
+  const google = identities.find((i) => i.provider === "google");
+  if (!google && !providers.includes("google")) return;
+
+  const email = (google?.identity_data as any)?.email ?? user.email;
+  if (!email) return;
+
+  const { data: prof } = await supabase
+    .from("profiles")
+    .select("google_email")
+    .eq("id", user.id)
+    .maybeSingle();
+  if ((prof as any)?.google_email === email) return; // already set
+
+  await supabase
+    .from("profiles")
+    .update({ google_email: email } as never)
+    .eq("id", user.id);
+}
+
 // Google OAuth for both environments. Web uses the normal Supabase redirect; native opens the OAuth
 // flow in the system browser and completes it via a custom-scheme deep link back into the app.
 export async function signInWithGoogle(): Promise<void> {
