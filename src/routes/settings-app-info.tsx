@@ -10,7 +10,7 @@ import { App as CapApp } from "@capacitor/app";
 // version, so it shows a dash.
 export default function AppInfoPage() {
   const [version, setVersion] = useState<string | null>(null);
-  const [build, setBuild] = useState<number | null>(null);
+  const [webVersion, setWebVersion] = useState<string | null>(null);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -20,19 +20,20 @@ export default function AppInfoPage() {
   }, []);
 
   useEffect(() => {
-    // Live patch/build number — written to public/build-version.json by version-bump.yml on every
-    // push. Best-effort: if it's missing (very first load) or the fetch fails, we show the native
-    // version with no build suffix.
+    // Full combined version — written to public/build-version.json by version-bump.yml on every push
+    // (major.minor from the last APK release + live patch, e.g. "1.2.7"). Best-effort: if it's
+    // missing (very first load) or the fetch fails, we fall back to the native version below.
     fetch(`/build-version.json?t=${Date.now()}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d && typeof d.patch === "number") setBuild(d.patch);
+        if (d && typeof d.version === "string") setWebVersion(d.version);
       })
       .catch(() => {});
   }, []);
 
-  // "Version 1.2.0 (build 4)" on native; the build suffix is dropped if the file isn't available.
-  const label = version ? `Version ${version}${build != null ? ` (build ${build})` : ""}` : "—";
+  // Prefer the live combined version ("1.2.7"); fall back to the native version, then a dash.
+  const shown = webVersion ?? version;
+  const label = shown ? `Version ${shown}` : "—";
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--background)" }}>
