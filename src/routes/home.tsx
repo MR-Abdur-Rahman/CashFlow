@@ -126,6 +126,9 @@ function showToastIfEnabled(n: any, prefs: any) {
     case "settlement_account_selection":
       shouldShow = !!prefs.toast_account_selection;
       break;
+    case "scheduled_due":
+      shouldShow = true; // recurring reminder — always surfaced
+      break;
   }
   if (shouldShow) notifyToast(n.type, n.title, n.message);
 }
@@ -146,6 +149,8 @@ function getNotificationIcon(type: string) {
     case "settlement_account_selection":
     case "settlement_account_needed":
       return { bg: "#064E3B", color: "#10B981", Icon: Wallet };
+    case "scheduled_due":
+      return { bg: "#2E1065", color: "#A78BFA", Icon: CalendarClock };
     default:
       return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Bell };
   }
@@ -1666,6 +1671,11 @@ function NotificationSheet({
       n.type === "settlement_account_needed"
     ) {
       onNavigate("/split?tab=pending");
+      return;
+    }
+
+    if (n.type === "scheduled_due") {
+      onNavigate("/settings/scheduled");
       return;
     }
 

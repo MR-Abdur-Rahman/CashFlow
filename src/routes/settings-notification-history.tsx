@@ -2,7 +2,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { notificationsQuery } from "@/lib/queries";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Users, Trash2, Check, ShieldAlert, Bell, Wallet } from "lucide-react";
+import {
+  ArrowLeft,
+  Users,
+  Trash2,
+  Check,
+  ShieldAlert,
+  Bell,
+  Wallet,
+  CalendarClock,
+} from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
@@ -23,6 +32,8 @@ function getNotificationIcon(type: string) {
     case "settlement_account_selection":
     case "settlement_account_needed":
       return { bg: "#064E3B", color: "#10B981", Icon: Wallet };
+    case "scheduled_due":
+      return { bg: "#2E1065", color: "#A78BFA", Icon: CalendarClock };
     default:
       return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Bell };
   }

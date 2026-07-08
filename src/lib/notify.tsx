@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { Users, Trash2, Check, ShieldAlert, Bell, Wallet } from "lucide-react";
+import { Users, Trash2, Check, ShieldAlert, Bell, Wallet, CalendarClock } from "lucide-react";
 
 const toastStyles: Record<string, { background: string; border: string }> = {
   split_added: { background: "#78350F", border: "1px solid #F59E0B" },
@@ -8,6 +8,7 @@ const toastStyles: Record<string, { background: string; border: string }> = {
   delete_attempt: { background: "var(--muted)", border: "1px solid var(--muted-foreground)" },
   account_selection: { background: "#78350F", border: "1px solid #F59E0B" },
   settlement_account_selection: { background: "#064E3B", border: "1px solid #10B981" },
+  scheduled_due: { background: "#2E1065", border: "1px solid #A78BFA" },
 };
 
 function getToastIcon(type: string) {
@@ -25,6 +26,8 @@ function getToastIcon(type: string) {
       return <Wallet {...props} />;
     case "settlement_account_selection":
       return <Wallet {...props} />;
+    case "scheduled_due":
+      return <CalendarClock {...props} />;
     default:
       return <Bell {...props} />;
   }
