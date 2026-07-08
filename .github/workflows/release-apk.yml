@@ -13,13 +13,24 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Bump minor + reset patch
-        run: node -e "const fs=require('fs');const v=JSON.parse(fs.readFileSync('version.json'));v.minor=(v.minor||0)+1;v.patch=0;fs.writeFileSync('version.json',JSON.stringify(v)+'\n')"
+      - name: Bump minor + reset patch (version.json + public/app-version.json)
+        run: |
+          node -e "
+            const fs=require('fs');
+            const v=JSON.parse(fs.readFileSync('version.json'));
+            v.minor=(v.minor||0)+1; v.patch=0;
+            fs.writeFileSync('version.json', JSON.stringify(v)+'\n');
+            // Keep the 'latest version' the app checks against accurate (patch always 0 at release).
+            const p='public/app-version.json';
+            const a=JSON.parse(fs.readFileSync(p));
+            a.version=v.major+'.'+v.minor+'.'+v.patch;
+            fs.writeFileSync(p, JSON.stringify(a,null,2)+'\n');
+          "
       - name: Commit version bump
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add version.json
+          git add version.json public/app-version.json
           git commit -m "chore: release APK — bump minor, reset patch [version-bump]"
           git push
 
