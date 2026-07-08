@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { profileQuery } from "@/lib/queries";
+import { profileQuery, myPhoneQuery } from "@/lib/queries";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { cn } from "@/lib/utils";
@@ -12,8 +12,11 @@ export default function QrPage() {
   const qc = useQueryClient();
   const [view, setView] = useState<"code" | "scan">("code");
   const [userId, setUserId] = useState<string | undefined>();
-  const userIdRef = useRef<string | undefined>();
+  const userIdRef = useRef<string | undefined>(undefined);
   const profileRef = useRef<any>(null);
+  // Own phone comes from the my_phone() RPC — the raw column is locked, so profileQuery omits it.
+  // Typed any to match profileRef and because create_mutual_connection's phone params accept null.
+  const myPhoneRef = useRef<any>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -27,8 +30,13 @@ export default function QrPage() {
     profileRef.current = profile;
   }, [profile]);
 
+  const { data: myPhoneData } = useQuery(myPhoneQuery());
+  useEffect(() => {
+    myPhoneRef.current = myPhoneData ?? null;
+  }, [myPhoneData]);
+
   const fullName = profile?.full_name ?? "";
-  const phone = profile?.phone_number ?? "";
+  const phone = myPhoneData ?? "";
 
   async function handleScannedQr(text: string) {
     let payload: any;
@@ -53,7 +61,7 @@ export default function QrPage() {
 
     const currentProfile = profileRef.current;
     const myName = currentProfile?.full_name || "Friend";
-    const myPhone = currentProfile?.phone_number || null;
+    const myPhone = myPhoneRef.current || null;
 
     const { error } = await supabase.rpc("create_mutual_connection", {
       scanner_user_id: currentUserId,

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { profileQuery } from "@/lib/queries";
+import { profileQuery, myPhoneQuery } from "@/lib/queries";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -119,8 +119,9 @@ export default function SettingsPage() {
     });
   }, []);
   const { data: profile } = useQuery(profileQuery(userId));
+  const { data: myPhoneData } = useQuery(myPhoneQuery());
   const fullName = profile?.full_name ?? "";
-  const phone = profile?.phone_number ?? "";
+  const phone = myPhoneData ?? "";
 
   async function signOut() {
     await qc.cancelQueries();

@@ -109,16 +109,19 @@ export type Database = {
         Row: {
           group_id: string
           id: string
+          member_user_id: string | null
           person_id: string
         }
         Insert: {
           group_id: string
           id?: string
+          member_user_id?: string | null
           person_id: string
         }
         Update: {
           group_id?: string
           id?: string
+          member_user_id?: string | null
           person_id?: string
         }
         Relationships: [
@@ -127,6 +130,13 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_member_user_id_fkey"
+            columns: ["member_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -140,6 +150,7 @@ export type Database = {
       }
       groups: {
         Row: {
+          avatar_url: string | null
           created_at: string
           created_by: string
           id: string
@@ -147,6 +158,7 @@ export type Database = {
           name: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           created_by: string
           id?: string
@@ -154,6 +166,7 @@ export type Database = {
           name: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           created_by?: string
           id?: string
@@ -170,28 +183,157 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          created_at: string | null
+          daily_expense_reminder: boolean | null
+          daily_expense_reminder_time: string | null
+          id: string
+          settlement_reminders: boolean | null
+          split_notifications: boolean | null
+          toast_account_selection: boolean | null
+          toast_delete_attempt: boolean | null
+          toast_payment_reminder: boolean | null
+          toast_settlement_bank: boolean | null
+          toast_settlement_cash: boolean | null
+          toast_settlement_ewallet: boolean | null
+          toast_split_added: boolean | null
+          toast_split_deleted: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          daily_expense_reminder?: boolean | null
+          daily_expense_reminder_time?: string | null
+          id?: string
+          settlement_reminders?: boolean | null
+          split_notifications?: boolean | null
+          toast_account_selection?: boolean | null
+          toast_delete_attempt?: boolean | null
+          toast_payment_reminder?: boolean | null
+          toast_settlement_bank?: boolean | null
+          toast_settlement_cash?: boolean | null
+          toast_settlement_ewallet?: boolean | null
+          toast_split_added?: boolean | null
+          toast_split_deleted?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          daily_expense_reminder?: boolean | null
+          daily_expense_reminder_time?: string | null
+          id?: string
+          settlement_reminders?: boolean | null
+          split_notifications?: boolean | null
+          toast_account_selection?: boolean | null
+          toast_delete_attempt?: boolean | null
+          toast_payment_reminder?: boolean | null
+          toast_settlement_bank?: boolean | null
+          toast_settlement_cash?: boolean | null
+          toast_settlement_ewallet?: boolean | null
+          toast_split_added?: boolean | null
+          toast_split_deleted?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          related_settlement_id: string | null
+          related_split_id: string | null
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          related_settlement_id?: string | null
+          related_split_id?: string | null
+          title: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          related_settlement_id?: string | null
+          related_split_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_related_settlement_id_fkey"
+            columns: ["related_settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_related_split_id_fkey"
+            columns: ["related_split_id"]
+            isOneToOne: false
+            referencedRelation: "splits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       people: {
         Row: {
+          avatar_url: string | null
           created_at: string
           id: string
           linked_user_id: string | null
           name: string
+          nickname: string | null
           phone_number: string | null
           user_id: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           id?: string
           linked_user_id?: string | null
           name: string
+          nickname?: string | null
           phone_number?: string | null
           user_id: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           id?: string
           linked_user_id?: string | null
           name?: string
+          nickname?: string | null
           phone_number?: string | null
           user_id?: string
         }
@@ -212,6 +354,72 @@ export type Database = {
           },
         ]
       }
+      phone_visibility_exceptions: {
+        Row: {
+          created_at: string
+          excluded_user_id: string
+          owner_id: string
+        }
+        Insert: {
+          created_at?: string
+          excluded_user_id: string
+          owner_id: string
+        }
+        Update: {
+          created_at?: string
+          excluded_user_id?: string
+          owner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phone_visibility_exceptions_excluded_user_id_fkey"
+            columns: ["excluded_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phone_visibility_exceptions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profile_visibility_exceptions: {
+        Row: {
+          created_at: string
+          excluded_user_id: string
+          owner_id: string
+        }
+        Insert: {
+          created_at?: string
+          excluded_user_id: string
+          owner_id: string
+        }
+        Update: {
+          created_at?: string
+          excluded_user_id?: string
+          owner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_visibility_exceptions_excluded_user_id_fkey"
+            columns: ["excluded_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_visibility_exceptions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -223,10 +431,15 @@ export type Database = {
           full_name: string | null
           google_email: string | null
           id: string
+          notification_prefs: Json | null
           notify_daily: boolean
           notify_settlement: boolean
           notify_splits: boolean
           phone_number: string | null
+          phone_share_enabled: boolean
+          phone_share_scope: string
+          profile_share_enabled: boolean
+          reminder_methods: string[]
           theme: string
           thousand_separator: string
           updated_at: string
@@ -241,10 +454,15 @@ export type Database = {
           full_name?: string | null
           google_email?: string | null
           id: string
+          notification_prefs?: Json | null
           notify_daily?: boolean
           notify_settlement?: boolean
           notify_splits?: boolean
           phone_number?: string | null
+          phone_share_enabled?: boolean
+          phone_share_scope?: string
+          profile_share_enabled?: boolean
+          reminder_methods?: string[]
           theme?: string
           thousand_separator?: string
           updated_at?: string
@@ -259,15 +477,110 @@ export type Database = {
           full_name?: string | null
           google_email?: string | null
           id?: string
+          notification_prefs?: Json | null
           notify_daily?: boolean
           notify_settlement?: boolean
           notify_splits?: boolean
           phone_number?: string | null
+          phone_share_enabled?: boolean
+          phone_share_scope?: string
+          profile_share_enabled?: boolean
+          reminder_methods?: string[]
           theme?: string
           thousand_separator?: string
           updated_at?: string
         }
         Relationships: []
+      }
+      scheduled_transactions: {
+        Row: {
+          account_id: string
+          amount: number
+          category_id: string | null
+          created_at: string
+          day_of_month: number
+          id: string
+          is_active: boolean
+          last_posted_date: string | null
+          note: string | null
+          pending_confirmation: boolean
+          scheduled_time: string
+          sub_category_id: string | null
+          to_account_id: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          category_id?: string | null
+          created_at?: string
+          day_of_month: number
+          id?: string
+          is_active?: boolean
+          last_posted_date?: string | null
+          note?: string | null
+          pending_confirmation?: boolean
+          scheduled_time: string
+          sub_category_id?: string | null
+          to_account_id?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          day_of_month?: number
+          id?: string
+          is_active?: boolean
+          last_posted_date?: string | null
+          note?: string | null
+          pending_confirmation?: boolean
+          scheduled_time?: string
+          sub_category_id?: string | null
+          to_account_id?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_transactions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_transactions_sub_category_id_fkey"
+            columns: ["sub_category_id"]
+            isOneToOne: false
+            referencedRelation: "sub_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_transactions_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       settlement_reminders: {
         Row: {
@@ -335,11 +648,13 @@ export type Database = {
           method: string
           note: string | null
           pending_for_user_id: string | null
+          person_id: string | null
           receiver_account_id: string | null
           receiver_account_pending: boolean
           receiver_confirmed_at: string | null
-          split_id: string
-          split_share_id: string
+          settler_is_creditor: boolean
+          split_id: string | null
+          split_share_id: string | null
         }
         Insert: {
           account_id?: string | null
@@ -351,11 +666,13 @@ export type Database = {
           method: string
           note?: string | null
           pending_for_user_id?: string | null
+          person_id?: string | null
           receiver_account_id?: string | null
           receiver_account_pending?: boolean
           receiver_confirmed_at?: string | null
-          split_id: string
-          split_share_id: string
+          settler_is_creditor?: boolean
+          split_id?: string | null
+          split_share_id?: string | null
         }
         Update: {
           account_id?: string | null
@@ -367,11 +684,13 @@ export type Database = {
           method?: string
           note?: string | null
           pending_for_user_id?: string | null
+          person_id?: string | null
           receiver_account_id?: string | null
           receiver_account_pending?: boolean
           receiver_confirmed_at?: string | null
-          split_id?: string
-          split_share_id?: string
+          settler_is_creditor?: boolean
+          split_id?: string | null
+          split_share_id?: string | null
         }
         Relationships: [
           {
@@ -386,6 +705,27 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "settlements_pending_for_user_id_fkey"
+            columns: ["pending_for_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "settlements_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "settlements_receiver_account_id_fkey"
+            columns: ["receiver_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
           {
@@ -458,7 +798,7 @@ export type Database = {
           created_at: string
           created_by: string
           date: string
-          description: string
+          description: string | null
           group_id: string | null
           id: string
           paid_by: string
@@ -479,7 +819,7 @@ export type Database = {
           created_at?: string
           created_by: string
           date?: string
-          description: string
+          description?: string | null
           group_id?: string | null
           id?: string
           paid_by: string
@@ -500,7 +840,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           date?: string
-          description?: string
+          description?: string | null
           group_id?: string | null
           id?: string
           paid_by?: string
@@ -543,6 +883,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "splits_paid_by_person_id_fkey"
+            columns: ["paid_by_person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "splits_pending_for_user_id_fkey"
+            columns: ["pending_for_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "splits_person_id_fkey"
             columns: ["person_id"]
             isOneToOne: false
@@ -562,6 +916,7 @@ export type Database = {
         Row: {
           category_id: string
           created_at: string
+          icon: string | null
           id: string
           is_default: boolean
           name: string
@@ -570,6 +925,7 @@ export type Database = {
         Insert: {
           category_id: string
           created_at?: string
+          icon?: string | null
           id?: string
           is_default?: boolean
           name: string
@@ -578,6 +934,7 @@ export type Database = {
         Update: {
           category_id?: string
           created_at?: string
+          icon?: string | null
           id?: string
           is_default?: boolean
           name?: string
@@ -602,7 +959,7 @@ export type Database = {
       }
       transactions: {
         Row: {
-          account_id: string
+          account_id: string | null
           amount: number
           category_id: string | null
           created_at: string
@@ -621,7 +978,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          account_id: string
+          account_id?: string | null
           amount: number
           category_id?: string | null
           created_at?: string
@@ -640,7 +997,7 @@ export type Database = {
           user_id: string
         }
         Update: {
-          account_id?: string
+          account_id?: string | null
           amount?: number
           category_id?: string | null
           created_at?: string
@@ -681,6 +1038,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "transactions_split_id_fkey"
+            columns: ["split_id"]
+            isOneToOne: false
+            referencedRelation: "splits"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "transactions_sub_category_id_fkey"
             columns: ["sub_category_id"]
             isOneToOne: false
@@ -708,17 +1072,70 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_see_person_via_split: {
+        Args: { p_person_id: string }
+        Returns: boolean
+      }
       can_see_split: { Args: { _split_id: string }; Returns: boolean }
-      delete_settlement: { Args: { p_settlement_id: string }; Returns: undefined }
+      contact_phones: {
+        Args: { target_ids: string[] }
+        Returns: {
+          phone_number: string
+          user_id: string
+        }[]
+      }
+      contact_profiles: {
+        Args: { target_ids: string[] }
+        Returns: {
+          avatar_url: string
+          full_name: string
+          user_id: string
+        }[]
+      }
+      create_mutual_connection: {
+        Args: {
+          scanned_name: string
+          scanned_phone: string
+          scanned_user_id: string
+          scanner_name: string
+          scanner_phone: string
+          scanner_user_id: string
+        }
+        Returns: undefined
+      }
+      delete_settlement: {
+        Args: { p_settlement_id: string }
+        Returns: undefined
+      }
       delete_split: { Args: { p_split_id: string }; Returns: undefined }
       has_unsettled_splits: { Args: { _user_id: string }; Returns: boolean }
-      run_rls_tests: {
-        Args: never
-        Returns: {
-          detail: string
-          passed: boolean
-          test_name: string
-        }[]
+      is_group_member: { Args: { gid: string }; Returns: boolean }
+      my_phone: { Args: never; Returns: string }
+      seed_default_categories: { Args: { p_user: string }; Returns: undefined }
+      sync_group_member_connections: {
+        Args: { p_group_id: string }
+        Returns: undefined
+      }
+      update_split: {
+        Args: {
+          p_category_id: string
+          p_date: string
+          p_description: string
+          p_group_id: string
+          p_person_id: string
+          p_shares: Json
+          p_split_id: string
+          p_split_type: string
+          p_sub_category_id: string
+          p_time: string
+          p_total_amount: number
+          p_type: string
+        }
+        Returns: undefined
+      }
+      user_participates_in_split: {
+        Args: { p_split_id: string }
+        Returns: boolean
       }
     }
     Enums: {
