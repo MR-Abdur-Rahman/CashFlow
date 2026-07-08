@@ -1,15 +1,20 @@
 name: Android APK
 
+# Manual/reusable only — no longer builds on every push to main. Run it from the Actions tab
+# (workflow_dispatch) or let release-apk.yml call it (workflow_call) after bumping the version.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Build the tip of main. When called by release-apk.yml this picks up the version bump it
+          # just committed (a reusable workflow otherwise checks out the caller's pre-bump commit).
+          ref: main
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
