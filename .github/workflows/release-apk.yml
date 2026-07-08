@@ -1,55 +1,20 @@
 name: Release APK (bump minor, reset patch + build)
-# One-button release: bump the minor (second) digit + reset the patch (third) digit to 0, build the
-# APK with that new version, and only then commit the bump. Build steps mirror android.yml. The
-# commit is tagged [version-bump] so version-bump.yml skips it; the patch counter then resumes from 0
-# on the next normal push to main. The bump is committed LAST, so a failed build never bumps version.
+# One-button release: bump the minor (second) digit + reset the patch (third) digit to 0, commit it,
+# then build the APK by CALLING android.yml (workflow_call) in the same run — no duplicated build
+# steps. The bump commit is tagged [version-bump] so version-bump.yml skips it; the patch counter
+# resumes from 0 on the next normal push to main. android.yml no longer builds on push, so this run
+# is the only APK build for the release.
 on:
   workflow_dispatch:
 jobs:
-  release:
+  bump:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-
-      # --- version bump (written locally now; committed at the end after a successful build) ---
       - name: Bump minor + reset patch
         run: node -e "const fs=require('fs');const v=JSON.parse(fs.readFileSync('version.json'));v.minor=(v.minor||0)+1;v.patch=0;fs.writeFileSync('version.json',JSON.stringify(v)+'\n')"
-
-      # --- build (same steps as android.yml) ---
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-      - name: Build web assets
-        run: bun run build
-      - name: Capacitor sync (android)
-        run: bunx cap sync android
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-      - name: Inject versionName from version.json
-        run: |
-          V=$(node -p "const v=require('./version.json');v.major+'.'+v.minor+'.'+v.patch")
-          sed -i "s/versionName \"[^\"]*\"/versionName \"$V\"/" android/app/build.gradle
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
-        working-directory: android
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: cashflow-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-
-      # --- persist the version bump only after the APK built successfully ---
       - name: Commit version bump
         run: |
           git config user.name "github-actions[bot]"
@@ -57,3 +22,8 @@ jobs:
           git add version.json
           git commit -m "chore: release APK — bump minor, reset patch [version-bump]"
           git push
+
+  # Runs after the bump; calls android.yml, which checks out the (now-bumped) tip of main and builds.
+  build:
+    needs: bump
+    uses: ./.github/workflows/android.yml
