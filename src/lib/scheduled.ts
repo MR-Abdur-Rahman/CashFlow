@@ -69,8 +69,10 @@ export async function postScheduled(s: Scheduled): Promise<void> {
   } else if (s.type === "transfer") {
     row.to_account_id = s.to_account_id;
   } else if (s.type === "income") {
-    // Recurring income posts as a plain "source" income (the app's income model uses source, not
-    // category); the note doubles as the source label.
+    // Recurring income carries its category, and also posts a "source" label (the app's income feed
+    // reads income_source_*), with the note doubling as that label.
+    row.category_id = s.category_id;
+    row.sub_category_id = s.sub_category_id;
     row.income_source_type = "source";
     row.income_source_text = s.note || "Scheduled income";
   }

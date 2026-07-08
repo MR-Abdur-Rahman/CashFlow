@@ -14,12 +14,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TimePicker } from "@/components/TimePicker";
+import { DayOfMonthPicker } from "@/components/DayOfMonthPicker";
 import { accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
 import type { Scheduled } from "@/lib/scheduled";
 import { cn } from "@/lib/utils";
 
 type TxType = "income" | "expense" | "transfer";
-const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
 // Create or edit a scheduled (recurring monthly) transaction. On save it writes the template only —
 // it never posts a real transaction; that happens on confirmation when the schedule is due.
@@ -46,8 +46,12 @@ export function ScheduledTransactionSheet({
   const [time, setTime] = useState("09:00");
   const [saving, setSaving] = useState(false);
 
-  const { data: categories = [] } = useQuery(categoriesQuery("expense"));
+  // Categories are per-type (income vs expense); transfers have none.
+  const { data: categories = [] } = useQuery(
+    categoriesQuery(type === "transfer" ? undefined : type),
+  );
   const { data: subCategories = [] } = useQuery(subCategoriesQuery(categoryId || null));
+  const needsCategory = type === "income" || type === "expense";
 
   useEffect(() => {
     if (!open) return;
@@ -88,6 +92,7 @@ export function ScheduledTransactionSheet({
       if (!toAccountId) return toast.error("Choose the destination account");
       if (toAccountId === accountId) return toast.error("Pick two different accounts");
     }
+    if (needsCategory && !categoryId) return toast.error("Choose a category");
     setSaving(true);
     try {
       const { data: u } = await supabase.auth.getUser();
@@ -98,8 +103,8 @@ export function ScheduledTransactionSheet({
         amount: amt,
         account_id: accountId,
         to_account_id: type === "transfer" ? toAccountId : null,
-        category_id: type === "expense" ? categoryId || null : null,
-        sub_category_id: type === "expense" && validSub ? subCategoryId : null,
+        category_id: needsCategory ? categoryId || null : null,
+        sub_category_id: needsCategory && validSub ? subCategoryId : null,
         note: note.trim() || null,
         day_of_month: dayOfMonth,
         scheduled_time: `${time}:00`,
@@ -131,11 +136,16 @@ export function ScheduledTransactionSheet({
         <div className="mt-4 space-y-4">
           {/* Type */}
           <div className="grid grid-cols-3 gap-2">
-            {(["expense", "income", "transfer"] as const).map((t) => (
+            {(["income", "expense", "transfer"] as const).map((t) => (
               <button
                 key={t}
                 type="button"
-                onClick={() => setType(t)}
+                onClick={() => {
+                  setType(t);
+                  // Categories differ by type, so a stale selection must clear.
+                  setCategoryId("");
+                  setSubCategoryId("");
+                }}
                 className={cn(
                   "rounded-lg py-2 text-sm font-medium capitalize transition-colors",
                   type === t ? "bg-primary text-white" : "bg-secondary text-muted-foreground",
@@ -193,7 +203,7 @@ export function ScheduledTransactionSheet({
             </div>
           )}
 
-          {type === "expense" && (
+          {needsCategory && (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Category</Label>
@@ -205,7 +215,7 @@ export function ScheduledTransactionSheet({
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Optional" />
+                    <SelectValue placeholder="Required" />
                   </SelectTrigger>
                   <SelectContent>
                     {(categories as any[]).map((c) => (
@@ -252,18 +262,9 @@ export function ScheduledTransactionSheet({
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-1.5">
               <Label>Day of month</Label>
-              <Select value={String(dayOfMonth)} onValueChange={(v) => setDayOfMonth(Number(v))}>
-                <SelectTrigger className="w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DAYS.map((d) => (
-                    <SelectItem key={d} value={String(d)}>
-                      {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div>
+                <DayOfMonthPicker value={dayOfMonth} onChange={setDayOfMonth} />
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label>Time</Label>
