@@ -7,6 +7,16 @@
 - Needs (external, can't be done without user setup): a Firebase/FCM project + credentials (store in Supabase Vault), the `@capacitor/push-notifications` plugin (→ native APK rebuild via the Actions workflow), a device-token table + client token registration on login, and an edge function to send FCM. The cron is structured so this is one `pg_net` call per due row (pg_net already available).
 - Blocked on: user providing Firebase/FCM setup.
 
+### [P3] SMS / phone-number login
+- Auth is currently **Email-only**. The login screen's Phone tab is an intentional placeholder (and the Google button was removed because the provider isn't enabled) — neither is a bug.
+- To enable: buy/configure an SMS OTP provider (e.g. Twilio) in Supabase Auth, then wire the Phone tab to `signInWithOtp`/verify. Re-enable steps noted in the phone/auth memory.
+- Blocked on: user purchasing an SMS provider.
+
+### [P3] SMS reminder channel
+- The reminder sheet greys out **SMS** as a send channel (CashFlow + WhatsApp/Telegram work today). SMS is deferred — don't build it yet.
+- To enable: same SMS provider as above; send the reminder text via the provider API (likely an edge function) and un-grey the SMS option.
+- Blocked on: user purchasing an SMS provider.
+
 ## Fixed
 
 ### [Feature] Scheduled (recurring) transactions + server cron — 2026-07-08
