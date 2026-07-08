@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Capacitor } from "@capacitor/core";
 import { getCurrentVersion, getLatestVersion, minorOf, type LatestVersion } from "@/lib/appVersion";
+import { scheduledTransactionsQuery } from "@/lib/queries";
+import { isDue, type Scheduled } from "@/lib/scheduled";
 import { UpdateAvailableDialog } from "@/components/UpdateAvailableDialog";
 
 // Native-only: on app open, prompts to update when the installed APK's MINOR version is behind the
@@ -14,15 +17,25 @@ const PERMISSIONS_SEEN_KEY = "cashflow_permissions_v2";
 export function NativeUpdateModal() {
   const [open, setOpen] = useState(false);
   const [latest, setLatest] = useState<LatestVersion | null>(null);
+  const decidedRef = useRef(false);
+  // Same query ScheduledDuePrompt uses to decide whether IT auto-opens.
+  const { data: scheduledList = [], isPending: schedPending } = useQuery(scheduledTransactionsQuery());
 
   useEffect(() => {
+    if (decidedRef.current) return;
     if (!Capacitor.isNativePlatform()) return;
     // X-button bug fix: two concurrently-open modal Radix dialogs cross-dismiss — clicking this
-    // popup's X registers as an "outside interaction" for the permissions dialog and closes it too.
-    // There is no shared modal state; the cause is the overlap. So we don't open until the
-    // permissions onboarding has finished (it runs once per device on first launch); by the next
-    // open this popup is the only app-level dialog and its X closes nothing else.
+    // popup's X registers as an "outside interaction" for the other dialog and closes it too. There
+    // is no shared modal state; the cause is the overlap. So we don't open while another app-level
+    // dialog will show:
+    //  - the permissions onboarding (once-per-device localStorage flag), and
+    //  - the ScheduledDuePrompt (opens when any schedule isDue).
+    // By the next launch this popup is the only app-level dialog and its X closes nothing else.
     if (!localStorage.getItem(PERMISSIONS_SEEN_KEY)) return;
+    // Wait for the scheduled data to load before deciding, then defer if the due prompt will open.
+    if (schedPending) return;
+    decidedRef.current = true;
+    if ((scheduledList as Scheduled[]).some((s) => isDue(s))) return;
 
     (async () => {
       const [current, data] = await Promise.all([getCurrentVersion(), getLatestVersion()]);
@@ -39,7 +52,7 @@ export function NativeUpdateModal() {
       setLatest(data);
       setOpen(true);
     })();
-  }, []);
+  }, [schedPending, scheduledList]);
 
   return (
     <UpdateAvailableDialog

@@ -4,7 +4,7 @@ import { GraduationCap, RefreshCw } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { SettingsHeader, Section, Row } from "@/components/SettingsRows";
 import { UpdateAvailableDialog } from "@/components/UpdateAvailableDialog";
-import { getCurrentVersion, getLatestVersion, type LatestVersion } from "@/lib/appVersion";
+import { getCurrentVersion, getLatestVersion, minorOf, type LatestVersion } from "@/lib/appVersion";
 
 export default function TutorialUpdatePage() {
   const native = Capacitor.isNativePlatform();
@@ -24,7 +24,9 @@ export default function TutorialUpdatePage() {
     try {
       const [cur, data] = await Promise.all([getCurrentVersion(), getLatestVersion()]);
       setCurrent(cur);
-      if (data?.version && cur && data.version !== cur) {
+      // Minor-only comparison (matches NativeUpdateModal) — a new APK is needed only on a minor bump;
+      // patch differences don't count.
+      if (data?.version && cur && minorOf(data.version) > minorOf(cur)) {
         setLatest(data);
         setDlgOpen(true);
       } else if (data?.version) {
