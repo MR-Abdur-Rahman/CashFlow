@@ -5,6 +5,9 @@ on:
 jobs:
   bump:
     if: ${{ !contains(github.event.head_commit.message, '[version-bump]') }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       contents: write
