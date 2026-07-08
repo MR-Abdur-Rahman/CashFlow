@@ -2,9 +2,72 @@
 
 ## Open
 
-(none)
+### [P3] Scheduled transactions — true OS push (buzz while app fully closed)
+- The server cron already flags due schedules and drops an in-app `scheduled_due` bell notification (migration `scheduled_due_cron`), and the client shows a live toast + home badge + confirm prompt. What's missing is OS-level push so the phone alerts while the app is fully closed.
+- Needs (external, can't be done without user setup): a Firebase/FCM project + credentials (store in Supabase Vault), the `@capacitor/push-notifications` plugin (→ native APK rebuild via the Actions workflow), a device-token table + client token registration on login, and an edge function to send FCM. The cron is structured so this is one `pg_net` call per due row (pg_net already available).
+- Blocked on: user providing Firebase/FCM setup.
 
 ## Fixed
+
+### [Feature] Scheduled (recurring) transactions + server cron — 2026-07-08
+- Commits: 74c15bf · 27e5d3e · 69a1541 · 5a0c630 · 14a85fd · bc20c71 · Migrations: scheduled_transactions, scheduled_due_cron. Full story in DEVLOG.md.
+- Recurring income/expense/transfer; confirm-on-open posting (insert → balance trigger); leap-safe day-of-month; Settings → Scheduled Transaction (swipe edit/delete); home "N due" badge; pg_cron hourly job flags due + inserts a `scheduled_due` bell notification.
+- Test Log:
+  1. 2026-07-08 — build/typecheck clean; Vercel READY; `mark_scheduled_due()` runs clean and the `mark-scheduled-due` cron job is registered/active (hourly). Live end-to-end confirm/skip verification pending user.
+
+### [Chore] Regenerated Supabase types + fixed exposed bugs — 2026-07-08
+- Commit: bd87bf4
+- Regenerated `types.ts` (now covers `scheduled_transactions` + the cycle's new columns/RPCs); error count dozens → ~11 (rest pre-existing nullability). Exposed + fixed: QR connections storing empty phones (read locked `profile.phone_number` → now `my_phone()` RPC), Settings-header phone same, and a missing `cn` import in `SettlementEditSheet` (latent crash).
+- Test Log:
+  1. 2026-07-08 — build/typecheck clean; Vercel READY. Note: QR links created since the phone-column lock captured no phone (data caveat); new links now carry it. Live QR reconnect check pending user.
+
+### [Feature] Notifications page revamp — 2026-07-07 → 07-08
+- Commits: 85d206b · 46200d2
+- Renamed toggles (Split/Settlement Notification); AM/PM `TimePicker` replaces the native time input; merged Split and Settlement toast toggles; renamed Account selection (already gates split+settlement); removed Delete attempt + Payment reminder rows.
+- Test Log:
+  1. 2026-07-08 — build/typecheck clean; Vercel READY. Live check pending user.
+
+### [Feature] Profile-visibility control + app-wide enforcement — 2026-07-07
+- Commits: c70cc62 (row + DB) · 0e7ba2a (enforcement) · Migration: profile_visibility
+- `contact_profiles()` RPC + `useContactVisibility()` hook; `contactDisplay`/`splitRowAvatar` fall back to local name + blank avatar when a contact hides their profile; wired through all split/settlement/contact surfaces.
+- Caveat: display-level enforcement (app respects the setting everywhere) — the name/avatar columns aren't hard-locked like phone (would break joins), so a determined API caller could still read them.
+- Test Log:
+  1. 2026-07-07 — build/typecheck clean; Vercel READY. Live two-user hide/show verification pending.
+
+### [Feature] Versioning + native update prompt + Tutorial & Update page — 2026-07-07
+- Commits: f766754 · e9674e8 · 53c927b · b61a5ae · 02aeffc · b22349e
+- version.json auto-bump workflow → APK versionName; NativeUpdateModal (login-gated) compares baked vs published; UpdateAvailableDialog reused by the manual check on /settings/tutorial.
+- Test Log:
+  1. 2026-07-07 — build clean; Vercel READY; published app-version 1.1.0. Native update-popup behavior verified only on old-vs-new by design.
+
+### [Feature] Native Android app (Capacitor, remote-URL) + device contacts — 2026-07-07
+- Commits: b328c5f · fdeb727 · 1215c20 · cded11a · 9ecae6e · 76a2cd4 · edde5ee · 476dfea · 97425ea · a247fe1 · f6d0c04 · dc04460 · 71ea95c
+- Capacitor 8 shell pointing at the live URL; GitHub Actions APK build; device-contacts Invite; permissions onboarding; status-bar/safe-area/icon/splash; WRITE_CONTACTS added.
+- Test Log:
+  1. 2026-07-07 — web build clean; APK builds via Actions. Native on-device verification (contacts, status bar, update popup) by user.
+
+### [Feature] Reminder system overhaul (CashFlow + WhatsApp/Telegram, direction-aware) — 2026-07-07
+- Commits: 07a3092 · 6912226 · e4a2e6c · 9e71631 · fc1afe7 · ff1018a · bfa9e9a · b3bac5b
+- In-app + one external channel; direction-aware messages listing only the net-direction splits; method picker + remembered preference; person-detail reminder button replaces Edit.
+- Test Log:
+  1. 2026-07-07 — build clean; Vercel READY. Live send-per-channel check pending user.
+
+### [Feature] Phone-number privacy (locked column + RPCs) — 2026-07-07
+- Commits: adff6d3 · cdf314b · 5c22c43
+- `profiles.phone_number` SELECT revoked; own via `my_phone()`, contacts via `contact_phones()`; `profileQuery` switched to explicit columns (the lock broke `select("*")`).
+- Test Log:
+  1. 2026-07-07 — build/typecheck clean (as authenticated role); Vercel READY.
+
+### [Fixes] Cross-user display + date-grouping cluster — 2026-07-07
+- Commits: 5776b31 (split-row avatar linked-detection) · b8717df (settlement paid-by-user shows as expense, not green) · 01d9a79 (payer name on receiver's settlement-income drill; was "Unknown → You") · 3674a8c (group History by LOCAL date, not UTC).
+- Test Log:
+  1. 2026-07-07 — build clean; Vercel READY. b8717df/01d9a79 diagnosed via bug-investigator/bug-fixer agents. Live verification pending user.
+
+### [Feature] Settings/Manage/Accounts rework + UI batch — 2026-07-06
+- Representative commits: 444b776 · 636e31d · 54a2fac · 9972b3e · 6b8ac16 · b948b2c · 2191820 · 02f8e79 · be64f2c
+- Settings hub rework; read-only Account view + Edit page + Delete→Privacy (email-OTP code, Resend deferred); Manage Accounts tab; swipe edit/delete on Accounts and removed elsewhere per user; public avatars bucket; sub-category icons; money-color tokens; SplitDirectRow extracted.
+- Test Log:
+  1. 2026-07-06 — build clean; Vercel READY; iterated live with user across the batch.
 
 ### [P3] History page filters — DONE 2026-07-05
 - Resolved by folding all filtering into the search box + type chips + period (no separate dropdowns).

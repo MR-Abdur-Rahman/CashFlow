@@ -8,6 +8,55 @@ This file tells the *story* of each bug — the problem, the reasoning, and how 
 
 ## Completed
 
+### [Feature] Scheduled (recurring) transactions + server cron — 2026-07-08
+**Goal.** Recurring monthly income / bills / transfers that the user confirms into real transactions.
+
+**Model (user-confirmed decisions).** Client-side due detection on app open (no cron needed for the core loop); **confirm-required**, not auto-post; Settings entry point. Table `scheduled_transactions` (migration `scheduled_transactions`; RLS = single FOR ALL `auth.uid()=user_id`, mirroring `transactions`): type, amount, account_id (source, or destination for income), to_account_id (transfer), category_id + sub_category_id, note, day_of_month, scheduled_time, is_active, last_posted_date, pending_confirmation.
+
+**Build.** `src/lib/scheduled.ts`: `isDue()` (active + this-month due date/time passed + not handled this month), leap-safe `currentCycleDueDate()` (day 31 → last valid day), `postScheduled()` (inserts a real `transactions` row — the existing `trg_account_balance_on_transaction` trigger moves the balance, never manual math — and stamps `last_posted_date`), `skipScheduled()`. UI: `ScheduledTransactionSheet` (Income/Expense/Transfer via the Manage-style `Tabs` toggle; category mandatory for income+expense, sub-category optional; recurring income also carries a source label; calendar-style `DayOfMonthPicker`; AM/PM `TimePicker`), the manage page (`/settings/scheduled`, `SwipeRow` edit/delete + active toggle + Due badge, placed under Manage in Settings), `ScheduledDuePrompt` (app-open Confirm/Skip dialog), and a home "N due" banner that re-opens the prompt via a tiny pub/sub (`scheduledPrompt.ts`).
+
+**Server cron (migration `scheduled_due_cron`).** `pg_cron` hourly job `mark-scheduled-due` → `mark_scheduled_due()` (SECURITY DEFINER, date-based since there's no stored user tz): flags due rows `pending_confirmation=true` and inserts a `scheduled_due` bell notification, so a schedule coming due while the app is closed is waiting on next open (live toast via realtime if open). The `scheduled_due` type is rendered app-side (CalendarClock/purple icon, always-show toast, tap → `/settings/scheduled`).
+
+**Not built:** true OS push (buzz while app fully closed) — needs Firebase/FCM + `@capacitor/push-notifications` + a device-token table + an edge function (pg_net can call it) + a native APK rebuild. Filed in BUGS.md Open.
+
+**Commits.** `74c15bf` (core) · `27e5d3e` (types order + category-for-both + calendar day picker) · `69a1541` (home due badge) · `5a0c630` (Settings order + Tabs toggle) · `14a85fd` (rename page + swipe rows) · `bc20c71` (server cron + notification).
+
+### [Chore] Regenerated Supabase types + fixed the bugs they exposed — 2026-07-08
+The generated `src/integrations/supabase/types.ts` had gone stale (the app worked around it with `as any` everywhere), so `scheduled_transactions` and a whole cycle of new columns/RPCs weren't typed. Regenerated it, which cut the type-check error count from dozens to ~11 (the rest are pre-existing latent nullability, not regressions — types are compile-time only). The accurate types surfaced three real pre-existing bugs: **QR connections were storing empty phone numbers** (the page read `profile.phone_number`, but that column is locked and excluded from `profileQuery`, so the QR payload + `scanner_phone` were blank — rerouted through the `my_phone()` RPC); the **Settings header phone** did the same; and **`SettlementEditSheet` used `cn(...)` with no import** (a latent runtime crash). Commit `bd87bf4`.
+
+### [Feature] Notifications page revamp — 2026-07-07 → 07-08
+Renamed the toggles ("Split notifications" → **Split Notification**, "Settlement reminders" → **Settlement Notification**). Replaced the native `<input type=time>` (which hides AM/PM on 24-hour devices and ignores the app style) with a design-system **`TimePicker`** (hour/minute selects + explicit AM/PM). Merged the toast rows: **Split** (added+deleted into one toggle) and **Settlement** (Cash/Bank/E-wallet into one), each writing all underlying columns via the shared confirm dialog; renamed **Account selection** and confirmed the single `toast_account_selection` pref already gates both split and settlement account-selection toasts; removed the **Delete attempt** and **Payment reminder received** rows. Commits `85d206b`, `46200d2`.
+
+### [Feature] Profile-visibility control + app-wide enforcement — 2026-07-07
+Privacy gained a "Show my profile" toggle + "Except these people" list, mirroring the phone control (migration `profile_visibility`: `profiles.profile_share_enabled` + `profile_visibility_exceptions`). Then made it **actually enforced everywhere** — unlike phone (2 places), a contact's name/avatar appears on every row, and the columns can't be locked without breaking joins. So: a `contact_profiles(target_ids)` SECURITY DEFINER RPC returns a contact's synced name/avatar only if they share with the caller; a shared `useContactVisibility()` hook computes which linked contacts are hiding from the viewer; and the two core resolvers (`contactDisplay`, `splitRowAvatar`) fall back to the locally-saved name + blank avatar when hidden. Wired through split rows (`SplitDirectRow` self-contains it), settlement rows (`settlementDirection`), person/group detail, the people list, invite, Manage, and the add-group picker. Reports already prefers the local name, so it needed no change. Commits `c70cc62` (row + DB), `0e7ba2a` (enforcement).
+
+### [Feature] Versioning + native update prompt + Tutorial & Update page — 2026-07-07
+`version.json` (repo root, auto-bumped by a `version-bump` GitHub workflow on push, injected as the APK `versionName`) and `public/app-version.json` (published latest version + release notes, bumped to 1.1.0). `NativeUpdateModal` compares the baked APK version to the published one on app open (native only, gated behind login so it never shows on the auth screen) — "Update Available" → release-notes → a greyed Continue, with Don't-show-again/Skip. A `UpdateAvailableDialog` + `appVersion.ts` helpers were extracted so the new **Tutorial & Update** page (`/settings/tutorial`) can run the same check manually and show the current version. Commits `f766754`, `e9674e8`, `53c927b`, `b61a5ae`, `02aeffc`, `b22349e`.
+
+### [Feature] Help & Feedback — 2026-07-07
+Settings hub (`/settings/help`) → Send feedback + App info pages. Commit `5ce5da8`.
+
+### [Feature] Native Android app via Capacitor — 2026-07-07
+Wrapped the live site as an Android app (Capacitor 8, **remote-URL** strategy: `server.url` points at the Vercel deploy, so the APK only rebuilds for native plugin/config changes). APK built by a GitHub Actions workflow (Bun + JDK 21 + `gradle assembleDebug`; the PAT can't push `.github/workflows/*`, so those go via the GitHub UI). Plugins: contacts, status-bar, app. Native device-contacts on the Invite page; a one-at-a-time permissions-onboarding flow after sign-in; status-bar/safe-area handling (no content overlap), app icon, splash, and status-bar color; `WRITE_CONTACTS` added (the contacts plugin requires it). Guard all native calls with `Capacitor.isNativePlatform()`. Commits `b328c5f`, `fdeb727`, `1215c20`, `cded11a`, `9ecae6e`, `76a2cd4`, `edde5ee`, `476dfea`, `97425ea`, `a247fe1`, `f6d0c04`.
+
+### [Feature] Reminder system overhaul — 2026-07-07
+Person-detail "remind" now sends via **CashFlow (in-app notification) + one external channel (WhatsApp or Telegram)**; SMS greyed out until a provider is bought. Messages are **direction-aware** (debtor vs creditor wording), list only the splits backing the net-balance direction, and drop split descriptions on the debtor side. Method selection became a row that opens a picker; a single Send with a remembered method preference. The person-detail Edit button was replaced by this reminder button (editing moved to Manage). Commits `07a3092`, `6912226`, `e4a2e6c`, `9e71631`, `fc1afe7`, `ff1018a`, `bfa9e9a`, `b3bac5b`.
+
+### [Feature] Phone-number privacy (locked column + RPCs) — 2026-07-07
+Phone visibility simplified to on/off + a hide-from list. The `profiles.phone_number` SELECT grant is **revoked**; own phone reads via a `my_phone()` RPC, contacts' phones via `contact_phones()` (privacy-enforced) — never `.select()` the column. This broke `profileQuery`'s `select("*")` (permission denied), fixed by switching it to an explicit column list. `PhoneVisibilitySettings.tsx`. Commits `adff6d3`, `cdf314b`, `5c22c43`.
+
+### [Feature] Invite a friend + device contacts — 2026-07-07
+An Invite sub-page styled like the Split-page search/toolbar; on native it reads device contacts (web can't enumerate — this was a driver for going Capacitor). Commits `dc04460`, `71ea95c`.
+
+### [Fixes] Cross-user display + date-grouping cluster — 2026-07-07
+- **Split-row avatar linked-detection** (`5776b31`) — split-row people embeds omit the `linked_user_id` scalar; `contactDisplay` now detects linkage via the embedded `linked` object, else the creator lost the counterpart's synced avatar.
+- **Settlement payer color/recording** (`b8717df`) — a settlement paid by the user now records as their expense (was green and missing from expense views).
+- **Unknown → You on receiver income drill** (`01d9a79`) — resolve the payer's name on the receiver's settlement-income drill row.
+- **History UTC date grouping** (`3674a8c`) — group settlements by local date, not UTC, so a late-evening settlement no longer lands under the previous day.
+
+### [Feature] Settings/Manage/Accounts rework + UI batch — 2026-07-06
+Reworked the Settings hub (Preferences, Appearance segmented toggle, History as a hub → two-history menu, added Manage/Help/Privacy rows, moved Manage off the bottom nav); read-only Account view with all editing on an Edit page and Delete routed to Privacy (email-OTP delete-code flow for now, Resend custom code deferred); a Manage **Accounts** tab; swipe edit/delete on Accounts (and removed swipe-delete from split People/Group + Account/Group detail per the user); public avatars bucket + public URLs so photos load for every viewer; sub-category icons + Manage category search; unified money colors on tokens; `SplitDirectRow` extracted to its own component. Representative commits `444b776`, `636e31d`, `54a2fac`, `9972b3e`, `6b8ac16`, `b948b2c`, `2191820`, `02f8e79`, `be64f2c`.
+
 ### [Feature] Settlement "bin" model — settlements are person-to-person, not per-split — 2026-07-05
 **Motivation.** The old model attached each settlement to a specific `split_share`, and Settle Up FIFO-allocated one payment across shares — so paying LKR 500 could record as *two* rows (200 on one split + 300 on another). The user's mental model is a **"bin"**: one ledger per relationship holding all lents/owes/settlements, where a settlement is a single payment against the **net**. One payment = one row.
 
