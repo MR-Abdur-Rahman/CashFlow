@@ -59,6 +59,9 @@ function App() {
   useRealtimeSplits();
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  // Bumped each time ScheduledDuePrompt closes, so NativeUpdateModal can re-run its check in the same
+  // session once that prompt is dismissed (instead of deferring to the next launch).
+  const [scheduledClosedTick, setScheduledClosedTick] = useState(0);
 
   // Native only: paint the reserved status-bar strip to match the app background, with light icons.
   useEffect(() => {
@@ -176,8 +179,8 @@ function App() {
         {session && <GlobalFab />}
         {session && <BottomNav />}
         {session && <PermissionsOnboarding />}
-        {session && <NativeUpdateModal />}
-        {session && <ScheduledDuePrompt />}
+        {session && <NativeUpdateModal retrySignal={scheduledClosedTick} />}
+        {session && <ScheduledDuePrompt onClosed={() => setScheduledClosedTick((t) => t + 1)} />}
         <UpdatePrompt />
       </div>
     </BrowserRouter>

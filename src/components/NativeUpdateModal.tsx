@@ -14,28 +14,30 @@ const DISMISSED_MINOR_KEY = "cashflow_update_dismissed_minor";
 // overlaps the permissions dialog (see the X-button fix note below).
 const PERMISSIONS_SEEN_KEY = "cashflow_permissions_v2";
 
-export function NativeUpdateModal() {
+// `retrySignal` increments (from App) each time ScheduledDuePrompt closes, so the update check can
+// re-run in the SAME session once that prompt is dismissed — instead of giving up until next launch.
+export function NativeUpdateModal({ retrySignal = 0 }: { retrySignal?: number }) {
   const [open, setOpen] = useState(false);
   const [latest, setLatest] = useState<LatestVersion | null>(null);
-  const decidedRef = useRef(false);
+  const checkRanRef = useRef(false);
   // Same query ScheduledDuePrompt uses to decide whether IT auto-opens.
   const { data: scheduledList = [], isPending: schedPending } = useQuery(scheduledTransactionsQuery());
 
   useEffect(() => {
-    if (decidedRef.current) return;
+    if (checkRanRef.current) return; // open at most once per session
     if (!Capacitor.isNativePlatform()) return;
     // X-button bug fix: two concurrently-open modal Radix dialogs cross-dismiss — clicking this
     // popup's X registers as an "outside interaction" for the other dialog and closes it too. There
     // is no shared modal state; the cause is the overlap. So we don't open while another app-level
-    // dialog will show:
+    // dialog is showing:
     //  - the permissions onboarding (once-per-device localStorage flag), and
-    //  - the ScheduledDuePrompt (opens when any schedule isDue).
-    // By the next launch this popup is the only app-level dialog and its X closes nothing else.
+    //  - the ScheduledDuePrompt (open while any schedule isDue AND it hasn't been dismissed yet this
+    //    session — retrySignal stays 0 until it closes, then we proceed right after dismissal).
     if (!localStorage.getItem(PERMISSIONS_SEEN_KEY)) return;
-    // Wait for the scheduled data to load before deciding, then defer if the due prompt will open.
+    // Wait for the scheduled data to load before deciding.
     if (schedPending) return;
-    decidedRef.current = true;
-    if ((scheduledList as Scheduled[]).some((s) => isDue(s))) return;
+    if ((scheduledList as Scheduled[]).some((s) => isDue(s)) && retrySignal === 0) return;
+    checkRanRef.current = true;
 
     (async () => {
       const [current, data] = await Promise.all([getCurrentVersion(), getLatestVersion()]);
@@ -52,7 +54,7 @@ export function NativeUpdateModal() {
       setLatest(data);
       setOpen(true);
     })();
-  }, [schedPending, scheduledList]);
+  }, [schedPending, scheduledList, retrySignal]);
 
   return (
     <UpdateAvailableDialog

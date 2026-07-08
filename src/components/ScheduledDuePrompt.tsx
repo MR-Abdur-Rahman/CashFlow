@@ -18,13 +18,21 @@ import { cn } from "@/lib/utils";
 // Shown once per session when scheduled transactions are due (their day-of-month + time has passed
 // this month and they haven't been posted/skipped yet). Confirm records the real transaction; Skip
 // stamps the cycle so it won't ask again until next month.
-export function ScheduledDuePrompt() {
+export function ScheduledDuePrompt({ onClosed }: { onClosed?: () => void }) {
   const qc = useQueryClient();
   const { data: list = [] } = useQuery(scheduledTransactionsQuery());
   const { data: accounts = [] } = useQuery(accountsQuery());
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const autoShownRef = useRef(false);
+  const wasOpenRef = useRef(false);
+
+  // Notify the parent whenever the prompt closes (any cause: confirm/skip all, X, or due→0), so the
+  // update popup can run in the same session once this dialog is out of the way.
+  useEffect(() => {
+    if (wasOpenRef.current && !open) onClosed?.();
+    wasOpenRef.current = open;
+  }, [open, onClosed]);
 
   const due = useMemo(() => (list as Scheduled[]).filter((s) => isDue(s)), [list]);
 
