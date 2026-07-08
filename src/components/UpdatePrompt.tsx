@@ -1,12 +1,31 @@
 import { useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
+import { getCurrentVersion, getLatestVersion, minorOf } from "@/lib/appVersion";
 
 // Polls /version.json (emitted per build by vite.config.ts) and, when the deployed build id differs
 // from the one baked into this running bundle, shows a prompt to reload into the new version.
 // The app isn't installed/launched, so users can otherwise sit on a stale cached bundle indefinitely.
 export function UpdatePrompt() {
   const [available, setAvailable] = useState(false);
+  // APK gate: on native, a web reload only helps users already on the latest APK. Users whose APK
+  // minor is behind need a new APK, so we hide this banner for them (inverse of NativeUpdateModal's
+  // "show the update popup when behind"). On web there's no APK — keep the banner ungated.
+  const [apkOk, setApkOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) {
+      setApkOk(true); // web: no APK concept, keep existing behavior
+      return;
+    }
+    (async () => {
+      const [current, latest] = await Promise.all([getCurrentVersion(), getLatestVersion()]);
+      // Only show when we can confirm the installed minor is NOT behind the latest minor.
+      if (!current || !latest?.version) return setApkOk(false);
+      setApkOk(minorOf(current) >= minorOf(latest.version));
+    })();
+  }, []);
 
   useEffect(() => {
     if (!import.meta.env.PROD) return; // no version.json in dev
@@ -36,7 +55,7 @@ export function UpdatePrompt() {
     };
   }, []);
 
-  if (!available) return null;
+  if (!available || !apkOk) return null;
 
   return (
     <div
