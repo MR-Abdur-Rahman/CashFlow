@@ -4,13 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   Plus,
-  Trash2,
   CalendarClock,
   ArrowDownLeft,
   ArrowUpRight,
   ArrowLeftRight,
 } from "lucide-react";
 import { SettingsHeader } from "@/components/SettingsRows";
+import { SwipeRow } from "@/components/SwipeRow";
 import { Switch } from "@/components/ui/switch";
 import { ScheduledTransactionSheet } from "@/components/ScheduledTransactionSheet";
 import { scheduledTransactionsQuery, accountsQuery } from "@/lib/queries";
@@ -56,7 +56,7 @@ export default function ScheduledPage() {
 
   return (
     <div className="px-4 pt-6 pb-24 space-y-4">
-      <SettingsHeader title="Scheduled" back="/settings" />
+      <SettingsHeader title="Scheduled Transaction" back="/settings" />
 
       <button
         onClick={() => {
@@ -78,16 +78,19 @@ export default function ScheduledPage() {
           {rows.map((s) => {
             const m = typeMeta(s.type);
             return (
-              <div
+              <SwipeRow
                 key={s.id}
-                className={cn("flex items-center gap-3 p-4", !s.is_active && "opacity-50")}
+                onEdit={() => {
+                  setEdit(s);
+                  setSheetOpen(true);
+                }}
+                onDelete={() => remove(s)}
               >
-                <button
-                  onClick={() => {
-                    setEdit(s);
-                    setSheetOpen(true);
-                  }}
-                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                <div
+                  className={cn(
+                    "flex items-center gap-3 bg-card p-4",
+                    !s.is_active && "opacity-50",
+                  )}
                 >
                   <span
                     className={cn(
@@ -117,16 +120,9 @@ export default function ScheduledPage() {
                   <span className={cn("shrink-0 text-sm font-semibold", m.color)}>
                     {formatMoney(Number(s.amount))}
                   </span>
-                </button>
-                <Switch checked={s.is_active} onCheckedChange={(v) => toggleActive(s, v)} />
-                <button
-                  onClick={() => remove(s)}
-                  aria-label="Delete"
-                  className="text-muted-foreground active:text-expense"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
+                  <Switch checked={s.is_active} onCheckedChange={(v) => toggleActive(s, v)} />
+                </div>
+              </SwipeRow>
             );
           })}
         </div>
