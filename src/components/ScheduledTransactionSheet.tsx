@@ -13,11 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TimePicker } from "@/components/TimePicker";
 import { DayOfMonthPicker } from "@/components/DayOfMonthPicker";
 import { accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
 import type { Scheduled } from "@/lib/scheduled";
-import { cn } from "@/lib/utils";
 
 type TxType = "income" | "expense" | "transfer";
 
@@ -134,27 +134,22 @@ export function ScheduledTransactionSheet({
         </SheetHeader>
 
         <div className="mt-4 space-y-4">
-          {/* Type */}
-          <div className="grid grid-cols-3 gap-2">
-            {(["income", "expense", "transfer"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => {
-                  setType(t);
-                  // Categories differ by type, so a stale selection must clear.
-                  setCategoryId("");
-                  setSubCategoryId("");
-                }}
-                className={cn(
-                  "rounded-lg py-2 text-sm font-medium capitalize transition-colors",
-                  type === t ? "bg-primary text-white" : "bg-secondary text-muted-foreground",
-                )}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
+          {/* Type — same segmented toggle as the Manage page tabs */}
+          <Tabs
+            value={type}
+            onValueChange={(v) => {
+              setType(v as TxType);
+              // Categories differ by type, so a stale selection must clear.
+              setCategoryId("");
+              setSubCategoryId("");
+            }}
+          >
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="income">Income</TabsTrigger>
+              <TabsTrigger value="expense">Expense</TabsTrigger>
+              <TabsTrigger value="transfer">Transfer</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           <div className="space-y-1.5">
             <Label>Amount</Label>
