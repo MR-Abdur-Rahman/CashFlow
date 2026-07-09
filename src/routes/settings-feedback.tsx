@@ -12,6 +12,7 @@ export default function FeedbackPage() {
   const [email, setEmail] = useState("");
   const [text, setText] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -27,26 +28,49 @@ export default function FeedbackPage() {
   }, []);
 
   function pick(f: File) {
+    setFile(f);
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
     reader.readAsDataURL(f);
+  }
+
+  function clearAttachment() {
+    setFile(null);
+    setPreview(null);
   }
 
   async function send() {
     if (!email.trim()) return toast.error("Email is required");
     if (!text.trim()) return;
     setSending(true);
-    const { error } = await (supabase as any).from("feedback").insert({
-      user_id: userId,
-      name: name.trim() || null,
-      email: email.trim(),
-      message: text.trim(),
-    });
-    setSending(false);
-    if (error) return toast.error(error.message);
-    toast.success("Feedback sent");
-    setText("");
-    setPreview(null);
+    try {
+      // Upload the attachment (if any) to the private feedback bucket; the Edge Function attaches it
+      // to the email. Best-effort — a failed upload still sends the text feedback.
+      let imagePath: string | null = null;
+      if (file) {
+        const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+        const path = `${userId ?? "anon"}/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("feedback")
+          .upload(path, file, { contentType: file.type || undefined });
+        if (upErr) toast.error(`Attachment couldn't upload: ${upErr.message}`);
+        else imagePath = path;
+      }
+
+      const { error } = await (supabase as any).from("feedback").insert({
+        user_id: userId,
+        name: name.trim() || null,
+        email: email.trim(),
+        message: text.trim(),
+        image_path: imagePath,
+      });
+      if (error) return toast.error(error.message);
+      toast.success("Feedback sent");
+      setText("");
+      clearAttachment();
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -97,7 +121,7 @@ export default function FeedbackPage() {
               <button
                 type="button"
                 aria-label="Remove"
-                onClick={() => setPreview(null)}
+                onClick={clearAttachment}
                 className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-secondary text-foreground border border-border"
               >
                 <X className="h-3.5 w-3.5" />
