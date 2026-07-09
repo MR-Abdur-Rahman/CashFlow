@@ -82,7 +82,7 @@ export default function AppInfoPage() {
         <p className="text-sm text-muted-foreground">{label}</p>
       </div>
 
-      <div className="px-6 pb-4">
+      <div className="px-6 pb-12">
         <Button className="w-full" disabled={checking} onClick={checkForUpdates}>
           {checking ? "Checking…" : "Check Updates"}
         </Button>
