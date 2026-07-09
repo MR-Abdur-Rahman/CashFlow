@@ -193,6 +193,44 @@ function useSaveSchedule(edit: Scheduled | null, onClose: () => void) {
 
 const hhmm = (t: string | null | undefined) => (t ?? "09:00").slice(0, 5);
 
+type Account = { id: string; institution: string | null; label: string };
+
+// Default the account at render rather than from an effect. An effect only fires once the accounts
+// query has resolved, and whether that happens before or after a form mounts depends on which other
+// queries warmed the cache — which left Expense/Transfer showing "Select account" while Income
+// defaulted. Deriving it makes the fallback independent of query timing.
+const pick = (accounts: Account[], index: number) => accounts[index]?.id ?? "";
+
+function AccountSelect({
+  label,
+  value,
+  onChange,
+  accounts,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  accounts: Account[];
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue placeholder="Select account" />
+        </SelectTrigger>
+        <SelectContent>
+          {accounts.map((a) => (
+            <SelectItem key={a.id} value={a.id}>
+              {[a.institution, a.label].filter(Boolean).join(" · ")}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 // ─── Income ────────────────────────────────────────────────────────────────
 function ScheduledIncomeForm({
   onClose,
@@ -233,10 +271,11 @@ function ScheduledIncomeForm({
       setDayOfMonth(edit.day_of_month);
       setTime(hhmm(edit.scheduled_time));
       setNote(edit.note ?? "");
-    } else if (accounts[0]?.id) {
-      setAccountId((a) => a || (accounts[0] as { id: string }).id);
     }
-  }, [edit, accounts, people]);
+  }, [edit, people]);
+
+  const list = accounts as Account[];
+  const accountValue = accountId || pick(list, 0);
 
   return (
     <>
@@ -252,12 +291,12 @@ function ScheduledIncomeForm({
           if (sourceType === "person" && !personId) return toast.error("Please select a person");
           if (sourceType === "source" && !sourceText.trim())
             return toast.error("Please enter or select a source");
-          if (!accountId) return toast.error("Please select an account");
+          if (!accountValue) return toast.error("Please select an account");
           save.mutate({
             type: "income",
             amount: amt,
             description: description.trim(),
-            account_id: accountId,
+            account_id: accountValue,
             to_account_id: null,
             category_id: null,
             sub_category_id: null,
@@ -314,21 +353,12 @@ function ScheduledIncomeForm({
             </button>
           )}
         </div>
-        <div className="space-y-1.5">
-          <Label>To account</Label>
-          <Select value={accountId} onValueChange={setAccountId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select account" />
-            </SelectTrigger>
-            <SelectContent>
-              {(accounts as { id: string; institution: string | null; label: string }[]).map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {[a.institution, a.label].filter(Boolean).join(" · ")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <AccountSelect
+          label="To account"
+          value={accountValue}
+          onChange={setAccountId}
+          accounts={list}
+        />
         <DayTime
           dayOfMonth={dayOfMonth}
           time={time}
@@ -399,10 +429,11 @@ function ScheduledExpenseForm({
       setDayOfMonth(edit.day_of_month);
       setTime(hhmm(edit.scheduled_time));
       setNote(edit.note ?? "");
-    } else if (accounts[0]?.id) {
-      setAccountId((a) => a || (accounts[0] as { id: string }).id);
     }
-  }, [edit, accounts, categories, subCategories]);
+  }, [edit, categories, subCategories]);
+
+  const list = accounts as Account[];
+  const accountValue = accountId || pick(list, 0);
 
   return (
     <>
@@ -415,13 +446,13 @@ function ScheduledExpenseForm({
           const amt = Number(amount);
           if (!amount || isNaN(amt) || amt <= 0) return toast.error("Amount must be greater than 0");
           if (!description.trim()) return toast.error("Enter a description");
-          if (!accountId) return toast.error("Please select an account");
+          if (!accountValue) return toast.error("Please select an account");
           if (!categoryId) return toast.error("Please select a category");
           save.mutate({
             type: "expense",
             amount: amt,
             description: description.trim(),
-            account_id: accountId,
+            account_id: accountValue,
             to_account_id: null,
             category_id: categoryId,
             sub_category_id: subCatId || null,
@@ -436,21 +467,12 @@ function ScheduledExpenseForm({
       >
         <AmountInput value={amount} onChange={setAmount} accent="text-expense" />
         <DescriptionField value={description} onChange={setDescription} />
-        <div className="space-y-1.5">
-          <Label>From account</Label>
-          <Select value={accountId} onValueChange={setAccountId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select account" />
-            </SelectTrigger>
-            <SelectContent>
-              {(accounts as { id: string; institution: string | null; label: string }[]).map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {[a.institution, a.label].filter(Boolean).join(" · ")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <AccountSelect
+          label="From account"
+          value={accountValue}
+          onChange={setAccountId}
+          accounts={list}
+        />
         <div className="space-y-1.5">
           <Label>Category</Label>
           <button
@@ -518,12 +540,13 @@ function ScheduledTransferForm({
       setDayOfMonth(edit.day_of_month);
       setTime(hhmm(edit.scheduled_time));
       setNote(edit.note ?? "");
-    } else {
-      const list = accounts as { id: string }[];
-      if (list[0]?.id) setFromId((v) => v || list[0].id);
-      if (list[1]?.id) setToId((v) => v || list[1].id);
     }
-  }, [edit, accounts]);
+  }, [edit]);
+
+  const list = accounts as Account[];
+  const fromValue = fromId || pick(list, 0);
+  // Default To to the second account so the two never start out equal (submit rejects that anyway).
+  const toValue = toId || pick(list, 1);
 
   return (
     <FormShell
@@ -535,15 +558,15 @@ function ScheduledTransferForm({
         const amt = Number(amount);
         if (!amount || isNaN(amt) || amt <= 0) return toast.error("Amount must be greater than 0");
         if (!description.trim()) return toast.error("Enter a description");
-        if (!fromId) return toast.error("Please select a from account");
-        if (!toId) return toast.error("Please select a to account");
-        if (fromId === toId) return toast.error("From and To accounts must be different");
+        if (!fromValue) return toast.error("Please select a from account");
+        if (!toValue) return toast.error("Please select a to account");
+        if (fromValue === toValue) return toast.error("From and To accounts must be different");
         save.mutate({
           type: "transfer",
           amount: amt,
           description: description.trim(),
-          account_id: fromId,
-          to_account_id: toId,
+          account_id: fromValue,
+          to_account_id: toValue,
           category_id: null,
           sub_category_id: null,
           income_source_type: null,
@@ -557,36 +580,13 @@ function ScheduledTransferForm({
     >
       <AmountInput value={amount} onChange={setAmount} accent="text-transfer" />
       <DescriptionField value={description} onChange={setDescription} />
-      <div className="space-y-1.5">
-        <Label>From account</Label>
-        <Select value={fromId} onValueChange={setFromId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select account" />
-          </SelectTrigger>
-          <SelectContent>
-            {(accounts as { id: string; institution: string | null; label: string }[]).map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {[a.institution, a.label].filter(Boolean).join(" · ")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-1.5">
-        <Label>To account</Label>
-        <Select value={toId} onValueChange={setToId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select account" />
-          </SelectTrigger>
-          <SelectContent>
-            {(accounts as { id: string; institution: string | null; label: string }[]).map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {[a.institution, a.label].filter(Boolean).join(" · ")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <AccountSelect
+        label="From account"
+        value={fromValue}
+        onChange={setFromId}
+        accounts={list}
+      />
+      <AccountSelect label="To account" value={toValue} onChange={setToId} accounts={list} />
       <DayTime dayOfMonth={dayOfMonth} time={time} setDayOfMonth={setDayOfMonth} setTime={setTime} />
       <NoteField value={note} onChange={setNote} />
     </FormShell>
