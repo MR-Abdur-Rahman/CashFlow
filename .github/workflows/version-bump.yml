@@ -11,14 +11,59 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      sha: ${{ steps.commit.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
       - name: Bump patch (version.json + public/build-version.json)
-        run: node -e "const fs=require('fs');const v=JSON.parse(fs.readFileSync('version.json'));v.patch=(v.patch||0)+1;fs.writeFileSync('version.json',JSON.stringify(v)+'\n');fs.writeFileSync('public/build-version.json',JSON.stringify({version:v.major+'.'+v.minor+'.'+v.patch,patch:v.patch})+'\n')"
+        id: bump
+        run: |
+          node -e "const fs=require('fs');const v=JSON.parse(fs.readFileSync('version.json'));v.patch=(v.patch||0)+1;fs.writeFileSync('version.json',JSON.stringify(v)+'\n');fs.writeFileSync('public/build-version.json',JSON.stringify({version:v.major+'.'+v.minor+'.'+v.patch,patch:v.patch})+'\n')"
+          V=$(node -p "const v=require('./version.json');v.major+'.'+v.minor+'.'+v.patch")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
       - name: Commit back
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add version.json public/build-version.json
           git commit -m "chore: bump version [version-bump]"
           git push
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: bump
+    uses: ./.github/workflows/android.yml
+
+  release:
+    needs: [bump, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: v${{ needs.bump.outputs.version }}
+      SHA: ${{ needs.bump.outputs.sha }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Download APK built by android.yml
+        uses: actions/download-artifact@v4
+        with:
+          name: cashflow-debug-apk
+          path: apk
+      - name: Stage asset under a version-independent name
+        run: mv apk/app-debug.apk apk/cashflow.apk
+      - name: Fail if the tag is already released
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release $TAG already exists — refusing to overwrite it."
+            exit 1
+          fi
+      - name: Publish release
+        run: |
+          gh release create "$TAG" apk/cashflow.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SHA" \
+            --title "CashFlow $TAG" \
+            --notes "Automatic patch build from \`$SHA\`." \
+            --latest
