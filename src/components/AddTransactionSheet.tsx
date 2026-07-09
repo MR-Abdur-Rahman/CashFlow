@@ -39,10 +39,14 @@ export function AddTransactionSheet({
   open,
   onOpenChange,
   defaultTab = "expense",
+  defaultPerson,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   defaultTab?: Tab;
+  // Preselects the Split tab's single person — e.g. opening this from a person's detail page. The
+  // user can still change it with the picker.
+  defaultPerson?: { id: string; name: string };
 }) {
   const [tab, setTab] = useState<Tab>(defaultTab);
   useEffect(() => {
@@ -99,7 +103,7 @@ export function AddTransactionSheet({
             <TransferForm onClose={() => onOpenChange(false)} />
           </TabsContent>
           <TabsContent value="split" className="flex-1 min-h-0 mt-0">
-            <SplitForm onClose={() => onOpenChange(false)} />
+            <SplitForm onClose={() => onOpenChange(false)} defaultPerson={defaultPerson} />
           </TabsContent>
         </Tabs>
       </SheetContent>
@@ -1329,7 +1333,13 @@ function TransferForm({ onClose }: { onClose: () => void }) {
 }
 
 // ─── Split Form ────────────────────────────────────────────────────────────
-function SplitForm({ onClose }: { onClose: () => void }) {
+function SplitForm({
+  onClose,
+  defaultPerson,
+}: {
+  onClose: () => void;
+  defaultPerson?: { id: string; name: string };
+}) {
   const { data: accounts = [] } = useQuery(accountsQuery());
   const { data: groups = [] } = useQuery(groupsQuery());
   const { data: people = [] } = useQuery(peopleQuery());
@@ -1338,9 +1348,10 @@ function SplitForm({ onClose }: { onClose: () => void }) {
   const [amount, setAmount] = useState("");
   const [target, setTarget] = useState<"person" | "multi" | "group">("person");
 
-  // Single person
-  const [personId, setPersonId] = useState("");
-  const [personName, setPersonName] = useState("");
+  // Single person. Seeded from defaultPerson via lazy initial state rather than an effect: the sheet
+  // unmounts on close, so a fresh open re-seeds, and nothing can clobber a person the user picked.
+  const [personId, setPersonId] = useState(defaultPerson?.id ?? "");
+  const [personName, setPersonName] = useState(defaultPerson?.name ?? "");
   const [personPickerOpen, setPersonPickerOpen] = useState(false);
 
   // Multi person

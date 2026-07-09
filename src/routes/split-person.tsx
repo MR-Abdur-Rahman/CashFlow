@@ -361,7 +361,14 @@ export default function PersonDetail() {
         descriptions={splitDescriptions}
       />
 
-      <AddTransactionSheet open={addSplitOpen} onOpenChange={setAddSplitOpen} defaultTab="split" />
+      <AddTransactionSheet
+        open={addSplitOpen}
+        onOpenChange={setAddSplitOpen}
+        defaultTab="split"
+        // Preselect the person whose page this is. Uses people.name (not the display nickname) to
+        // match what PersonPickerSheet supplies, which paid_by is compared against.
+        defaultPerson={person ? { id: person.id, name: person.name } : undefined}
+      />
 
       {Math.abs(balance) > 0.005 && (
         <SettleUpDialog
