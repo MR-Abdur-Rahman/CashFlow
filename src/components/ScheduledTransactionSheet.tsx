@@ -168,7 +168,7 @@ export function ScheduledTransactionSheet({
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Required"
+              placeholder="Salary / Rent / etc..."
             />
           </div>
 
