@@ -10,6 +10,7 @@ export type Scheduled = {
   category_id: string | null;
   sub_category_id: string | null;
   note: string | null;
+  description: string | null;
   day_of_month: number;
   scheduled_time: string;
   is_active: boolean;

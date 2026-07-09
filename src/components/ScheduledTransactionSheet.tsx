@@ -42,6 +42,7 @@ export function ScheduledTransactionSheet({
   const [categoryId, setCategoryId] = useState("");
   const [subCategoryId, setSubCategoryId] = useState("");
   const [note, setNote] = useState("");
+  const [description, setDescription] = useState("");
   const [dayOfMonth, setDayOfMonth] = useState(1);
   const [time, setTime] = useState("09:00");
   const [saving, setSaving] = useState(false);
@@ -63,6 +64,7 @@ export function ScheduledTransactionSheet({
       setCategoryId(edit.category_id ?? "");
       setSubCategoryId(edit.sub_category_id ?? "");
       setNote(edit.note ?? "");
+      setDescription(edit.description ?? "");
       setDayOfMonth(edit.day_of_month);
       setTime((edit.scheduled_time ?? "09:00").slice(0, 5));
     } else {
@@ -73,6 +75,7 @@ export function ScheduledTransactionSheet({
       setCategoryId("");
       setSubCategoryId("");
       setNote("");
+      setDescription("");
       setDayOfMonth(1);
       setTime("09:00");
     }
@@ -106,6 +109,7 @@ export function ScheduledTransactionSheet({
         category_id: needsCategory ? categoryId || null : null,
         sub_category_id: needsCategory && validSub ? subCategoryId : null,
         note: note.trim() || null,
+        description: description.trim() || null,
         day_of_month: dayOfMonth,
         scheduled_time: `${time}:00`,
       };
@@ -251,6 +255,17 @@ export function ScheduledTransactionSheet({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={type === "income" ? "e.g. Salary" : "Optional"}
+            />
+          </div>
+
+          {/* Shown for all three types. Kept separate from `note`, which becomes the posted income's
+              income_source_text and so can't carry longer prose. */}
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Optional"
             />
           </div>
 

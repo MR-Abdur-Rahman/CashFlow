@@ -499,6 +499,7 @@ export type Database = {
           category_id: string | null
           created_at: string
           day_of_month: number
+          description: string | null
           id: string
           is_active: boolean
           last_posted_date: string | null
@@ -516,6 +517,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           day_of_month: number
+          description?: string | null
           id?: string
           is_active?: boolean
           last_posted_date?: string | null
@@ -533,6 +535,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           day_of_month?: number
+          description?: string | null
           id?: string
           is_active?: boolean
           last_posted_date?: string | null

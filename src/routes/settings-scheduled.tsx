@@ -1,19 +1,19 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import {
-  Plus,
-  CalendarClock,
-  ArrowDownLeft,
-  ArrowUpRight,
-  ArrowLeftRight,
-} from "lucide-react";
+import { CalendarClock, ArrowDownLeft, ArrowUpRight, ArrowLeftRight } from "lucide-react";
 import { SettingsHeader } from "@/components/SettingsRows";
+import { ListToolbar } from "@/components/ListToolbar";
 import { SwipeRow } from "@/components/SwipeRow";
 import { Switch } from "@/components/ui/switch";
 import { ScheduledTransactionSheet } from "@/components/ScheduledTransactionSheet";
-import { scheduledTransactionsQuery, accountsQuery } from "@/lib/queries";
+import {
+  scheduledTransactionsQuery,
+  accountsQuery,
+  categoriesQuery,
+  allSubCategoriesQuery,
+} from "@/lib/queries";
 import { formatMoney } from "@/lib/format";
 import { formatTime12 } from "@/components/TimePicker";
 import { isDue, type Scheduled } from "@/lib/scheduled";
@@ -29,11 +29,28 @@ export default function ScheduledPage() {
   const qc = useQueryClient();
   const { data: list = [] } = useQuery(scheduledTransactionsQuery());
   const { data: accounts = [] } = useQuery(accountsQuery());
+  // Untyped categoriesQuery() returns every category; the rows only carry FK ids, so both lookups
+  // are needed to make category and sub-category names searchable.
+  const { data: categories = [] } = useQuery(categoriesQuery());
+  const { data: subCategories = [] } = useQuery(allSubCategoriesQuery());
   const [sheetOpen, setSheetOpen] = useState(false);
   const [edit, setEdit] = useState<Scheduled | null>(null);
+  const [q, setQ] = useState("");
 
   const accLabel = (id: string | null) =>
     (accounts as any[]).find((a) => a.id === id)?.label ?? "—";
+
+  // id → name maps, so filtering is a hash lookup per field rather than a scan of every category for
+  // every row on every keystroke.
+  const nameById = useMemo(() => {
+    const cats = new Map<string, string>();
+    for (const c of categories as any[]) cats.set(c.id, c.name);
+    const subs = new Map<string, string>();
+    for (const s of subCategories as any[]) subs.set(s.id, s.name);
+    const accs = new Map<string, string>();
+    for (const a of accounts as any[]) accs.set(a.id, a.label);
+    return { cats, subs, accs };
+  }, [categories, subCategories, accounts]);
 
   async function toggleActive(s: Scheduled, v: boolean) {
     const { error } = await supabase
@@ -52,26 +69,59 @@ export default function ScheduledPage() {
     toast.success("Deleted");
   }
 
-  const rows = list as Scheduled[];
+  const all = list as Scheduled[];
+
+  // One haystack per row so a single query can match anything the row is "about" — its own text, the
+  // type, the amount (raw and formatted), the account labels, and the joined category names.
+  const rows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return all;
+    const { cats, subs, accs } = nameById;
+    return all.filter((s) => {
+      const haystack = [
+        s.description,
+        s.note,
+        s.type,
+        String(s.amount),
+        formatMoney(Number(s.amount)),
+        accs.get(s.account_id),
+        s.to_account_id ? accs.get(s.to_account_id) : "",
+        s.category_id ? cats.get(s.category_id) : "",
+        s.sub_category_id ? subs.get(s.sub_category_id) : "",
+        `day ${s.day_of_month}`,
+        formatTime12((s.scheduled_time ?? "09:00").slice(0, 5)),
+        s.is_active ? "active" : "inactive paused",
+        s.is_active && isDue(s) ? "due" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [all, q, nameById]);
 
   return (
     <div className="px-4 pt-6 pb-24 space-y-4">
       <SettingsHeader title="Scheduled Transaction" back="/settings" />
 
-      <button
-        onClick={() => {
+      <ListToolbar
+        query={q}
+        onQuery={setQ}
+        placeholder="Search scheduled transactions"
+        onAdd={() => {
           setEdit(null);
           setSheetOpen(true);
         }}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-medium text-white"
-      >
-        <Plus className="h-4 w-4" /> New scheduled transaction
-      </button>
+      />
 
-      {rows.length === 0 ? (
+      {all.length === 0 ? (
         <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
           <CalendarClock className="mx-auto mb-2 h-6 w-6 opacity-60" />
           No scheduled transactions yet. Set up recurring income, bills or transfers.
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+          No scheduled transactions match “{q.trim()}”.
         </div>
       ) : (
         <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
@@ -109,6 +159,9 @@ export default function ScheduledPage() {
                         </span>
                       )}
                     </p>
+                    {s.description && (
+                      <p className="truncate text-xs text-foreground/80">{s.description}</p>
+                    )}
                     <p className="truncate text-xs text-muted-foreground">
                       Day {s.day_of_month} · {formatTime12((s.scheduled_time ?? "09:00").slice(0, 5))}{" "}
                       ·{" "}
