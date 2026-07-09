@@ -79,7 +79,7 @@ export default function FeedbackPage() {
         <SettingsHeader title="Send feedback" back="/settings/help" />
       </div>
 
-      <div className="flex-1 px-4 pt-3 space-y-5">
+      <div className="px-4 pt-3 space-y-5">
         <div className="space-y-2">
           <Input
             value={name}
@@ -153,9 +153,7 @@ export default function FeedbackPage() {
           By sending, you allow CashFlow to review related technical info to help address your
           feedback.
         </p>
-      </div>
 
-      <div className="px-4 pt-4">
         <Button
           className="w-full"
           disabled={sending || !text.trim() || !email.trim()}

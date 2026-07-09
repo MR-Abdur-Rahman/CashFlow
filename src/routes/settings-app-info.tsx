@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Capacitor } from "@capacitor/core";
@@ -76,18 +76,15 @@ export default function AppInfoPage() {
         </Link>
       </div>
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 pb-24 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
         <img src="/favicon.svg" alt="CashFlow" className="h-20 w-20" />
         <p className="text-xl font-semibold text-foreground">CashFlow</p>
         <p className="text-sm text-muted-foreground">{label}</p>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={checking}
-          onClick={checkForUpdates}
-          className="mt-1"
-        >
-          <RefreshCw className="mr-2 h-4 w-4" /> {checking ? "Checking…" : "Check Updates"}
+      </div>
+
+      <div className="px-6 pb-4">
+        <Button className="w-full" disabled={checking} onClick={checkForUpdates}>
+          {checking ? "Checking…" : "Check Updates"}
         </Button>
       </div>
 
