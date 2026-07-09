@@ -81,6 +81,7 @@ export default function ScheduledPage() {
       const haystack = [
         s.description,
         s.note,
+        s.income_source_text,
         s.type,
         String(s.amount),
         formatMoney(Number(s.amount)),
@@ -152,16 +153,14 @@ export default function ScheduledPage() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-1.5 truncate text-sm font-medium">
-                      {s.note || s.type[0].toUpperCase() + s.type.slice(1)}
+                      {/* Description is required on new schedules; older rows fall back to note. */}
+                      {s.description || s.note || s.type[0].toUpperCase() + s.type.slice(1)}
                       {s.is_active && isDue(s) && (
                         <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                           Due
                         </span>
                       )}
                     </p>
-                    {s.description && (
-                      <p className="truncate text-xs text-foreground/80">{s.description}</p>
-                    )}
                     <p className="truncate text-xs text-muted-foreground">
                       Day {s.day_of_month} · {formatTime12((s.scheduled_time ?? "09:00").slice(0, 5))}{" "}
                       ·{" "}

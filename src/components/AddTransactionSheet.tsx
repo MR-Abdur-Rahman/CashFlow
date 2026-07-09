@@ -133,7 +133,9 @@ function DateTime({
   );
 }
 
-function FormShell({
+// FormShell and the picker sheets below are also used by ScheduledTransactionSheet, so the two
+// sheets stay visually identical rather than drifting as copies.
+export function FormShell({
   children,
   onSubmit,
   button,
@@ -159,7 +161,7 @@ function FormShell({
 }
 
 // ─── Category Picker Sheet ─────────────────────────────────────────────────
-function CategoryPickerSheet({
+export function CategoryPickerSheet({
   open,
   onOpenChange,
   onSelect,
@@ -389,7 +391,7 @@ function CategoryPickerSheet({
 }
 
 // ─── Person Picker Sheet (single select) ──────────────────────────────────
-function PersonPickerSheet({
+export function PersonPickerSheet({
   open,
   onOpenChange,
   onSelect,
@@ -831,7 +833,7 @@ const DEFAULT_SOURCES = [
   "Other",
 ];
 
-function SourcePickerSheet({
+export function SourcePickerSheet({
   open,
   onOpenChange,
   onSelect,

@@ -501,6 +501,9 @@ export type Database = {
           day_of_month: number
           description: string | null
           id: string
+          income_person_id: string | null
+          income_source_text: string | null
+          income_source_type: string | null
           is_active: boolean
           last_posted_date: string | null
           note: string | null
@@ -519,6 +522,9 @@ export type Database = {
           day_of_month: number
           description?: string | null
           id?: string
+          income_person_id?: string | null
+          income_source_text?: string | null
+          income_source_type?: string | null
           is_active?: boolean
           last_posted_date?: string | null
           note?: string | null
@@ -537,6 +543,9 @@ export type Database = {
           day_of_month?: number
           description?: string | null
           id?: string
+          income_person_id?: string | null
+          income_source_text?: string | null
+          income_source_type?: string | null
           is_active?: boolean
           last_posted_date?: string | null
           note?: string | null

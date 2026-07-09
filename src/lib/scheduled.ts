@@ -11,6 +11,9 @@ export type Scheduled = {
   sub_category_id: string | null;
   note: string | null;
   description: string | null;
+  income_source_type: "person" | "source" | null;
+  income_person_id: string | null;
+  income_source_text: string | null;
   day_of_month: number;
   scheduled_time: string;
   is_active: boolean;
@@ -70,12 +73,22 @@ export async function postScheduled(s: Scheduled): Promise<void> {
   } else if (s.type === "transfer") {
     row.to_account_id = s.to_account_id;
   } else if (s.type === "income") {
-    // Recurring income carries its category, and also posts a "source" label (the app's income feed
-    // reads income_source_*), with the note doubling as that label.
+    // The income form no longer sets a category, but schedules created before that still carry one.
     row.category_id = s.category_id;
     row.sub_category_id = s.sub_category_id;
-    row.income_source_type = "source";
-    row.income_source_text = s.note || "Scheduled income";
+    // Income schedules now carry a real person/source, mirroring the Add Transaction sheet. Rows
+    // created before those columns existed have income_source_type null — fall back to the old
+    // behaviour of using the note as the source label so they keep posting unchanged.
+    if (s.income_source_type === "person" && s.income_person_id) {
+      row.income_source_type = "person";
+      row.income_person_id = s.income_person_id;
+    } else if (s.income_source_type === "source" && s.income_source_text) {
+      row.income_source_type = "source";
+      row.income_source_text = s.income_source_text;
+    } else {
+      row.income_source_type = "source";
+      row.income_source_text = s.note || s.description || "Scheduled income";
+    }
   }
   const { error } = await supabase.from("transactions").insert(row as never);
   if (error) throw error;
