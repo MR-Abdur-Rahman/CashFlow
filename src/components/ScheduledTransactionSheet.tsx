@@ -16,6 +16,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TimePicker } from "@/components/TimePicker";
 import { DayOfMonthPicker } from "@/components/DayOfMonthPicker";
+import { AmountInput } from "@/components/AmountInput";
 import { accountsQuery, categoriesQuery, subCategoriesQuery } from "@/lib/queries";
 import type { Scheduled } from "@/lib/scheduled";
 
@@ -82,6 +83,8 @@ export function ScheduledTransactionSheet({
   }, [open, edit]);
 
   const accountLabel = type === "income" ? "To account" : "From account";
+  const amountAccent =
+    type === "income" ? "text-income" : type === "transfer" ? "text-transfer" : "text-expense";
   const validSub = useMemo(
     () => (subCategories as any[]).some((s) => s.id === subCategoryId),
     [subCategories, subCategoryId],
@@ -90,6 +93,7 @@ export function ScheduledTransactionSheet({
   async function save() {
     const amt = Number(amount);
     if (!amt || amt <= 0) return toast.error("Enter an amount");
+    if (!description.trim()) return toast.error("Enter a description");
     if (!accountId) return toast.error(`Choose the ${accountLabel.toLowerCase()}`);
     if (type === "transfer") {
       if (!toAccountId) return toast.error("Choose the destination account");
@@ -109,7 +113,7 @@ export function ScheduledTransactionSheet({
         category_id: needsCategory ? categoryId || null : null,
         sub_category_id: needsCategory && validSub ? subCategoryId : null,
         note: note.trim() || null,
-        description: description.trim() || null,
+        description: description.trim(),
         day_of_month: dayOfMonth,
         scheduled_time: `${time}:00`,
       };
@@ -155,14 +159,16 @@ export function ScheduledTransactionSheet({
             </TabsList>
           </Tabs>
 
+          <AmountInput value={amount} onChange={setAmount} accent={amountAccent} />
+
+          {/* Required. Kept separate from `note`, which becomes the posted income's
+              income_source_text and so can't carry longer prose. */}
           <div className="space-y-1.5">
-            <Label>Amount</Label>
+            <Label>Description</Label>
             <Input
-              type="number"
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Required"
             />
           </div>
 
@@ -249,26 +255,6 @@ export function ScheduledTransactionSheet({
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <Label>Note</Label>
-            <Input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={type === "income" ? "e.g. Salary" : "Optional"}
-            />
-          </div>
-
-          {/* Shown for all three types. Kept separate from `note`, which becomes the posted income's
-              income_source_text and so can't carry longer prose. */}
-          <div className="space-y-1.5">
-            <Label>Description</Label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional"
-            />
-          </div>
-
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-1.5">
               <Label>Day of month</Label>
@@ -286,6 +272,15 @@ export function ScheduledTransactionSheet({
           <p className="text-xs text-muted-foreground">
             Runs on day {dayOfMonth} each month. Months without that day use their last day.
           </p>
+
+          <div className="space-y-1.5">
+            <Label>Note</Label>
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={type === "income" ? "e.g. Salary" : "Optional"}
+            />
+          </div>
 
           <Button className="w-full" onClick={save} disabled={saving}>
             {saving ? "Saving…" : edit ? "Save changes" : "Create schedule"}
