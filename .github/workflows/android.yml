@@ -32,10 +32,16 @@ jobs:
         run: bunx cap sync android
       - name: Make gradlew executable
         run: chmod +x android/gradlew
-      - name: Inject versionName from version.json
+      - name: Inject versionName + versionCode from version.json
         run: |
           V=$(node -p "const v=require('./version.json');v.major+'.'+v.minor+'.'+v.patch")
+          # Play Store requires a strictly increasing versionCode. Derive it from the same
+          # major.minor.patch so it can never drift out of sync with versionName.
+          # 3-digit slots (×1000000 / ×1000) give headroom for up to 999 patches between releases.
+          VC=$(node -p "const v=require('./version.json');v.major*1000000+v.minor*1000+v.patch")
           sed -i "s/versionName \"[^\"]*\"/versionName \"$V\"/" android/app/build.gradle
+          sed -i "s/versionCode [0-9]*/versionCode $VC/" android/app/build.gradle
+          echo "Injected versionName=$V versionCode=$VC"
       - name: Build debug APK
         run: ./gradlew assembleDebug
         working-directory: android
