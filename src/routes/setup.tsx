@@ -45,8 +45,16 @@ export default function SetupPage() {
 
   return (
     <div
-      style={{ background: LIGHT.bg }}
-      className="min-h-[100dvh] flex flex-col px-6 pb-10"
+      style={{
+        background: LIGHT.bg,
+        // .phone-frame already reserves the top safe-area via padding-top, and demands min-height:100dvh.
+        // Adding a second 100dvh here would overflow the viewport by exactly the top inset (measured),
+        // pushing the bottom button off-screen. Subtract that inset so the page fits the visible area,
+        // and pad the bottom for the home-indicator inset.
+        minHeight: "calc(100dvh - env(safe-area-inset-top))",
+        paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
+      }}
+      className="flex flex-col px-6"
     >
       {/* Header: back button on its own row, 3-segment progress bar centered full-width below it. */}
       <div className="shrink-0 pt-4">
@@ -293,7 +301,7 @@ function PhotoStep({
         onCropped={uploadPhoto}
       />
 
-      <div className="w-full space-y-3 pt-8 shrink-0">
+      <div className="w-full space-y-3 pt-6 shrink-0">
         <PrimaryButton onClick={handleContinue} disabled={busy}>
           Continue
         </PrimaryButton>
@@ -396,7 +404,7 @@ function PhoneStep({
         </p>
       </div>
 
-      <div className="w-full space-y-3 pt-8 shrink-0">
+      <div className="w-full space-y-3 pt-6 shrink-0">
         <PrimaryButton onClick={savePhone} disabled={saving}>
           {saving ? "Saving…" : "Continue"}
         </PrimaryButton>
@@ -411,40 +419,56 @@ function DoneStep({ onFinish }: { onFinish: () => void }) {
   const [finishing, setFinishing] = useState(false);
   return (
     <div className="flex flex-1 flex-col items-center text-center">
-      {/* Water fill: a faint base logo, with the full-color logo revealed bottom-to-top through a
-          rising liquid surface. The fill boundary is a wavy clip-path() cubic curve (not a flat edge)
-          whose crest/trough alternate across keyframes so the surface undulates as it climbs. Coords
-          are in the 96×96 (h-24 w-24) logo box. Uses the exact favicon.svg. */}
+      {/* Sea-wave liquid fill: the favicon.svg silhouette is used as a CSS mask over a rising
+          purple→blue body, with three overlapping wave layers scrolling horizontally at different
+          speeds/opacities so the surface reads like real ocean waves climbing to fill the logo. */}
       <style>{`
-        @keyframes cashflow-waterfill {
-          0%   { clip-path: path('M0,100 C24,96 72,104 96,100 L96,96 L0,96 Z'); }
-          20%  { clip-path: path('M0,80 C24,85 72,74 96,80 L96,96 L0,96 Z'); }
-          40%  { clip-path: path('M0,60 C24,54 72,66 96,60 L96,96 L0,96 Z'); }
-          60%  { clip-path: path('M0,40 C24,46 72,34 96,40 L96,96 L0,96 Z'); }
-          80%  { clip-path: path('M0,20 C24,14 72,26 96,20 L96,96 L0,96 Z'); }
-          100% { clip-path: path('M0,-3 C24,2 72,-6 96,-3 L96,96 L0,96 Z'); }
+        .wl { position: relative; height: 96px; width: 96px; }
+        .wl-base { position: absolute; inset: 0; height: 96px; width: 96px; opacity: 0.14; }
+        .wl-mask {
+          position: absolute; inset: 0; overflow: hidden;
+          -webkit-mask: url(/favicon.svg) no-repeat center / contain;
+          mask: url(/favicon.svg) no-repeat center / contain;
         }
-        .cashflow-waterfill {
-          animation: cashflow-waterfill 1.5s ease-out forwards;
+        .wl-water {
+          position: absolute; left: 0; width: 100%; height: 200px;
+          top: calc(100% + 16px);
+          background: linear-gradient(180deg, #7C3AED 0%, #3B82F6 100%);
+          animation: wl-rise 2.2s cubic-bezier(0.45, 0, 0.15, 1) forwards;
         }
+        @keyframes wl-rise { to { top: -14px; } }
+        .wl-wave {
+          position: absolute; bottom: 100%; left: 0; width: 200%; height: 16px;
+          background-repeat: repeat-x; background-size: 50% 100%; will-change: transform;
+        }
+        .wl-wave-1 {
+          height: 16px; opacity: 0.5; animation: wl-scroll 3.6s linear infinite;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 16' preserveAspectRatio='none'%3E%3Cpath d='M0 8 Q12 2 24 8 T48 8 T72 8 T96 8 V16 H0 Z' fill='%238B5CF6'/%3E%3C/svg%3E");
+        }
+        .wl-wave-2 {
+          height: 14px; opacity: 0.75; animation: wl-scroll 2.9s linear infinite reverse;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 16' preserveAspectRatio='none'%3E%3Cpath d='M0 8 Q12 3 24 8 T48 8 T72 8 T96 8 V16 H0 Z' fill='%237C3AED'/%3E%3C/svg%3E");
+        }
+        .wl-wave-3 {
+          height: 12px; opacity: 1; animation: wl-scroll 2.3s linear infinite;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 16' preserveAspectRatio='none'%3E%3Cpath d='M0 8 Q12 4 24 8 T48 8 T72 8 T96 8 V16 H0 Z' fill='%236D5EF0'/%3E%3C/svg%3E");
+        }
+        @keyframes wl-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @media (prefers-reduced-motion: reduce) {
-          .cashflow-waterfill { animation: none; clip-path: none; }
+          .wl-water { top: -14px; animation: none; }
+          .wl-wave { animation: none; }
         }
       `}</style>
       <div className="flex flex-1 flex-col items-center justify-center">
-        <div className="relative" style={{ height: 96, width: 96 }}>
-          <img
-            src="/favicon.svg"
-            alt=""
-            aria-hidden="true"
-            className="absolute inset-0 h-24 w-24"
-            style={{ opacity: 0.15 }}
-          />
-          <img
-            src="/favicon.svg"
-            alt="CashFlow"
-            className="cashflow-waterfill absolute inset-0 h-24 w-24"
-          />
+        <div className="wl">
+          <img src="/favicon.svg" alt="" aria-hidden="true" className="wl-base" />
+          <div className="wl-mask">
+            <div className="wl-water">
+              <span className="wl-wave wl-wave-1" />
+              <span className="wl-wave wl-wave-2" />
+              <span className="wl-wave wl-wave-3" />
+            </div>
+          </div>
         </div>
 
         <h1 className="mt-8 text-2xl font-bold" style={{ color: LIGHT.fg }}>
@@ -455,7 +479,7 @@ function DoneStep({ onFinish }: { onFinish: () => void }) {
         </p>
       </div>
 
-      <div className="w-full pt-8 shrink-0">
+      <div className="w-full pt-6 shrink-0">
         <PrimaryButton
           onClick={() => {
             if (finishing) return;

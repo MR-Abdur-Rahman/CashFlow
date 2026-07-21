@@ -68,7 +68,7 @@ export default function IntroCarousel() {
   // Step 1: permissions. Renders on the light background; once dismissed/completed, reveal the carousel.
   if (permsPending) {
     return (
-      <div style={{ background: LIGHT.bg, height: "100dvh" }}>
+      <div style={{ background: LIGHT.bg, height: "calc(100dvh - env(safe-area-inset-top))" }}>
         <PermissionsOnboarding onComplete={() => setPermsPending(false)} />
       </div>
     );
@@ -100,7 +100,12 @@ export default function IntroCarousel() {
   return (
     <div
       className="relative overflow-hidden"
-      style={{ background: LIGHT.bg, height: "100dvh", touchAction: "pan-y" }}
+      style={{
+        background: LIGHT.bg,
+        // Match setup: .phone-frame already reserves the top inset, so subtract it to avoid overflow.
+        height: "calc(100dvh - env(safe-area-inset-top))",
+        touchAction: "pan-y",
+      }}
     >
       <Styles />
 
@@ -123,14 +128,14 @@ export default function IntroCarousel() {
         {SLIDES.map((s, i) => (
           <section
             key={i}
-            className={`intro-slide ${i === index ? "intro-slide--active" : ""} w-full shrink-0 h-full flex flex-col items-center justify-center px-8 pb-36 text-center`}
+            className={`intro-slide ${i === index ? "intro-slide--active" : ""} w-full shrink-0 h-full flex flex-col items-center justify-center px-6 pb-32 text-center`}
           >
-            <div className="flex h-56 w-full items-center justify-center">
+            <div className="flex h-72 w-full items-center justify-center">
               {i === 0 && <SlideTrack />}
               {i === 1 && <SlideSplit />}
               {i === 2 && <SlideInsights />}
             </div>
-            <h1 className="anim-rise mt-8 text-2xl font-bold leading-snug" style={{ color: LIGHT.fg }}>
+            <h1 className="anim-rise mt-6 text-2xl font-bold leading-snug" style={{ color: LIGHT.fg }}>
               {s.title}
               <br />
               <span className="intro-highlight">{s.highlight}</span>
@@ -146,7 +151,10 @@ export default function IntroCarousel() {
       </div>
 
       {/* Bottom controls: dots + next arrow, or the final CTA on the last slide */}
-      <div className="absolute inset-x-0 bottom-0 px-8 pb-10">
+      <div
+        className="absolute inset-x-0 bottom-0 px-8"
+        style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}
+      >
         <div className="flex items-center justify-center gap-2">
           {SLIDES.map((_, i) => (
             <span
