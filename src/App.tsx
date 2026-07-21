@@ -39,6 +39,7 @@ import { NativeUpdateModal } from "./components/NativeUpdateModal";
 import { PermissionsOnboarding } from "./components/PermissionsOnboarding";
 import { SplashScreen } from "./components/SplashScreen";
 import Setup from "./routes/setup";
+import Welcome, { INTRO_SEEN_KEY } from "./routes/welcome";
 import { supabase } from "./integrations/supabase/client";
 import { profileQuery } from "@/lib/queries";
 import { syncGoogleEmail } from "@/lib/googleAuth";
@@ -142,14 +143,26 @@ function RoutedApp({
     return <Navigate to="/home" replace />;
   }
 
-  // App chrome (nav, FAB, prompts) shows only once past setup — never over the guided-setup screens.
-  const showChrome = !!session && !needsSetup;
+  // App chrome (nav, FAB, prompts) shows only once past setup — never over the guided-setup or intro
+  // screens (/welcome renders full-screen for logged-out first-timers AND for logged-in replay).
+  const showChrome = !!session && !needsSetup && location.pathname !== "/welcome";
+
+  // First-time, logged-out users see the intro carousel before /auth (gated by a per-device flag, like
+  // PermissionsOnboarding). /welcome itself ignores the flag so "Replay intro" from Settings always shows.
+  const introSeen = !!localStorage.getItem(INTRO_SEEN_KEY);
 
   return (
     <div className="phone-frame">
       <Routes>
-        <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/home" />} />
-        <Route path="/" element={<Navigate to={session ? "/home" : "/auth"} />} />
+        <Route
+          path="/auth"
+          element={session ? <Navigate to="/home" /> : introSeen ? <Auth /> : <Navigate to="/welcome" />}
+        />
+        <Route path="/welcome" element={<Welcome />} />
+        <Route
+          path="/"
+          element={<Navigate to={session ? "/home" : introSeen ? "/auth" : "/welcome"} />}
+        />
         <Route path="/setup" element={session ? <Setup /> : <Navigate to="/auth" />} />
         <Route path="/home" element={session ? <Home /> : <Navigate to="/auth" />} />
         <Route path="/accounts" element={session ? <Accounts /> : <Navigate to="/auth" />} />
