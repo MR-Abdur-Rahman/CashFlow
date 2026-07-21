@@ -13,7 +13,7 @@ import { bilateralBalance } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
 import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { UserAvatar } from "@/components/UserAvatar";
-import { Users, ChevronRight, Archive, History, CheckCircle } from "lucide-react";
+import { Users, ChevronRight, Archive, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -81,17 +81,6 @@ export default function SplitPage() {
 
   return (
     <div className="px-4 pt-6 space-y-4 pb-24">
-      {/* Header: title + history only */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Split</h1>
-        <Link
-          to="/settings/history/transactions?filter=split"
-          className="h-9 w-9 flex items-center justify-center rounded-full bg-secondary text-foreground"
-        >
-          <History className="h-5 w-5" />
-        </Link>
-      </div>
-
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
         <TabsList className="grid grid-cols-3 w-full">
           <TabsTrigger value="people">People</TabsTrigger>

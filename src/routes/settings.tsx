@@ -139,8 +139,6 @@ export default function SettingsPage() {
 
   return (
     <div className="px-4 pt-6 pb-24 space-y-5">
-      <h1 className="text-xl font-semibold">Settings</h1>
-
       {/* Profile header — tap the left area for Account, the icon for QR */}
       <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
         <div className="flex items-center gap-4 p-4">
