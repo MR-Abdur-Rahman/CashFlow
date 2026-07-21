@@ -64,9 +64,17 @@ function App() {
   useRealtimeSplits();
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  // Enforce a minimum splash duration so it never just flashes by. The splash stays up until BOTH the
+  // real session check is done AND at least 2.5s have elapsed since mount — whichever finishes later.
+  const [minElapsed, setMinElapsed] = useState(false);
   // Bumped each time ScheduledDuePrompt closes, so NativeUpdateModal can re-run its check in the same
   // session once that prompt is dismissed (instead of deferring to the next launch).
   const [scheduledClosedTick, setScheduledClosedTick] = useState(0);
+
+  useEffect(() => {
+    const t = setTimeout(() => setMinElapsed(true), 2500);
+    return () => clearTimeout(t);
+  }, []);
 
   // Native only: paint the reserved status-bar strip to match the app background, with light icons.
   useEffect(() => {
@@ -91,7 +99,7 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading) {
+  if (loading || !minElapsed) {
     return <SplashScreen />;
   }
 
