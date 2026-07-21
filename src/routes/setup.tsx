@@ -91,7 +91,7 @@ export default function SetupPage() {
               try {
                 // Mark onboarded (account-level flag, syncs across devices). Invalidate the profile
                 // query BEFORE navigating so the App.tsx onboarding gate sees the new value and doesn't
-                // bounce /home → /setup.
+                // bounce back to /setup.
                 const { error } = await supabase
                   .from("profiles")
                   .update({ onboarded_at: new Date().toISOString() })
@@ -101,7 +101,8 @@ export default function SetupPage() {
               } catch (err) {
                 toast.error(err instanceof Error ? err.message : "Could not finish setup");
               }
-              navigate("/home");
+              // Onboarded — hand off to the intro carousel, which ends on /home.
+              navigate("/welcome");
             }}
           />
         )}

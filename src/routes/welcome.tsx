@@ -2,9 +2,10 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 
-// Shown once per device to first-time, logged-out users before /auth (gated by this flag, the same
-// localStorage pattern PermissionsOnboarding uses). Exported so App.tsx's routing can consult it.
-export const INTRO_SEEN_KEY = "cashflow_intro_seen_v1";
+// Post-onboarding intro carousel: shown after guided Setup completes (Setup's Done button routes here
+// with onboarded_at already set) and re-shown on demand via Settings → Tutorial → "Replay intro".
+// Finishing the last slide goes to /home. There's no localStorage gate — appearance is driven by the
+// Setup flow (onboarded_at, one-time per account) and by explicit replay navigation.
 
 // Always-light, like SplashScreen / auth / setup — these render before the theme is applied, so the
 // light-theme token values are hardcoded rather than read from var(--…).
@@ -21,10 +22,6 @@ const AMBER = "#F59E0B";
 const GRADIENT_H = "linear-gradient(90deg, #7C3AED 0%, #3B82F6 100%)";
 
 const SLIDES = [
-  {
-    title: "Your money, all in one place",
-    subtitle: "CashFlow keeps every account, split and insight together — beautifully simple.",
-  },
   {
     title: "Every account, one clear balance",
     subtitle: "Track cash, bank and e-wallet side by side, always up to date.",
@@ -48,9 +45,7 @@ export default function IntroCarousel() {
   const last = SLIDES.length - 1;
 
   function finish() {
-    localStorage.setItem(INTRO_SEEN_KEY, "1");
-    // If a session already exists (manual replay from Settings), /auth bounces to /home.
-    navigate("/auth");
+    navigate("/home");
   }
   const goNext = () => setIndex((i) => Math.min(last, i + 1));
 
@@ -102,10 +97,9 @@ export default function IntroCarousel() {
             className={`intro-slide ${i === index ? "intro-slide--active" : ""} w-full shrink-0 h-full flex flex-col items-center justify-center px-8 pb-36 text-center`}
           >
             <div className="flex h-56 w-full items-center justify-center">
-              {i === 0 && <SlideWelcome />}
-              {i === 1 && <SlideTrack />}
-              {i === 2 && <SlideSplit />}
-              {i === 3 && <SlideInsights />}
+              {i === 0 && <SlideTrack />}
+              {i === 1 && <SlideSplit />}
+              {i === 2 && <SlideInsights />}
             </div>
             <h1 className="anim-rise mt-8 text-2xl font-bold" style={{ color: LIGHT.fg }}>
               {s.title}
@@ -120,19 +114,7 @@ export default function IntroCarousel() {
         ))}
       </div>
 
-      {/* Skip — top right, slides 1–3 */}
-      {index < last && (
-        <button
-          type="button"
-          onClick={finish}
-          className="absolute right-5 top-6 text-sm font-medium"
-          style={{ color: LIGHT.muted }}
-        >
-          Skip
-        </button>
-      )}
-
-      {/* Bottom controls: dots + next arrow, or the Get Started CTA on the last slide */}
+      {/* Bottom controls: dots + next arrow, or the final CTA on the last slide */}
       <div className="absolute inset-x-0 bottom-0 px-8 pb-10">
         <div className="flex items-center justify-center gap-2">
           {SLIDES.map((_, i) => (
@@ -166,7 +148,7 @@ export default function IntroCarousel() {
             className="mt-6 w-full rounded-xl py-3.5 text-sm font-semibold text-white"
             style={{ background: GRADIENT_H }}
           >
-            Get Started
+            Go to CashFlow
           </button>
         )}
       </div>
@@ -174,19 +156,7 @@ export default function IntroCarousel() {
   );
 }
 
-// ─── Slide 1: Welcome ────────────────────────────────────────────────────────
-function SlideWelcome() {
-  return (
-    <div className="flex flex-col items-center">
-      <img src="/favicon.svg" alt="CashFlow" className="anim-float" style={{ height: 88, width: 88 }} />
-      <p className="anim-rise anim-d1 mt-6 text-3xl font-bold" style={{ color: LIGHT.fg }}>
-        CashFlow
-      </p>
-    </div>
-  );
-}
-
-// ─── Slide 2: Track (floating balance card + account chips + sparkles) ────────
+// ─── Slide 1: Track (floating balance card + account chips + sparkles) ────────
 function SlideTrack() {
   return (
     <svg viewBox="0 0 280 210" width="100%" height="100%" role="img" aria-label="Balance overview">
@@ -231,7 +201,7 @@ function SlideTrack() {
   );
 }
 
-// ─── Slide 3: Split (linked avatars + traveling dot + expense rows) ───────────
+// ─── Slide 2: Split (linked avatars + traveling dot + expense rows) ───────────
 function SlideSplit() {
   return (
     <svg viewBox="0 0 280 210" width="100%" height="100%" role="img" aria-label="Splitting expenses">
@@ -264,7 +234,7 @@ function SlideSplit() {
   );
 }
 
-// ─── Slide 4: Insights (self-drawing donut + growing bars) ────────────────────
+// ─── Slide 3: Insights (self-drawing donut + growing bars) ────────────────────
 function SlideInsights() {
   // Donut: r=46 → circumference ≈ 289.03. Segments 35 / 28 / 22 / 15 %.
   const segs = [
