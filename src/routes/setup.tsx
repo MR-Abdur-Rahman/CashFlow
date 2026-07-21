@@ -205,17 +205,18 @@ function PhotoStep({
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center pt-12 text-center">
-      <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
-        Add a profile photo
-      </h1>
-      <p className="mt-1.5 text-sm" style={{ color: LIGHT.muted }}>
-        Help friends recognize you when you split
-      </p>
+    <div className="flex flex-1 flex-col items-center text-center">
+      <div className="flex flex-1 flex-col items-center justify-center">
+        <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
+          Add a profile photo
+        </h1>
+        <p className="mt-1.5 text-sm" style={{ color: LIGHT.muted }}>
+          Help friends recognize you when you split
+        </p>
 
-      {/* Tap-to-change avatar with gradient ring + camera badge */}
-      <div className="mt-10">
-        <DropdownMenu>
+        {/* Tap-to-change avatar with gradient ring + camera badge */}
+        <div className="mt-10">
+          <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button type="button" disabled={busy} className="relative" aria-label="Change photo">
               <span
@@ -257,9 +258,10 @@ function PhotoStep({
         </DropdownMenu>
       </div>
 
-      <p className="mt-4 text-sm" style={{ color: LIGHT.muted }}>
-        Tap to add a photo
-      </p>
+        <p className="mt-4 text-sm" style={{ color: LIGHT.muted }}>
+          Tap to add a photo
+        </p>
+      </div>
 
       <input
         ref={cameraRef}
@@ -291,7 +293,7 @@ function PhotoStep({
         onCropped={uploadPhoto}
       />
 
-      <div className="mt-auto w-full space-y-3 pt-8">
+      <div className="w-full space-y-3 pt-8">
         <PrimaryButton onClick={handleContinue} disabled={busy}>
           Continue
         </PrimaryButton>
@@ -345,14 +347,7 @@ function PhoneStep({
   }
 
   return (
-    <div className="flex flex-1 flex-col pt-12 text-center">
-      <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
-        Add your phone number
-      </h1>
-      <p className="mt-1.5 text-sm" style={{ color: LIGHT.muted }}>
-        So friends can find and connect with you
-      </p>
-
+    <div className="flex flex-1 flex-col text-center">
       <style>{`
         .setup-field {
           background: #FFFFFF;
@@ -368,31 +363,40 @@ function PhoneStep({
         }
       `}</style>
 
-      <div className="mt-10 flex gap-2 text-left">
-        <input
-          type="text"
-          inputMode="tel"
-          aria-label="Country code"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          className="setup-field w-20 px-3 py-3.5 text-center text-sm"
-        />
-        <input
-          type="tel"
-          inputMode="tel"
-          autoComplete="tel"
-          placeholder="Phone number"
-          value={number}
-          onChange={(e) => setNumber(e.target.value)}
-          className="setup-field flex-1 px-4 py-3.5 text-sm"
-        />
+      <div className="flex flex-1 flex-col justify-center">
+        <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
+          Add your phone number
+        </h1>
+        <p className="mt-1.5 text-sm" style={{ color: LIGHT.muted }}>
+          So friends can find and connect with you
+        </p>
+
+        <div className="mt-10 flex gap-2 text-left">
+          <input
+            type="text"
+            inputMode="tel"
+            aria-label="Country code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            className="setup-field w-20 px-3 py-3.5 text-center text-sm"
+          />
+          <input
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="Phone number"
+            value={number}
+            onChange={(e) => setNumber(e.target.value)}
+            className="setup-field flex-1 px-4 py-3.5 text-sm"
+          />
+        </div>
+
+        <p className="mt-4 text-left text-xs" style={{ color: LIGHT.muted }}>
+          Your number is never shown to other users unless you turn sharing on.
+        </p>
       </div>
 
-      <p className="mt-4 text-left text-xs" style={{ color: LIGHT.muted }}>
-        Your number is never shown to other users unless you turn sharing on.
-      </p>
-
-      <div className="mt-auto w-full space-y-3 pt-8">
+      <div className="w-full space-y-3 pt-8">
         <PrimaryButton onClick={savePhone} disabled={saving}>
           {saving ? "Saving…" : "Continue"}
         </PrimaryButton>
@@ -406,7 +410,7 @@ function PhoneStep({
 function DoneStep({ onFinish }: { onFinish: () => void }) {
   const [finishing, setFinishing] = useState(false);
   return (
-    <div className="flex flex-1 flex-col items-center pt-12 text-center">
+    <div className="flex flex-1 flex-col items-center text-center">
       {/* Water fill: a faint base logo, with the full-color logo revealed bottom-to-top via a rising
           clip-path. Uses the exact favicon.svg (no need to dissect the multi-layer SVG). */}
       <style>{`
@@ -421,29 +425,31 @@ function DoneStep({ onFinish }: { onFinish: () => void }) {
           .cashflow-waterfill { animation: none; clip-path: inset(0 0 0 0); }
         }
       `}</style>
-      <div className="relative mt-8" style={{ height: 96, width: 96 }}>
-        <img
-          src="/favicon.svg"
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 h-24 w-24"
-          style={{ opacity: 0.15 }}
-        />
-        <img
-          src="/favicon.svg"
-          alt="CashFlow"
-          className="cashflow-waterfill absolute inset-0 h-24 w-24"
-        />
+      <div className="flex flex-1 flex-col items-center justify-center">
+        <div className="relative" style={{ height: 96, width: 96 }}>
+          <img
+            src="/favicon.svg"
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-24 w-24"
+            style={{ opacity: 0.15 }}
+          />
+          <img
+            src="/favicon.svg"
+            alt="CashFlow"
+            className="cashflow-waterfill absolute inset-0 h-24 w-24"
+          />
+        </div>
+
+        <h1 className="mt-8 text-2xl font-bold" style={{ color: LIGHT.fg }}>
+          You're all set!
+        </h1>
+        <p className="mt-1.5 text-sm" style={{ color: LIGHT.muted }}>
+          Your Cash account is ready — start adding transactions and splitting with friends.
+        </p>
       </div>
 
-      <h1 className="mt-8 text-2xl font-bold" style={{ color: LIGHT.fg }}>
-        You're all set!
-      </h1>
-      <p className="mt-1.5 text-sm" style={{ color: LIGHT.muted }}>
-        Your Cash account is ready — start adding transactions and splitting with friends.
-      </p>
-
-      <div className="mt-auto w-full pt-8">
+      <div className="w-full pt-8">
         <PrimaryButton
           onClick={() => {
             if (finishing) return;

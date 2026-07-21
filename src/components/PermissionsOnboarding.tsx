@@ -9,9 +9,12 @@ import { cn } from "@/lib/utils";
 // One-at-a-time permission prompts, shown once per device to any signed-in user (new + existing;
 // gated by a localStorage flag since browser permissions are per-device). On the native app a third
 // step requests real Contacts access; on the web only Notifications + Camera are grantable.
-const SEEN_KEY = "cashflow_permissions_v2";
+export const PERMISSIONS_SEEN_KEY = "cashflow_permissions_v2";
 
-export function PermissionsOnboarding() {
+// `onComplete` fires when the flow is dismissed/finished, OR immediately on mount if permissions were
+// already granted on this device — letting callers (e.g. the post-setup /welcome handoff) chain the
+// next step. The App-chrome instance passes nothing, so it's a no-op there (unchanged behavior).
+export function PermissionsOnboarding({ onComplete }: { onComplete?: () => void } = {}) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -44,12 +47,15 @@ export function PermissionsOnboarding() {
   }, []);
 
   useEffect(() => {
-    if (!localStorage.getItem(SEEN_KEY)) setOpen(true);
+    if (!localStorage.getItem(PERMISSIONS_SEEN_KEY)) setOpen(true);
+    else onComplete?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function finish() {
-    localStorage.setItem(SEEN_KEY, "1");
+    localStorage.setItem(PERMISSIONS_SEEN_KEY, "1");
     setOpen(false);
+    onComplete?.();
   }
   function next() {
     if (step < steps.length - 1) setStep((s) => s + 1);

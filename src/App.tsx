@@ -138,9 +138,10 @@ function RoutedApp({
   if (needsSetup && location.pathname !== "/setup") {
     return <Navigate to="/setup" replace />;
   }
-  // A finished user should never sit on /setup.
+  // A finished user should never sit on /setup. Hand off to /welcome (permissions → intro carousel →
+  // home), matching Setup's own navigate — so the redirect is deterministic and never races to /home.
   if (session && onboarded && location.pathname === "/setup") {
-    return <Navigate to="/home" replace />;
+    return <Navigate to="/welcome" replace />;
   }
 
   // App chrome (nav, FAB, prompts) shows only once past setup — never over the guided-setup or intro

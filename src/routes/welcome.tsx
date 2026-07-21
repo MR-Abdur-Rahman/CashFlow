@@ -1,11 +1,17 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
+import {
+  PermissionsOnboarding,
+  PERMISSIONS_SEEN_KEY,
+} from "@/components/PermissionsOnboarding";
 
-// Post-onboarding intro carousel: shown after guided Setup completes (Setup's Done button routes here
-// with onboarded_at already set) and re-shown on demand via Settings → Tutorial → "Replay intro".
-// Finishing the last slide goes to /home. There's no localStorage gate — appearance is driven by the
-// Setup flow (onboarded_at, one-time per account) and by explicit replay navigation.
+// Post-onboarding sequence, shown after guided Setup completes (Setup's Done button routes here with
+// onboarded_at already set) and re-shown on demand via Settings → Tutorial → "Replay intro":
+//   1. Native permission prompts, if not yet granted on this device (once-per-device gate).
+//   2. The 3-slide intro carousel.
+// The last slide's button goes to /home. The carousel itself has no localStorage gate — its appearance
+// is driven by the Setup flow (onboarded_at, one-time per account) and by explicit replay navigation.
 
 // Always-light, like SplashScreen / auth / setup — these render before the theme is applied, so the
 // light-theme token values are hardcoded rather than read from var(--…).
@@ -44,10 +50,25 @@ export default function IntroCarousel() {
   const startX = useRef<number | null>(null);
   const last = SLIDES.length - 1;
 
+  // Gate the carousel behind the native permission prompts on first-ever run for this device. If
+  // they've already been shown, permsPending is false and the carousel renders immediately.
+  const [permsPending, setPermsPending] = useState(
+    () => !localStorage.getItem(PERMISSIONS_SEEN_KEY),
+  );
+
   function finish() {
     navigate("/home");
   }
   const goNext = () => setIndex((i) => Math.min(last, i + 1));
+
+  // Step 1: permissions. Renders on the light background; once dismissed/completed, reveal the carousel.
+  if (permsPending) {
+    return (
+      <div style={{ background: LIGHT.bg, height: "100dvh" }}>
+        <PermissionsOnboarding onComplete={() => setPermsPending(false)} />
+      </div>
+    );
+  }
 
   function onPointerDown(e: React.PointerEvent) {
     startX.current = e.clientX;
