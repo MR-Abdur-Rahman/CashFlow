@@ -101,13 +101,13 @@ export default function AuthPage() {
         {/* Heading + subtitle */}
         <div className="mt-6 text-center">
           <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
-            {mode === "signup" ? "Create your account" : "Welcome back"}
+            {mode === "signup" ? "Create your account" : "Welcome to CashFlow"}
           </h1>
-          <p className="mt-1.5 text-sm" style={{ color: LIGHT.muted }}>
-            {mode === "signup"
-              ? "Start tracking your money in minutes"
-              : "Log in to pick up where you left off"}
-          </p>
+          {mode === "signup" && (
+            <p className="mt-1.5 text-sm" style={{ color: LIGHT.muted }}>
+              Start tracking your money in minutes
+            </p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
@@ -218,7 +218,7 @@ export default function AuthPage() {
 
         {/* Bottom signup / signin toggle */}
         <p className="mt-6 text-center text-sm" style={{ color: LIGHT.muted }}>
-          {mode === "signin" ? "Need an account? " : "Already have an account? "}
+          {mode === "signin" ? "I didn't have an account? " : "Already have an account? "}
           <button
             type="button"
             onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
