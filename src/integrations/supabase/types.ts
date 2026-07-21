@@ -435,6 +435,7 @@ export type Database = {
           notify_daily: boolean
           notify_settlement: boolean
           notify_splits: boolean
+          onboarded_at: string | null
           phone_number: string | null
           phone_share_enabled: boolean
           phone_share_scope: string
@@ -458,6 +459,7 @@ export type Database = {
           notify_daily?: boolean
           notify_settlement?: boolean
           notify_splits?: boolean
+          onboarded_at?: string | null
           phone_number?: string | null
           phone_share_enabled?: boolean
           phone_share_scope?: string
@@ -481,6 +483,7 @@ export type Database = {
           notify_daily?: boolean
           notify_settlement?: boolean
           notify_splits?: boolean
+          onboarded_at?: string | null
           phone_number?: string | null
           phone_share_enabled?: boolean
           phone_share_scope?: string

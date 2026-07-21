@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { useRealtimeSplits } from "./hooks/useRealtimeSplits";
@@ -36,7 +37,10 @@ import { BottomNav } from "./components/BottomNav";
 import { UpdatePrompt } from "./components/UpdatePrompt";
 import { NativeUpdateModal } from "./components/NativeUpdateModal";
 import { PermissionsOnboarding } from "./components/PermissionsOnboarding";
+import { SplashScreen } from "./components/SplashScreen";
+import Setup from "./routes/setup";
 import { supabase } from "./integrations/supabase/client";
+import { profileQuery } from "@/lib/queries";
 import { syncGoogleEmail } from "@/lib/googleAuth";
 
 // The add-transaction FAB lives on every main tab (Home / Accounts / Split / Reports / Manage /
@@ -87,103 +91,146 @@ function App() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="phone-frame flex items-center justify-center min-h-screen">
-        <p className="text-muted-foreground text-sm">Loading...</p>
-      </div>
-    );
+    return <SplashScreen />;
   }
 
   return (
     <BrowserRouter>
-      <div className="phone-frame">
-        <Routes>
-          <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/home" />} />
-          <Route path="/" element={<Navigate to={session ? "/home" : "/auth"} />} />
-          <Route path="/home" element={session ? <Home /> : <Navigate to="/auth" />} />
-          <Route path="/accounts" element={session ? <Accounts /> : <Navigate to="/auth" />} />
-          <Route
-            path="/accounts/:accountId"
-            element={session ? <AccountDetail /> : <Navigate to="/auth" />}
-          />
-          <Route path="/split" element={session ? <Split /> : <Navigate to="/auth" />} />
-          <Route
-            path="/split/person/:personId"
-            element={session ? <SplitPerson /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/split/group/:groupId"
-            element={session ? <SplitGroup /> : <Navigate to="/auth" />}
-          />
-          <Route path="/reports" element={session ? <Reports /> : <Navigate to="/auth" />} />
-          <Route path="/manage" element={session ? <Manage /> : <Navigate to="/auth" />} />
-          <Route path="/settings" element={session ? <Settings /> : <Navigate to="/auth" />} />
-          <Route
-            path="/settings/account"
-            element={session ? <SettingsAccount /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/settings/account/edit"
-            element={session ? <SettingsAccountEdit /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/settings/privacy"
-            element={session ? <SettingsPrivacy /> : <Navigate to="/auth" />}
-          />
-          <Route path="/settings/qr" element={session ? <SettingsQr /> : <Navigate to="/auth" />} />
-          <Route
-            path="/settings/preferences"
-            element={session ? <SettingsPreferences /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/settings/notifications"
-            element={session ? <SettingsNotifications /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/settings/notifications/history"
-            element={session ? <SettingsNotificationHistory /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/settings/invite"
-            element={session ? <SettingsInvite /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/settings/history"
-            element={session ? <SettingsHistoryHub /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/settings/help"
-            element={session ? <SettingsHelp /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/settings/feedback"
-            element={session ? <SettingsFeedback /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/settings/app-info"
-            element={session ? <SettingsAppInfo /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/settings/tutorial"
-            element={session ? <SettingsTutorial /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/settings/scheduled"
-            element={session ? <SettingsScheduled /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/settings/history/transactions"
-            element={session ? <SettingsHistory /> : <Navigate to="/auth" />}
-          />
-        </Routes>
-        {session && <GlobalFab />}
-        {session && <BottomNav />}
-        {session && <PermissionsOnboarding />}
-        {session && <NativeUpdateModal retrySignal={scheduledClosedTick} />}
-        {session && <ScheduledDuePrompt onClosed={() => setScheduledClosedTick((t) => t + 1)} />}
-        <UpdatePrompt />
-      </div>
+      <RoutedApp
+        session={session}
+        scheduledClosedTick={scheduledClosedTick}
+        onScheduledClosed={() => setScheduledClosedTick((t) => t + 1)}
+      />
     </BrowserRouter>
+  );
+}
+
+// Everything below the router: the onboarding gate + routes + app chrome. Split into its own component
+// so it can call useLocation()/useQuery() inside the BrowserRouter context.
+function RoutedApp({
+  session,
+  scheduledClosedTick,
+  onScheduledClosed,
+}: {
+  session: any;
+  scheduledClosedTick: number;
+  onScheduledClosed: () => void;
+}) {
+  const location = useLocation();
+  const userId = session?.user?.id as string | undefined;
+  const { data: profile, isLoading: profileLoading } = useQuery(profileQuery(userId));
+
+  // With a session but the profile not yet loaded, hold on the splash so we never flash /home before
+  // the gate can decide. profileQuery is disabled without a userId, so this only waits when signed in.
+  if (session && profileLoading) {
+    return <SplashScreen />;
+  }
+
+  const onboarded = !!profile?.onboarded_at;
+  // Central onboarding gate: any signed-in user whose profile exists but hasn't finished guided setup
+  // is funneled to /setup from EVERY entry point (app reopen, direct nav to /home, Google landing).
+  // A brand-new email/Google user's row is created synchronously by the handle_new_user trigger inside
+  // the signup transaction, so by the time a session exists the row is present with onboarded_at null
+  // → gate sends them to /setup. If the row is somehow absent (profile == null), fall through to normal
+  // routing rather than trap them in a loop.
+  const needsSetup = !!session && profile != null && !onboarded;
+  if (needsSetup && location.pathname !== "/setup") {
+    return <Navigate to="/setup" replace />;
+  }
+  // A finished user should never sit on /setup.
+  if (session && onboarded && location.pathname === "/setup") {
+    return <Navigate to="/home" replace />;
+  }
+
+  // App chrome (nav, FAB, prompts) shows only once past setup — never over the guided-setup screens.
+  const showChrome = !!session && !needsSetup;
+
+  return (
+    <div className="phone-frame">
+      <Routes>
+        <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/home" />} />
+        <Route path="/" element={<Navigate to={session ? "/home" : "/auth"} />} />
+        <Route path="/setup" element={session ? <Setup /> : <Navigate to="/auth" />} />
+        <Route path="/home" element={session ? <Home /> : <Navigate to="/auth" />} />
+        <Route path="/accounts" element={session ? <Accounts /> : <Navigate to="/auth" />} />
+        <Route
+          path="/accounts/:accountId"
+          element={session ? <AccountDetail /> : <Navigate to="/auth" />}
+        />
+        <Route path="/split" element={session ? <Split /> : <Navigate to="/auth" />} />
+        <Route
+          path="/split/person/:personId"
+          element={session ? <SplitPerson /> : <Navigate to="/auth" />}
+        />
+        <Route
+          path="/split/group/:groupId"
+          element={session ? <SplitGroup /> : <Navigate to="/auth" />}
+        />
+        <Route path="/reports" element={session ? <Reports /> : <Navigate to="/auth" />} />
+        <Route path="/manage" element={session ? <Manage /> : <Navigate to="/auth" />} />
+        <Route path="/settings" element={session ? <Settings /> : <Navigate to="/auth" />} />
+        <Route
+          path="/settings/account"
+          element={session ? <SettingsAccount /> : <Navigate to="/auth" />}
+        />
+        <Route
+          path="/settings/account/edit"
+          element={session ? <SettingsAccountEdit /> : <Navigate to="/auth" />}
+        />
+        <Route
+          path="/settings/privacy"
+          element={session ? <SettingsPrivacy /> : <Navigate to="/auth" />}
+        />
+        <Route path="/settings/qr" element={session ? <SettingsQr /> : <Navigate to="/auth" />} />
+        <Route
+          path="/settings/preferences"
+          element={session ? <SettingsPreferences /> : <Navigate to="/auth" />}
+        />
+        <Route
+          path="/settings/notifications"
+          element={session ? <SettingsNotifications /> : <Navigate to="/auth" />}
+        />
+        <Route
+          path="/settings/notifications/history"
+          element={session ? <SettingsNotificationHistory /> : <Navigate to="/auth" />}
+        />
+        <Route
+          path="/settings/invite"
+          element={session ? <SettingsInvite /> : <Navigate to="/auth" />}
+        />
+        <Route
+          path="/settings/history"
+          element={session ? <SettingsHistoryHub /> : <Navigate to="/auth" />}
+        />
+        <Route path="/settings/help" element={session ? <SettingsHelp /> : <Navigate to="/auth" />} />
+        <Route
+          path="/settings/feedback"
+          element={session ? <SettingsFeedback /> : <Navigate to="/auth" />}
+        />
+        <Route
+          path="/settings/app-info"
+          element={session ? <SettingsAppInfo /> : <Navigate to="/auth" />}
+        />
+        <Route
+          path="/settings/tutorial"
+          element={session ? <SettingsTutorial /> : <Navigate to="/auth" />}
+        />
+        <Route
+          path="/settings/scheduled"
+          element={session ? <SettingsScheduled /> : <Navigate to="/auth" />}
+        />
+        <Route
+          path="/settings/history/transactions"
+          element={session ? <SettingsHistory /> : <Navigate to="/auth" />}
+        />
+      </Routes>
+      {showChrome && <GlobalFab />}
+      {showChrome && <BottomNav />}
+      {showChrome && <PermissionsOnboarding />}
+      {showChrome && <NativeUpdateModal retrySignal={scheduledClosedTick} />}
+      {showChrome && <ScheduledDuePrompt onClosed={onScheduledClosed} />}
+      <UpdatePrompt />
+    </div>
   );
 }
 

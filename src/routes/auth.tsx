@@ -5,20 +5,22 @@ import { signInWithGoogle } from "@/lib/googleAuth";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 
-// Shared dark-theme field styling (per design spec).
-const FIELD: React.CSSProperties = {
-  background: "#1A1A1A",
-  border: "1px solid #2A2A2A",
-  color: "#FFFFFF",
+// This page renders while logged out, BEFORE PrefsApplier adds the `html.light` class (that only runs
+// once a profile loads). So — like SplashScreen — the light-theme colors are hardcoded here instead of
+// using var(--…) tokens, keeping the page reliably light regardless of the dark :root default.
+const LIGHT = {
+  bg: "oklch(0.99 0 0)", // --background (html.light) — same as SplashScreen
+  fg: "oklch(0.15 0 0)", // --foreground
+  muted: "oklch(0.45 0.01 286)", // --muted-foreground
+  border: "oklch(0.9 0 0)", // --border (html.light)
 };
 
 export default function AuthPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  // One field accepts either an email or a phone number; routing is decided at submit.
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -40,21 +42,25 @@ export default function AuthPage() {
     });
   }, [navigate]);
 
-  // Email + password flow (the active method). UNCHANGED Supabase calls.
-  async function handleEmail(email: string) {
+  // Email + password flow. Supabase calls themselves are UNCHANGED — only the post-signup destination
+  // (guided setup) and the removed emailRedirectTo differ from before.
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const address = email.trim();
     setLoading(true);
     try {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
-          email,
+          email: address,
           password,
-          options: { data: { full_name: name }, emailRedirectTo: window.location.origin },
+          options: { data: { full_name: name } },
         });
         if (error) throw error;
         toast.success("Account created! You're signed in.");
-        navigate("/home");
+        // New users go through guided setup (name/photo/phone) before landing in the app.
+        navigate("/setup");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: address, password });
         if (error) throw error;
         navigate("/home");
       }
@@ -65,53 +71,67 @@ export default function AuthPage() {
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const id = identifier.trim();
-    // An "@" means it's an email → the active flow. Anything else is treated as a phone number,
-    // which isn't wired yet.
-    if (id.includes("@")) {
-      handleEmail(id);
-    } else {
-      toast.message("Phone login is being set up — use your email for now.");
-    }
-  }
-
   return (
     <div
-      style={{ background: "#0A0A0A" }}
+      style={{ background: LIGHT.bg }}
       className="min-h-[100dvh] flex flex-col items-center justify-center px-6 py-12"
     >
-      <div className="w-full max-w-sm">
-        {/* Wordmark */}
-        <h1 className="text-center text-4xl font-bold tracking-tight text-white">CashFlow</h1>
+      {/* Scoped input styling — inline styles can't express :focus / ::placeholder. */}
+      <style>{`
+        .auth-field {
+          background: #FFFFFF;
+          border: 1px solid ${LIGHT.border};
+          color: ${LIGHT.fg};
+          border-radius: 13px;
+        }
+        .auth-field::placeholder { color: #9CA3AF; }
+        .auth-field:focus {
+          outline: none;
+          border-color: #7C3AED;
+          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+        }
+      `}</style>
 
-        <form onSubmit={handleSubmit} className="mt-10 space-y-4">
-          <h2 className="mb-1 text-center text-xl font-semibold text-white">
-            {mode === "signup" ? "Create account" : "Login"}
-          </h2>
+      <div className="w-full max-w-sm">
+        {/* Gradient lightning-bolt logo — same asset as the splash / App Info page */}
+        <div className="flex justify-center">
+          <img src="/favicon.svg" alt="CashFlow" style={{ height: 46, width: 46 }} />
+        </div>
+
+        {/* Heading + subtitle */}
+        <div className="mt-6 text-center">
+          <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
+            {mode === "signup" ? "Create your account" : "Welcome back"}
+          </h1>
+          <p className="mt-1.5 text-sm" style={{ color: LIGHT.muted }}>
+            {mode === "signup"
+              ? "Start tracking your money in minutes"
+              : "Log in to pick up where you left off"}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           {mode === "signup" && (
             <input
               type="text"
               placeholder="Full name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              style={FIELD}
-              className="w-full rounded-lg px-4 py-3 text-sm outline-none placeholder:text-[#9CA3AF]"
+              autoComplete="name"
+              className="auth-field w-full px-4 py-3.5 text-sm"
             />
           )}
 
-          {/* Single identifier — email or phone number */}
           <input
-            type="text"
+            type="email"
             inputMode="email"
             autoCapitalize="none"
             autoCorrect="off"
-            placeholder="Email / Phone Number"
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            style={FIELD}
-            className="w-full rounded-lg px-4 py-3 text-sm outline-none placeholder:text-[#9CA3AF]"
+            autoComplete="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="auth-field w-full px-4 py-3.5 text-sm"
           />
 
           {/* Password with show/hide */}
@@ -121,15 +141,15 @@ export default function AuthPage() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              style={FIELD}
-              className="w-full rounded-lg px-4 py-3 pr-11 text-sm outline-none placeholder:text-[#9CA3AF]"
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              className="auth-field w-full px-4 py-3.5 pr-11 text-sm"
             />
             <button
               type="button"
               onClick={() => setShowPassword((s) => !s)}
               aria-label={showPassword ? "Hide password" : "Show password"}
               className="absolute right-3 top-1/2 -translate-y-1/2"
-              style={{ color: "#9CA3AF" }}
+              style={{ color: LIGHT.muted }}
             >
               {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             </button>
@@ -140,8 +160,8 @@ export default function AuthPage() {
               <button
                 type="button"
                 onClick={() => toast.message("Password reset is coming soon.")}
-                className="text-xs"
-                style={{ color: "#9CA3AF" }}
+                className="text-xs font-medium"
+                style={{ color: "#7C3AED" }}
               >
                 Forgot Password?
               </button>
@@ -151,29 +171,29 @@ export default function AuthPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-60"
-            style={{ background: "#7C3AED" }}
+            className="w-full rounded-xl py-3.5 text-sm font-semibold text-white disabled:opacity-60"
+            style={{ background: "linear-gradient(90deg, #7C3AED 0%, #3B82F6 100%)" }}
           >
-            {loading ? "Please wait…" : mode === "signup" ? "Create account" : "Login"}
+            {loading ? "Please wait…" : mode === "signup" ? "Create account" : "Log in"}
           </button>
         </form>
 
         {/* Divider */}
         <div className="my-6 flex items-center gap-3">
-          <span className="h-px flex-1" style={{ background: "#2A2A2A" }} />
-          <span className="text-xs" style={{ color: "#9CA3AF" }}>
-            or
+          <span className="h-px flex-1" style={{ background: LIGHT.border }} />
+          <span className="text-xs" style={{ color: LIGHT.muted }}>
+            or continue with
           </span>
-          <span className="h-px flex-1" style={{ background: "#2A2A2A" }} />
+          <span className="h-px flex-1" style={{ background: LIGHT.border }} />
         </div>
 
-        {/* Google — alternative to the email/phone form */}
+        {/* Google — keeps signInWithGoogle logic; restyled light */}
         <button
           type="button"
           onClick={handleGoogle}
           disabled={googleLoading}
-          style={{ background: "#1A1A1A", border: "1px solid #2A2A2A", color: "#FFFFFF" }}
-          className="flex w-full items-center justify-center gap-3 rounded-xl py-3 text-sm font-semibold disabled:opacity-60"
+          style={{ background: "#FFFFFF", border: `1px solid ${LIGHT.border}`, color: LIGHT.fg }}
+          className="flex w-full items-center justify-center gap-3 rounded-xl py-3.5 text-sm font-semibold disabled:opacity-60"
         >
           <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
             <path
@@ -197,15 +217,15 @@ export default function AuthPage() {
         </button>
 
         {/* Bottom signup / signin toggle */}
-        <p className="mt-6 text-center text-sm" style={{ color: "#9CA3AF" }}>
+        <p className="mt-6 text-center text-sm" style={{ color: LIGHT.muted }}>
           {mode === "signin" ? "Need an account? " : "Already have an account? "}
           <button
             type="button"
             onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-            className="font-medium"
+            className="font-semibold"
             style={{ color: "#7C3AED" }}
           >
-            {mode === "signin" ? "Sign up" : "Login"}
+            {mode === "signin" ? "Sign up" : "Log in"}
           </button>
         </p>
       </div>

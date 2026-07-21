@@ -514,7 +514,7 @@ export const profileQuery = (userId: string | undefined) =>
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "id, full_name, google_email, avatar_url, created_at, updated_at, theme, currency_code, currency_symbol, thousand_separator, decimal_places, notify_splits, notify_settlement, notify_daily, daily_reminder_time, notification_prefs, phone_share_enabled, phone_share_scope, reminder_methods, profile_share_enabled",
+          "id, full_name, google_email, avatar_url, created_at, updated_at, onboarded_at, theme, currency_code, currency_symbol, thousand_separator, decimal_places, notify_splits, notify_settlement, notify_daily, daily_reminder_time, notification_prefs, phone_share_enabled, phone_share_scope, reminder_methods, profile_share_enabled",
         )
         .eq("id", userId)
         .maybeSingle();
