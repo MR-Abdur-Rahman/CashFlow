@@ -32,12 +32,16 @@ export default function SetupPage() {
 
   const [userId, setUserId] = useState<string | undefined>();
   const [googlePicture, setGooglePicture] = useState<string | null>(null);
+  const [metaName, setMetaName] = useState<string | null>(null);
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUserId(data.user?.id);
       const meta = (data.user?.user_metadata ?? {}) as Record<string, unknown>;
       const pic = (meta.avatar_url ?? meta.picture) as string | undefined;
       setGooglePicture(pic ?? null);
+      // Name from signup metadata (email signUp passes full_name; Google provides full_name/name).
+      const nm = (meta.full_name ?? meta.name) as string | undefined;
+      setMetaName(nm ?? null);
     });
   }, []);
 
@@ -88,6 +92,7 @@ export default function SetupPage() {
             userId={userId}
             profile={profile}
             googlePicture={googlePicture}
+            metaName={metaName}
             onContinue={() => setStep(1)}
           />
         )}
@@ -125,15 +130,18 @@ function PhotoStep({
   userId,
   profile,
   googlePicture,
+  metaName,
   onContinue,
 }: {
   userId: string | undefined;
   profile: any;
   googlePicture: string | null;
+  metaName: string | null;
   onContinue: () => void;
 }) {
   const qc = useQueryClient();
   const [photo, setPhoto] = useState<string | null | undefined>(undefined); // undefined = not inited
+  const [name, setName] = useState<string | undefined>(undefined); // undefined = not inited
   const [busy, setBusy] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
@@ -146,6 +154,13 @@ function PhotoStep({
       setPhoto((profile?.avatar_url as string | null) ?? googlePicture ?? null);
     }
   }, [photo, profile, googlePicture]);
+
+  // Prefill the name the same way: existing profile name, else the signup/Google metadata name.
+  useEffect(() => {
+    if (name === undefined && (profile !== undefined || metaName !== null)) {
+      setName((profile?.full_name as string | null) ?? metaName ?? "");
+    }
+  }, [name, profile, metaName]);
 
   function pickPhoto(f: File) {
     if (f.size > 5 * 1024 * 1024) return toast.error("Image must be under 5MB");
@@ -199,14 +214,23 @@ function PhotoStep({
   }
 
   async function handleContinue() {
-    // If the shown photo is the Google prefill and isn't yet on the profile row, persist it so the
-    // user keeps their Google photo without having to re-pick it.
-    if (userId && photo && photo === googlePicture && profile && profile.avatar_url !== photo) {
+    if (!userId) return onContinue();
+    const trimmed = (name ?? "").trim();
+    const updates: { avatar_url?: string; full_name?: string } = {};
+    // Persist the Google-prefill photo if it isn't on the row yet (so they keep it without re-picking).
+    if (photo && photo === googlePicture && profile && profile.avatar_url !== photo) {
+      updates.avatar_url = photo;
+    }
+    // Save the (possibly edited) name; skip the write if unchanged from what's stored.
+    if (trimmed && trimmed !== (profile?.full_name ?? "")) {
+      updates.full_name = trimmed;
+    }
+    if (Object.keys(updates).length) {
       try {
-        await supabase.from("profiles").update({ avatar_url: photo }).eq("id", userId);
+        await supabase.from("profiles").update(updates).eq("id", userId);
         qc.invalidateQueries({ queryKey: ["profile"] });
       } catch {
-        /* non-fatal — they can set it later in Settings */
+        /* non-fatal — both are editable later in Settings */
       }
     }
     onContinue();
@@ -214,16 +238,30 @@ function PhotoStep({
 
   return (
     <div className="flex flex-1 flex-col items-center text-center min-h-0">
+      <style>{`
+        .setup-field {
+          background: #FFFFFF;
+          border: 1px solid ${LIGHT.border};
+          color: ${LIGHT.fg};
+          border-radius: 13px;
+        }
+        .setup-field::placeholder { color: #9CA3AF; }
+        .setup-field:focus {
+          outline: none;
+          border-color: #7C3AED;
+          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+        }
+      `}</style>
       <div className="flex flex-1 flex-col items-center justify-center min-h-0">
         <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
-          Add a profile photo
+          Set up your profile
         </h1>
         <p className="mt-1.5 text-sm" style={{ color: LIGHT.muted }}>
           Help friends recognize you when you split
         </p>
 
         {/* Tap-to-change avatar with gradient ring + camera badge */}
-        <div className="mt-10">
+        <div className="mt-8">
           <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button type="button" disabled={busy} className="relative" aria-label="Change photo">
@@ -266,9 +304,15 @@ function PhotoStep({
         </DropdownMenu>
       </div>
 
-        <p className="mt-4 text-sm" style={{ color: LIGHT.muted }}>
-          Tap to add a photo
-        </p>
+        {/* Full name — pre-filled from signup/Google, editable. Photo stays optional (avatar menu). */}
+        <input
+          type="text"
+          placeholder="Full name"
+          value={name ?? ""}
+          onChange={(e) => setName(e.target.value)}
+          autoComplete="name"
+          className="setup-field mt-6 w-full px-4 py-3.5 text-center text-sm"
+        />
       </div>
 
       <input
@@ -301,11 +345,10 @@ function PhotoStep({
         onCropped={uploadPhoto}
       />
 
-      <div className="w-full space-y-3 pt-6 shrink-0">
-        <PrimaryButton onClick={handleContinue} disabled={busy}>
+      <div className="w-full pt-6 shrink-0">
+        <PrimaryButton onClick={handleContinue} disabled={busy || !(name ?? "").trim()}>
           Continue
         </PrimaryButton>
-        <SkipLink onClick={handleContinue} />
       </div>
     </div>
   );
@@ -405,7 +448,7 @@ function PhoneStep({
       </div>
 
       <div className="w-full space-y-3 pt-6 shrink-0">
-        <PrimaryButton onClick={savePhone} disabled={saving}>
+        <PrimaryButton onClick={savePhone} disabled={saving || !number.trim()}>
           {saving ? "Saving…" : "Continue"}
         </PrimaryButton>
         <SkipLink onClick={onContinue} />
