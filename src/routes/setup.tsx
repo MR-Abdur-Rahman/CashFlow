@@ -46,24 +46,24 @@ export default function SetupPage() {
   return (
     <div
       style={{ background: LIGHT.bg }}
-      className="min-h-[100dvh] flex flex-col px-6 pt-8 pb-10"
+      className="min-h-[100dvh] flex flex-col px-6 pb-10"
     >
-      {/* Header: back (step ≥ 1) + 3-segment progress bar */}
-      <div className="flex items-center gap-3">
-        {step >= 1 ? (
-          <button
-            type="button"
-            aria-label="Back"
-            onClick={() => setStep((s) => Math.max(0, s - 1))}
-            style={{ color: LIGHT.fg }}
-            className="-ml-1 p-1"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-        ) : (
-          <span className="h-7 w-7" aria-hidden="true" />
-        )}
-        <div className="flex flex-1 items-center gap-2">
+      {/* Header: back button on its own row, 3-segment progress bar centered full-width below it. */}
+      <div className="shrink-0 pt-4">
+        <div className="flex h-9 items-center">
+          {step >= 1 && (
+            <button
+              type="button"
+              aria-label="Back"
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
+              style={{ color: LIGHT.fg }}
+              className="-ml-1 p-1"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+        <div className="mt-3 flex items-center gap-2">
           {[0, 1, 2].map((i) => (
             <span
               key={i}
@@ -74,7 +74,7 @@ export default function SetupPage() {
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col min-h-0">
         {step === 0 && (
           <PhotoStep
             userId={userId}
@@ -205,8 +205,8 @@ function PhotoStep({
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center text-center">
-      <div className="flex flex-1 flex-col items-center justify-center">
+    <div className="flex flex-1 flex-col items-center text-center min-h-0">
+      <div className="flex flex-1 flex-col items-center justify-center min-h-0">
         <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
           Add a profile photo
         </h1>
@@ -293,7 +293,7 @@ function PhotoStep({
         onCropped={uploadPhoto}
       />
 
-      <div className="w-full space-y-3 pt-8">
+      <div className="w-full space-y-3 pt-8 shrink-0">
         <PrimaryButton onClick={handleContinue} disabled={busy}>
           Continue
         </PrimaryButton>
@@ -347,7 +347,7 @@ function PhoneStep({
   }
 
   return (
-    <div className="flex flex-1 flex-col text-center">
+    <div className="flex flex-1 flex-col text-center min-h-0">
       <style>{`
         .setup-field {
           background: #FFFFFF;
@@ -363,7 +363,7 @@ function PhoneStep({
         }
       `}</style>
 
-      <div className="flex flex-1 flex-col justify-center">
+      <div className="flex flex-1 flex-col justify-center min-h-0">
         <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
           Add your phone number
         </h1>
@@ -396,7 +396,7 @@ function PhoneStep({
         </p>
       </div>
 
-      <div className="w-full space-y-3 pt-8">
+      <div className="w-full space-y-3 pt-8 shrink-0">
         <PrimaryButton onClick={savePhone} disabled={saving}>
           {saving ? "Saving…" : "Continue"}
         </PrimaryButton>
@@ -411,18 +411,24 @@ function DoneStep({ onFinish }: { onFinish: () => void }) {
   const [finishing, setFinishing] = useState(false);
   return (
     <div className="flex flex-1 flex-col items-center text-center">
-      {/* Water fill: a faint base logo, with the full-color logo revealed bottom-to-top via a rising
-          clip-path. Uses the exact favicon.svg (no need to dissect the multi-layer SVG). */}
+      {/* Water fill: a faint base logo, with the full-color logo revealed bottom-to-top through a
+          rising liquid surface. The fill boundary is a wavy clip-path() cubic curve (not a flat edge)
+          whose crest/trough alternate across keyframes so the surface undulates as it climbs. Coords
+          are in the 96×96 (h-24 w-24) logo box. Uses the exact favicon.svg. */}
       <style>{`
         @keyframes cashflow-waterfill {
-          from { clip-path: inset(100% 0 0 0); }
-          to   { clip-path: inset(0 0 0 0); }
+          0%   { clip-path: path('M0,100 C24,96 72,104 96,100 L96,96 L0,96 Z'); }
+          20%  { clip-path: path('M0,80 C24,85 72,74 96,80 L96,96 L0,96 Z'); }
+          40%  { clip-path: path('M0,60 C24,54 72,66 96,60 L96,96 L0,96 Z'); }
+          60%  { clip-path: path('M0,40 C24,46 72,34 96,40 L96,96 L0,96 Z'); }
+          80%  { clip-path: path('M0,20 C24,14 72,26 96,20 L96,96 L0,96 Z'); }
+          100% { clip-path: path('M0,-3 C24,2 72,-6 96,-3 L96,96 L0,96 Z'); }
         }
         .cashflow-waterfill {
-          animation: cashflow-waterfill 1.3s ease-out forwards;
+          animation: cashflow-waterfill 1.5s ease-out forwards;
         }
         @media (prefers-reduced-motion: reduce) {
-          .cashflow-waterfill { animation: none; clip-path: inset(0 0 0 0); }
+          .cashflow-waterfill { animation: none; clip-path: none; }
         }
       `}</style>
       <div className="flex flex-1 flex-col items-center justify-center">
@@ -449,7 +455,7 @@ function DoneStep({ onFinish }: { onFinish: () => void }) {
         </p>
       </div>
 
-      <div className="w-full pt-8">
+      <div className="w-full pt-8 shrink-0">
         <PrimaryButton
           onClick={() => {
             if (finishing) return;

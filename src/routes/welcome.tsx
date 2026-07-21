@@ -27,17 +27,21 @@ const EMERALD = "#10B981";
 const AMBER = "#F59E0B";
 const GRADIENT_H = "linear-gradient(90deg, #7C3AED 0%, #3B82F6 100%)";
 
+// Each headline is split into a plain lead line and a bold gradient-highlighted phrase (the second line).
 const SLIDES = [
   {
-    title: "Every account, one clear balance",
+    title: "Every account,",
+    highlight: "one clear balance",
     subtitle: "Track cash, bank and e-wallet side by side, always up to date.",
   },
   {
-    title: "Split bills, skip the awkward math",
+    title: "Split bills,",
+    highlight: "skip the awkward math",
     subtitle: "Share expenses with friends and groups — CashFlow does the settling up.",
   },
   {
-    title: "See where your money actually goes",
+    title: "See where your",
+    highlight: "money actually goes",
     subtitle: "Clear charts turn your spending into insight you can act on.",
   },
 ];
@@ -100,12 +104,16 @@ export default function IntroCarousel() {
     >
       <Styles />
 
-      {/* Swipe track */}
+      {/* Swipe track. touch-action:pan-y reserves horizontal gestures for our pointer handlers (so the
+          browser doesn't claim the finger swipe), and user-select:none stops text/SVG selection mid-drag. */}
       <div
         className="flex h-full"
         style={{
           transform: `translateX(calc(${-index * 100}% + ${drag}px))`,
           transition: dragging ? "none" : "transform 0.35s ease",
+          touchAction: "pan-y",
+          userSelect: "none",
+          WebkitUserSelect: "none",
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -122,8 +130,10 @@ export default function IntroCarousel() {
               {i === 1 && <SlideSplit />}
               {i === 2 && <SlideInsights />}
             </div>
-            <h1 className="anim-rise mt-8 text-2xl font-bold" style={{ color: LIGHT.fg }}>
+            <h1 className="anim-rise mt-8 text-2xl font-bold leading-snug" style={{ color: LIGHT.fg }}>
               {s.title}
+              <br />
+              <span className="intro-highlight">{s.highlight}</span>
             </h1>
             <p
               className="anim-rise anim-d1 mt-2 max-w-xs text-sm leading-relaxed"
@@ -320,6 +330,15 @@ function SlideInsights() {
 function Styles() {
   return (
     <style>{`
+      /* Bold gradient highlight phrase. The -webkit- pair is what actually renders clipped-to-text in
+         Chromium/Android WebView; the unprefixed props are the standard fallback. */
+      .intro-highlight {
+        background: linear-gradient(90deg, #7C3AED 0%, #3B82F6 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+      }
       @keyframes intro-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
       @keyframes intro-drop { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
       @keyframes intro-spark { 0%,100% { opacity: 0; transform: scale(0.4); } 50% { opacity: 1; transform: scale(1); } }
