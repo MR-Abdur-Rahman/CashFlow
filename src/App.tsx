@@ -31,6 +31,7 @@ import SettingsHelp from "./routes/settings-help";
 import SettingsFeedback from "./routes/settings-feedback";
 import SettingsAppInfo from "./routes/settings-app-info";
 import SettingsTutorial from "./routes/settings-tutorial";
+import SettingsTutorialDetail from "./routes/settings-tutorial-detail";
 import SettingsScheduled from "./routes/settings-scheduled";
 import { ScheduledDuePrompt } from "@/components/ScheduledDuePrompt";
 import { BottomNav } from "./components/BottomNav";
@@ -226,6 +227,10 @@ function RoutedApp({
         <Route
           path="/settings/tutorial"
           element={session ? <SettingsTutorial /> : <Navigate to="/auth" />}
+        />
+        <Route
+          path="/settings/tutorial/:topicId"
+          element={session ? <SettingsTutorialDetail /> : <Navigate to="/auth" />}
         />
         <Route
           path="/settings/scheduled"
