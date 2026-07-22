@@ -436,11 +436,8 @@ export default function Home() {
         </button>
       )}
 
-      {/* Balance Card — brand logo gradient (purple → blue) */}
-      <div
-        className="rounded-2xl p-5 relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #7C3AED 0%, #3B82F6 100%)" }}
-      >
+      {/* Balance Card — solid brand purple (the app's --primary) */}
+      <div className="bg-primary rounded-2xl p-5 relative overflow-hidden">
         <p className="text-xs font-mono text-white/70 uppercase tracking-wider">Total Balance</p>
         <p className="text-xs font-mono text-white mt-1">LKR</p>
         <p className="text-4xl font-mono font-bold text-white tracking-tight">
