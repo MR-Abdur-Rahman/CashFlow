@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Plus, ChevronRight, Check } from "lucide-react";
+import { Plus, ChevronRight, Check, Search, QrCode, Users } from "lucide-react";
 
 // Simplified, recreated mockups of the real Add Transaction / Split UI for the Tutorial guides. Built
 // entirely from the app's design tokens (bg-card, bg-secondary, text-foreground, text-income, etc.) so
@@ -297,6 +297,214 @@ export function IlloCustomSplit() {
           </div>
         ))}
       </div>
+    </Card>
+  );
+}
+
+// ─── Shared primitives for Batch 2 (people / groups / linking) ───────────────
+
+// Dialog title — matches ui/dialog's DialogTitle (text-lg font-semibold tracking-tight).
+function DlgTitle({ children }: { children: ReactNode }) {
+  return <p className="text-lg font-semibold tracking-tight">{children}</p>;
+}
+
+// Bordered text input — matches ui/input (h-9 rounded-md border border-input bg-transparent px-3, text-sm).
+function TextField({ value, placeholder }: { value?: string; placeholder?: string }) {
+  return (
+    <div className="flex h-9 items-center rounded-md border border-input px-3 text-sm">
+      <span className={value ? "text-foreground" : "text-muted-foreground"}>
+        {value ?? placeholder ?? ""}
+      </span>
+    </div>
+  );
+}
+
+// Primary Save button — matches ui/button default (bg-primary rounded-md text-sm font-medium).
+function SaveBtn({ label = "Save" }: { label?: string }) {
+  return (
+    <div className="w-full rounded-md bg-primary py-2 text-center text-sm font-medium text-white">
+      {label}
+    </div>
+  );
+}
+
+// Initials avatar — matches UserAvatar's fallback (bg-primary/20 text-primary font-semibold, bordered).
+function InitialsAvatar({ name, size = 40 }: { name: string; size?: number }) {
+  return (
+    <div
+      className="grid shrink-0 place-items-center rounded-full border border-border bg-primary/20 font-semibold text-primary"
+      style={{ height: size, width: size, fontSize: Math.round(size * 0.4) }}
+    >
+      {name.trim()[0]?.toUpperCase() ?? "?"}
+    </div>
+  );
+}
+
+// A contact list row (avatar + name + optional 🔗 badge). The badge is an emoji appended to the name,
+// exactly as the Split list renders it.
+function PersonRow({ name, linked }: { name: string; linked?: boolean }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <InitialsAvatar name={name} />
+      <p className="text-sm font-medium text-foreground">
+        {name}
+        {linked ? " 🔗" : ""}
+      </p>
+    </div>
+  );
+}
+
+// Group-member checkbox row — matches ui/checkbox (h-4 w-4 rounded-sm border-primary, checked bg-primary).
+function MemberCheck({ name, checked }: { name: string; checked: boolean }) {
+  return (
+    <div className="flex items-center gap-3 p-3">
+      <div
+        className={`grid h-4 w-4 place-items-center rounded-sm border border-primary ${
+          checked ? "bg-primary" : ""
+        }`}
+      >
+        {checked && <Check className="h-3 w-3 text-white" />}
+      </div>
+      <span className="text-sm text-foreground">{name}</span>
+    </div>
+  );
+}
+
+// List toolbar — matches ListToolbar (search pill + h-10 w-10 rounded-lg primary add, optional QR).
+function Toolbar({ placeholder, scan }: { placeholder: string; scan?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative flex-1">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="w-full rounded-lg bg-secondary py-2 pl-9 pr-3 text-sm text-muted-foreground">
+          {placeholder}
+        </div>
+      </div>
+      <div className="relative">
+        <span className="absolute inset-0 rounded-lg ring-4 ring-primary/20" />
+        <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary text-white">
+          <Plus className="h-5 w-5" />
+        </div>
+      </div>
+      {scan && (
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-secondary text-foreground">
+          <QrCode className="h-5 w-5" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Topic — Create a local person ───────────────────────────────────────────
+
+export function IlloPeopleToolbar() {
+  return (
+    <Card className="p-4">
+      <Toolbar placeholder="Search people" scan />
+    </Card>
+  );
+}
+
+export function IlloAddPersonDialog() {
+  return (
+    <Card className="space-y-4 p-4">
+      <DlgTitle>Add person</DlgTitle>
+      <div>
+        <FieldLabel>Name</FieldLabel>
+        <TextField value="Alex" />
+      </div>
+      <div>
+        <FieldLabel>Phone (optional)</FieldLabel>
+        <TextField placeholder="+94..." />
+      </div>
+      <SaveBtn />
+    </Card>
+  );
+}
+
+export function IlloLocalPersonRow() {
+  return (
+    <Card>
+      <PersonRow name="Alex" />
+    </Card>
+  );
+}
+
+// ─── Topic — Create a group ──────────────────────────────────────────────────
+
+export function IlloGroupToolbar() {
+  return (
+    <Card className="p-4">
+      <Toolbar placeholder="Search groups" />
+    </Card>
+  );
+}
+
+export function IlloAddGroupDialog() {
+  return (
+    <Card className="space-y-4 p-4">
+      <DlgTitle>Create group</DlgTitle>
+      <div>
+        <FieldLabel>Name</FieldLabel>
+        <TextField value="Roomies" />
+      </div>
+      <div className="space-y-2">
+        <FieldLabel>Members</FieldLabel>
+        <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+          <MemberCheck name="Alex" checked />
+          <MemberCheck name="Sam" checked />
+          <MemberCheck name="Jordan" checked={false} />
+        </div>
+      </div>
+      <SaveBtn />
+    </Card>
+  );
+}
+
+export function IlloGroupInList() {
+  return (
+    <Card>
+      <div className="flex items-center gap-3 px-4 py-3">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-split/20 text-split">
+          <Users className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">Roomies</p>
+          <p className="text-xs text-muted-foreground">3 members</p>
+        </div>
+        <div className="flex -space-x-2">
+          {["A", "S", "J"].map((i) => (
+            <div
+              key={i}
+              className="grid h-6 w-6 place-items-center rounded-full border-2 border-card bg-primary/20 text-[10px] font-semibold text-primary"
+            >
+              {i}
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ─── Topic — Local vs CashFlow person ────────────────────────────────────────
+
+export function IlloScanToLink() {
+  return (
+    <Card className="flex flex-col items-center gap-2 p-6 text-center">
+      <div className="grid h-16 w-16 place-items-center rounded-2xl bg-secondary text-foreground">
+        <QrCode className="h-9 w-9" />
+      </div>
+      <p className="text-sm font-medium text-foreground">Scan their CashFlow QR</p>
+      <p className="text-xs text-muted-foreground">Connects you both as linked contacts 🔗</p>
+    </Card>
+  );
+}
+
+export function IlloLinkedPersonRow() {
+  return (
+    <Card>
+      <PersonRow name="Sam" linked />
     </Card>
   );
 }

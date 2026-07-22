@@ -24,6 +24,14 @@ import {
   IlloSplitTypeToggle,
   IlloEqualShare,
   IlloCustomSplit,
+  IlloPeopleToolbar,
+  IlloAddPersonDialog,
+  IlloLocalPersonRow,
+  IlloGroupToolbar,
+  IlloAddGroupDialog,
+  IlloGroupInList,
+  IlloScanToLink,
+  IlloLinkedPersonRow,
 } from "@/components/tutorialIllustrations";
 
 // Data model for the Tutorial guides. Both the list (settings-tutorial.tsx) and the shared detail page
@@ -79,9 +87,9 @@ export const TUTORIAL_TOPICS: TutorialTopic[] = [
     desc: "Group people for shared, recurring splits",
     intro: "Bundle people together for trips, households, or anything you split often.",
     steps: [
-      { caption: "On the Split tab, open Groups and tap Add." },
-      { caption: "Name the group and add its members." },
-      { caption: "Save — you can now split expenses across the whole group at once." },
+      { caption: "On Split → Groups, tap +.", illustration: IlloGroupToolbar },
+      { caption: "Name it, tick members — you're always in.", illustration: IlloAddGroupDialog },
+      { caption: "Saved to Groups with its members.", illustration: IlloGroupInList },
     ],
   },
   {
@@ -91,9 +99,9 @@ export const TUTORIAL_TOPICS: TutorialTopic[] = [
     desc: "Add someone who isn't on CashFlow",
     intro: "Track splits with friends who don't use the app — no account needed.",
     steps: [
-      { caption: "On the Split tab (People), tap Add." },
-      { caption: "Enter their name, and an optional nickname." },
-      { caption: "Save — they appear as a local person you can split with." },
+      { caption: "On Split → People, tap +.", illustration: IlloPeopleToolbar },
+      { caption: "Enter a name (phone optional).", illustration: IlloAddPersonDialog },
+      { caption: "Added to People — local, no 🔗.", illustration: IlloLocalPersonRow },
     ],
   },
   {
@@ -151,9 +159,9 @@ export const TUTORIAL_TOPICS: TutorialTopic[] = [
     desc: "The difference between the two kinds of people",
     intro: "The people you split with come in two kinds — here's how they differ.",
     steps: [
-      { caption: "A local person exists only in your app; you track their balance yourself." },
-      { caption: "A CashFlow person is linked to a real account, so splits sync both ways." },
-      { caption: "Connect via QR or phone number to turn a contact into a linked CashFlow person." },
+      { caption: "Local: you set the name & photo. No 🔗.", illustration: IlloLocalPersonRow },
+      { caption: "Scan their CashFlow QR to link.", illustration: IlloScanToLink },
+      { caption: "Linked 🔗: profile & splits sync both ways.", illustration: IlloLinkedPersonRow },
     ],
   },
   {
