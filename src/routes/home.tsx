@@ -436,8 +436,8 @@ export default function Home() {
         </button>
       )}
 
-      {/* Balance Card — solid brand purple (the app's --primary) */}
-      <div className="bg-primary rounded-2xl p-5 relative overflow-hidden">
+      {/* Balance Card */}
+      <div className="balance-gradient rounded-2xl p-5 relative overflow-hidden">
         <p className="text-xs font-mono text-white/70 uppercase tracking-wider">Total Balance</p>
         <p className="text-xs font-mono text-white mt-1">LKR</p>
         <p className="text-4xl font-mono font-bold text-white tracking-tight">
