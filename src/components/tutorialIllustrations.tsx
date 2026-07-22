@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Plus, ChevronRight, Check, Search, QrCode, Users } from "lucide-react";
+import { Plus, ChevronRight, ChevronDown, Check, Search, QrCode, Users, Wallet } from "lucide-react";
 
 // Simplified, recreated mockups of the real Add Transaction / Split UI for the Tutorial guides. Built
 // entirely from the app's design tokens (bg-card, bg-secondary, text-foreground, text-income, etc.) so
@@ -505,6 +505,160 @@ export function IlloLinkedPersonRow() {
   return (
     <Card>
       <PersonRow name="Sam" linked />
+    </Card>
+  );
+}
+
+// ─── Shared primitives for Batch 3 (settlement / pending) ────────────────────
+
+// Dropdown-style select trigger — matches ui/select's SelectTrigger (h-9 rounded-md border-input +
+// a chevron), used for Method / Account pickers.
+function SelectMock({ value }: { value: string }) {
+  return (
+    <div className="flex h-9 items-center justify-between rounded-md border border-input px-3 text-sm">
+      <span className="text-foreground">{value}</span>
+      <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </div>
+  );
+}
+
+// ─── Topic — Do a settlement ─────────────────────────────────────────────────
+
+export function IlloSettleTrigger() {
+  return (
+    <Card className="space-y-3 p-4">
+      {/* The person's net balance card (real .balance-gradient) — white text over the purple gradient. */}
+      <div className="balance-gradient rounded-2xl p-4">
+        <p className="font-mono text-xs uppercase text-white/70">Net balance</p>
+        <p className="mt-1 font-mono text-2xl font-bold text-white">+1,000.00</p>
+        <p className="mt-1 font-mono text-xs text-white/70">owes you</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-md border border-border py-2 text-center text-sm font-medium text-foreground">
+          Add Split
+        </div>
+        <div className="rounded-md border border-border py-2 text-center text-sm font-medium text-income">
+          Settle Up
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+export function IlloSettleAmount() {
+  return (
+    <Card className="space-y-4 p-4">
+      {/* Net summary — green when you're owed (You lent), red when you owe. */}
+      <div className="flex items-center justify-between rounded-xl bg-secondary/50 px-4 py-3">
+        <span className="text-sm text-muted-foreground">You lent</span>
+        <span className="font-mono text-lg font-semibold text-income">1,000.00</span>
+      </div>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">Amount to settle</span>
+          <span className="text-[11px] text-primary underline">Full amount</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs text-muted-foreground">LKR</span>
+          <div className="flex-1 rounded-md border border-border bg-secondary px-3 py-2 text-right font-mono text-sm font-semibold text-income">
+            600.00
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Records a payment against your net balance.
+        </p>
+      </div>
+    </Card>
+  );
+}
+
+export function IlloSettleMethod() {
+  return (
+    <Card className="space-y-4 p-4">
+      <div>
+        <FieldLabel>Method</FieldLabel>
+        <SelectMock value="Bank transfer" />
+      </div>
+      <div>
+        <FieldLabel>Account</FieldLabel>
+        <SelectMock value="HNB · Savings" />
+      </div>
+    </Card>
+  );
+}
+
+export function IlloSettleResult() {
+  return (
+    <Card className="divide-y divide-border">
+      <div className="flex items-center justify-between px-4 py-3">
+        <span className="text-sm text-foreground">Paid in full</span>
+        <span className="text-[12px] font-medium text-settled">Fully settled</span>
+      </div>
+      <div className="flex items-center justify-between px-4 py-3">
+        <span className="text-sm text-foreground">Paid part</span>
+        <span className="font-mono text-[12px] text-muted-foreground">Still lent · 400 remaining</span>
+      </div>
+    </Card>
+  );
+}
+
+// ─── Topic — Pending account selection ───────────────────────────────────────
+
+export function IlloPendingCard() {
+  return (
+    <Card className="space-y-3 p-4">
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-semibold text-foreground">Pending</span>
+        <span
+          className="grid h-[18px] min-w-[18px] place-items-center rounded-full px-1.5 text-[10px] font-bold text-white"
+          style={{ background: "#EF4444" }}
+        >
+          1
+        </span>
+      </div>
+      <div className="space-y-2 rounded-xl border border-border p-3">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm font-medium text-foreground">Dinner</p>
+          <span className="shrink-0 font-mono text-sm font-semibold text-split">1,250.00</span>
+        </div>
+        <p className="text-xs text-muted-foreground">Alex added this split</p>
+      </div>
+    </Card>
+  );
+}
+
+export function IlloPendingConfirm() {
+  return (
+    <Card className="space-y-2.5 p-4">
+      <SelectMock value="🍔 Food" />
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <SelectMock value="Cash" />
+        </div>
+        <div
+          className="rounded-md px-4 py-2 text-sm font-medium text-white"
+          style={{ background: "#78350F" }}
+        >
+          Confirm
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+export function IlloAccountDeducted() {
+  return (
+    <Card className="p-4">
+      <div className="flex items-center gap-3">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-secondary text-foreground">
+          <Wallet className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">Cash</p>
+          <p className="text-xs text-expense">−1,250.00 recorded</p>
+        </div>
+        <span className="font-mono text-sm font-semibold text-foreground">8,750.00</span>
+      </div>
     </Card>
   );
 }

@@ -32,6 +32,13 @@ import {
   IlloGroupInList,
   IlloScanToLink,
   IlloLinkedPersonRow,
+  IlloSettleTrigger,
+  IlloSettleAmount,
+  IlloSettleMethod,
+  IlloSettleResult,
+  IlloPendingCard,
+  IlloPendingConfirm,
+  IlloAccountDeducted,
 } from "@/components/tutorialIllustrations";
 
 // Data model for the Tutorial guides. Both the list (settings-tutorial.tsx) and the shared detail page
@@ -111,9 +118,10 @@ export const TUTORIAL_TOPICS: TutorialTopic[] = [
     desc: "Record a payment that clears a balance",
     intro: "When money changes hands to settle up, record it so the balance zeroes out.",
     steps: [
-      { caption: "Open a person with an outstanding balance and tap Settle up." },
-      { caption: "Enter the amount and how it was paid — cash, bank, or e-wallet." },
-      { caption: "Confirm — the balance and the account update accordingly." },
+      { caption: "Open a person → Settle Up.", illustration: IlloSettleTrigger },
+      { caption: "Enter the amount — partial is fine.", illustration: IlloSettleAmount },
+      { caption: "Pick Cash or Bank transfer, + account.", illustration: IlloSettleMethod },
+      { caption: "Balance drops; Fully settled when clear.", illustration: IlloSettleResult },
     ],
   },
   {
@@ -121,11 +129,11 @@ export const TUTORIAL_TOPICS: TutorialTopic[] = [
     icon: Wallet,
     title: "Pending account selection",
     desc: "Why some splits and settlements wait for you",
-    intro: "When you owe on a split someone else created, CashFlow waits for you to say which account it came out of.",
+    intro: "When someone else paid a split, they confirm which of their accounts the money came from.",
     steps: [
-      { caption: "Open the Pending tab on the Split screen to see items awaiting your input." },
-      { caption: "Pick the account (and category) the money moved through." },
-      { caption: "Confirm — the amount is deducted and the item leaves Pending." },
+      { caption: "Other paid → shows in your Pending tab.", illustration: IlloPendingCard },
+      { caption: "Pick your account & category, Confirm.", illustration: IlloPendingConfirm },
+      { caption: "Confirmed — deducted from that account.", illustration: IlloAccountDeducted },
     ],
   },
   {
