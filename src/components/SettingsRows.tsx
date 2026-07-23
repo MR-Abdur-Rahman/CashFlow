@@ -1,17 +1,20 @@
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
+import { useBack } from "@/lib/navBack";
 
 // Shared building blocks for the Settings hub + sub-pages. Pure presentation — no logic moved here.
 
-// Back arrow + page title. Defaults to navigate(-1) (arrow == phone/browser back); pass `back` to
-// force a specific destination regardless of history.
+// Back arrow + page title. Defaults to the logical parent of the current route (see navBack); pass
+// `back` to force a specific destination. Either way it goes UP the hierarchy (replace), so back is
+// consistent with the hardware/gesture back button.
 export function SettingsHeader({ title, back }: { title: string; back?: string }) {
   const navigate = useNavigate();
+  const goBack = useBack();
   return (
     <div className="flex items-center gap-2">
       <button
-        onClick={() => (back ? navigate(back) : navigate(-1))}
+        onClick={() => (back ? navigate(back, { replace: true }) : goBack())}
         aria-label="Back"
         className="-ml-1 p-1 text-muted-foreground"
       >

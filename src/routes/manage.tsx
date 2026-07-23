@@ -36,9 +36,10 @@ import { ListToolbar } from "@/components/ListToolbar";
 import { Plus, Archive, ChevronRight, ArrowLeft } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { useBack } from "@/lib/navBack";
 
 export default function ManagePage() {
-  const navigate = useNavigate();
+  const goBack = useBack();
   const [catDrill, setCatDrill] = useState<{ id: string; name: string; icon: string } | null>(null);
   // Tab lives in the URL (?tab=) so navigating away and pressing Back restores the same tab.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -53,7 +54,7 @@ export default function ManagePage() {
     <div className="px-4 pt-6 pb-24 space-y-5">
       <div className="flex items-center gap-2">
         <button
-          onClick={() => navigate(-1)}
+          onClick={goBack}
           aria-label="Back"
           className="-ml-1 p-1 text-muted-foreground"
         >

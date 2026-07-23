@@ -38,6 +38,7 @@ import { BottomNav } from "./components/BottomNav";
 import { UpdatePrompt } from "./components/UpdatePrompt";
 import { NativeUpdateModal } from "./components/NativeUpdateModal";
 import { PermissionsOnboarding } from "./components/PermissionsOnboarding";
+import { BackButtonHandler } from "./components/BackButtonHandler";
 import { SplashScreen } from "./components/SplashScreen";
 import Setup from "./routes/setup";
 import Welcome from "./routes/welcome";
@@ -159,6 +160,7 @@ function RoutedApp({
 
   return (
     <div className="phone-frame">
+      <BackButtonHandler />
       <Routes>
         <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/home" />} />
         <Route path="/welcome" element={<Welcome />} />

@@ -26,6 +26,7 @@ export function BottomNav() {
             <Link
               key={t.to}
               to={t.to}
+              replace
               className={cn(
                 "relative flex flex-col items-center justify-center gap-1 py-3 text-[11px] transition-colors",
                 active ? "text-primary" : "text-muted-foreground hover:text-foreground",

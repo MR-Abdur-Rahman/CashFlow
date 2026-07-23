@@ -33,7 +33,8 @@ import {
   deleteSettlement as deleteSettlementRpc,
 } from "@/lib/deleteSettlement";
 import { useState, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import { useBack } from "@/lib/navBack";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -63,7 +64,7 @@ import {
 
 export default function PersonDetail() {
   const { personId } = useParams<{ personId: string }>();
-  const navigate = useNavigate();
+  const goBack = useBack();
   const qc = useQueryClient();
   const vis = useContactVisibility();
   const { data: person } = useQuery(personQuery(personId!));
@@ -201,7 +202,7 @@ export default function PersonDetail() {
   return (
     <div className="px-4 pt-4 pb-24 space-y-5">
       <button
-        onClick={() => navigate(-1)}
+        onClick={goBack}
         className="inline-flex items-center text-sm text-muted-foreground"
       >
         <ArrowLeft className="h-4 w-4 mr-1" /> Back

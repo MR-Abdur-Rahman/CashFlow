@@ -36,6 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useNavigate, useParams } from "react-router-dom";
+import { useBack } from "@/lib/navBack";
 import { EditSplitSheet, EditTxSheet } from "@/routes/home";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import { SettlementRow } from "@/components/SettlementRow";
@@ -62,6 +63,7 @@ import { cn } from "@/lib/utils";
 export default function AccountDetail() {
   const { accountId } = useParams<{ accountId: string }>();
   const navigate = useNavigate();
+  const goBack = useBack();
   const qc = useQueryClient();
   const { data: account } = useQuery(accountQuery(accountId!));
   const [period, setPeriod] = useState<Period>("monthly");
@@ -191,7 +193,7 @@ export default function AccountDetail() {
     <div className="px-4 pt-4 pb-24 space-y-4">
       {/* Back */}
       <button
-        onClick={() => navigate(-1)}
+        onClick={goBack}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground"
       >
         <ArrowLeft className="h-4 w-4" /> Back

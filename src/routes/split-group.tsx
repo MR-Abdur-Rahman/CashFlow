@@ -13,7 +13,8 @@ import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit
 import { useState, useMemo } from "react";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { AddTransactionSheet } from "@/components/AddTransactionSheet";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
+import { useBack } from "@/lib/navBack";
 import { formatMoney } from "@/lib/format";
 import { EditSplitSheet } from "./home";
 import { SplitDirectRow } from "@/components/SplitDirectRow";
@@ -46,7 +47,7 @@ import {
 
 export default function GroupDetail() {
   const { groupId } = useParams<{ groupId: string }>();
-  const navigate = useNavigate();
+  const goBack = useBack();
   const qc = useQueryClient();
   const { data: group } = useQuery(groupQuery(groupId!));
   const { data: balanceData } = useQuery(splitBalancesQuery());
@@ -88,7 +89,7 @@ export default function GroupDetail() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["groups"] });
       toast.success("Group deleted");
-      navigate(-1);
+      goBack();
     },
     onError: (e) => toast.error(e.message),
   });
@@ -174,7 +175,7 @@ export default function GroupDetail() {
   return (
     <div className="px-4 pt-4 pb-24 space-y-5">
       <button
-        onClick={() => navigate(-1)}
+        onClick={goBack}
         className="inline-flex items-center text-sm text-muted-foreground"
       >
         <ArrowLeft className="h-4 w-4 mr-1" /> Back
