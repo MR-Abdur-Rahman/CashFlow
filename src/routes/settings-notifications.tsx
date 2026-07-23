@@ -135,7 +135,7 @@ export default function NotificationSettingsPage() {
           if (!o) setPendingToggle(null);
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-xs">
           <DialogTitle>{pendingToggle?.label}</DialogTitle>
           <DialogDescription>
             {pendingToggle?.newValue
