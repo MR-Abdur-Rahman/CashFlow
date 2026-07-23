@@ -53,11 +53,16 @@ const FAB_TABS = ["/home", "/accounts", "/split", "/reports", "/manage", "/setti
 function GlobalFab() {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<"expense" | "split">("expense");
   if (!FAB_TABS.includes(pathname)) return null;
+  function openSheet(t: "expense" | "split") {
+    setTab(t);
+    setOpen(true);
+  }
   return (
     <>
-      <Fab onClick={() => setOpen(true)} />
-      <AddTransactionSheet open={open} onOpenChange={setOpen} />
+      <Fab onAddTransaction={() => openSheet("expense")} onAddSplit={() => openSheet("split")} />
+      <AddTransactionSheet open={open} onOpenChange={setOpen} defaultTab={tab} />
     </>
   );
 }
