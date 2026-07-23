@@ -27,10 +27,11 @@ export default function PrivacyPage() {
   const [code, setCode] = useState("");
   const [sending, setSending] = useState(false);
 
-  async function onContinueDelete() {
+  function onContinueDelete() {
     if (!userId) return;
-    const { data: blocked } = await supabase.rpc("has_unsettled_splits", { _user_id: userId });
-    if (blocked) return toast.error("Settle all splits before deleting your account");
+    // No unsettled-split gate: deletion is allowed regardless. Any outstanding balance stays with the
+    // other party as a normal local ("Deleted user") contact they can still settle against, thanks to
+    // the on_profile_delete cascade.
     setDelStep("method");
   }
   async function sendCode() {
