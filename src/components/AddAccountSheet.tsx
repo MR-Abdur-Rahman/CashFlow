@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { AccountIcon, PRESET_ICONS, ICON_COLORS } from "./AccountIcon";
 import { ImageCropDialog } from "./ImageCropDialog";
 import { cn } from "@/lib/utils";
+import { formatMoney } from "@/lib/format";
 
 type Account = {
   id?: string;
@@ -80,23 +81,37 @@ export function AddAccountSheet({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
-      const payload = {
+      // Metadata only — opening/current balance are handled separately (see below).
+      const meta = {
         type: a.type,
         institution: a.institution || null,
         label: a.label,
-        opening_balance: Number(a.opening_balance) || 0,
         icon_type: a.icon_type,
         icon_name: a.icon_name,
         icon_color: a.icon_color,
         icon_url: a.icon_url,
       };
+      const openingNum = Number(a.opening_balance) || 0;
       if (edit?.id) {
-        const { error } = await supabase.from("accounts").update(payload).eq("id", edit.id);
+        const { error } = await supabase.from("accounts").update(meta).eq("id", edit.id);
         if (error) throw error;
+        // Opening balance edits shift current_balance by the same delta, done atomically in the DB
+        // (no accounts-UPDATE trigger exists, and current_balance is trigger-maintained incrementally).
+        // Skip the RPC entirely when the opening balance is unchanged.
+        if (openingNum !== (Number(edit.opening_balance) || 0)) {
+          const { error: rpcErr } = await supabase.rpc("update_account_opening_balance", {
+            p_account_id: edit.id,
+            p_new_opening: openingNum,
+          });
+          if (rpcErr) throw rpcErr;
+        }
       } else {
-        const { error } = await supabase
-          .from("accounts")
-          .insert({ ...payload, user_id: u.user.id, current_balance: payload.opening_balance });
+        const { error } = await supabase.from("accounts").insert({
+          ...meta,
+          user_id: u.user.id,
+          opening_balance: openingNum,
+          current_balance: openingNum,
+        });
         if (error) throw error;
       }
     },
@@ -136,6 +151,21 @@ export function AddAccountSheet({
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            // Editing the opening balance shifts this account's current balance by the same amount —
+            // confirm the impact before saving (only when it actually changed).
+            if (edit?.id) {
+              const newOpening = Number(a.opening_balance) || 0;
+              const oldOpening = Number(edit.opening_balance) || 0;
+              if (newOpening !== oldOpening) {
+                const oldCur = Number(edit.current_balance) || 0;
+                const newCur = oldCur + (newOpening - oldOpening);
+                const ok = window.confirm(
+                  `Change the opening balance to ${formatMoney(newOpening)}?\n\n` +
+                    `This account's current balance will change from ${formatMoney(oldCur)} to ${formatMoney(newCur)}.`,
+                );
+                if (!ok) return;
+              }
+            }
             mutation.mutate();
           }}
           className="flex flex-col flex-1 min-h-0"
@@ -259,15 +289,20 @@ export function AddAccountSheet({
             </div>
 
             <div className="space-y-1.5">
-              <Label>{edit ? "Current balance (read-only)" : "Opening balance"}</Label>
+              <Label>Opening balance</Label>
               <Input
                 inputMode="decimal"
-                disabled={!!edit}
-                value={edit ? edit.current_balance : String(a.opening_balance)}
+                value={String(a.opening_balance)}
                 onChange={(e) =>
                   setA((s) => ({ ...s, opening_balance: e.target.value.replace(/[^\d.-]/g, "") }))
                 }
               />
+              {edit && (
+                <p className="text-xs text-muted-foreground">
+                  The starting balance when this account was created. Editing it adjusts the current
+                  balance by the same amount.
+                </p>
+              )}
             </div>
           </div>
           <div className="p-4 border-t border-border">

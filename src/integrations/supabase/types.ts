@@ -1131,6 +1131,10 @@ export type Database = {
         Args: { p_group_id: string }
         Returns: undefined
       }
+      update_account_opening_balance: {
+        Args: { p_account_id: string; p_new_opening: number }
+        Returns: undefined
+      }
       update_split: {
         Args: {
           p_category_id: string
