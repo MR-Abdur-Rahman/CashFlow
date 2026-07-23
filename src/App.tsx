@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { useRealtimeSplits } from "./hooks/useRealtimeSplits";
-import { Fab } from "./components/Fab";
+import { Fab, type TxnTab } from "./components/Fab";
 import { AddTransactionSheet } from "./components/AddTransactionSheet";
 import "./index.css";
 import Home from "./routes/home";
@@ -53,15 +53,16 @@ const FAB_TABS = ["/home", "/accounts", "/split", "/reports", "/manage", "/setti
 function GlobalFab() {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"expense" | "split">("expense");
+  const [tab, setTab] = useState<TxnTab>("expense");
   if (!FAB_TABS.includes(pathname)) return null;
-  function openSheet(t: "expense" | "split") {
-    setTab(t);
-    setOpen(true);
-  }
   return (
     <>
-      <Fab onAddTransaction={() => openSheet("expense")} onAddSplit={() => openSheet("split")} />
+      <Fab
+        onSelect={(t) => {
+          setTab(t);
+          setOpen(true);
+        }}
+      />
       <AddTransactionSheet open={open} onOpenChange={setOpen} defaultTab={tab} />
     </>
   );
