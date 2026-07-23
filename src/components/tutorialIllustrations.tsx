@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Plus, ChevronRight, ChevronDown, Check, Search, QrCode, Users, Wallet } from "lucide-react";
+import { Plus, ChevronRight, ChevronDown, Check, Search, QrCode, Users, Wallet, Bell, Send } from "lucide-react";
 
 // Simplified, recreated mockups of the real Add Transaction / Split UI for the Tutorial guides. Built
 // entirely from the app's design tokens (bg-card, bg-secondary, text-foreground, text-income, etc.) so
@@ -658,6 +658,155 @@ export function IlloAccountDeducted() {
           <p className="text-xs text-expense">−1,250.00 recorded</p>
         </div>
         <span className="font-mono text-sm font-semibold text-foreground">8,750.00</span>
+      </div>
+    </Card>
+  );
+}
+
+// ─── Topic — Schedule transactions ───────────────────────────────────────────
+
+export function IlloScheduledToolbar() {
+  return (
+    <Card className="p-4">
+      <Toolbar placeholder="Search scheduled" />
+    </Card>
+  );
+}
+
+export function IlloScheduledForm() {
+  return (
+    <Card className="space-y-3 p-4">
+      {/* Scheduled sheet mirrors Add Transaction, minus Split — three type tabs. */}
+      <div className="grid grid-cols-3 rounded-lg bg-secondary p-1 text-center text-sm font-medium">
+        <div className="whitespace-nowrap rounded-md py-1 text-muted-foreground">Income</div>
+        <div
+          className="whitespace-nowrap rounded-md py-1 text-expense"
+          style={{ background: "var(--color-expense-bg)" }}
+        >
+          Expense
+        </div>
+        <div className="whitespace-nowrap rounded-md py-1 text-muted-foreground">Transfer</div>
+      </div>
+      <div className="py-1 text-center">
+        <p className="font-mono text-3xl font-semibold text-expense">15,000.00</p>
+        <p className="mt-1 font-mono text-xs text-muted-foreground">LKR</p>
+      </div>
+      <div>
+        <FieldLabel>Description</FieldLabel>
+        <TextField value="Rent" />
+      </div>
+      <div>
+        <FieldLabel>From account</FieldLabel>
+        <SelectMock value="HNB · Savings" />
+      </div>
+      <div>
+        <FieldLabel>Category</FieldLabel>
+        <Pill label="🏠 Housing" />
+      </div>
+    </Card>
+  );
+}
+
+export function IlloScheduledRecurrence() {
+  return (
+    <Card className="space-y-3 p-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <FieldLabel>Day of month</FieldLabel>
+          <SelectMock value="15" />
+        </div>
+        <div>
+          <FieldLabel>Time</FieldLabel>
+          <SelectMock value="9:00 AM" />
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">Runs on day 15 each month.</p>
+      <div
+        className="w-full rounded-md py-2 text-center text-sm font-medium text-white"
+        style={{ background: SAVE.expense }}
+      >
+        Create schedule
+      </div>
+    </Card>
+  );
+}
+
+export function IlloScheduledDue() {
+  return (
+    <Card className="space-y-2 p-4">
+      <p className="text-base font-semibold text-foreground">Scheduled transactions due</p>
+      <p className="text-xs text-muted-foreground">Confirm to record them, or skip this month.</p>
+      <div className="space-y-1 rounded-xl border border-border p-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-foreground">Rent</p>
+          <span className="font-mono text-sm font-semibold text-expense">15,000.00</span>
+        </div>
+        <p className="text-xs text-muted-foreground">HNB · Savings · Jul 15</p>
+        <div className="grid grid-cols-2 gap-2 pt-1.5">
+          <div className="rounded-md py-1.5 text-center text-sm font-medium text-muted-foreground">
+            Skip
+          </div>
+          <div className="rounded-md bg-primary py-1.5 text-center text-sm font-medium text-white">
+            Confirm
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ─── Topic — Reminders (send a payment reminder) ─────────────────────────────
+
+export function IlloReminderTrigger() {
+  return (
+    <Card className="p-4">
+      <div className="flex items-center gap-3">
+        <InitialsAvatar name="Alex" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">Alex</p>
+          <p className="text-xs text-income">owes you 1,000</p>
+        </div>
+        <div className="relative">
+          <span className="absolute inset-0 rounded-full ring-4 ring-primary/20" />
+          <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-foreground">
+            <Bell className="h-5 w-5" />
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+export function IlloReminderDialog() {
+  return (
+    <Card className="space-y-4 p-4">
+      <DlgTitle>Send reminder</DlgTitle>
+      <div>
+        <FieldLabel>Message</FieldLabel>
+        <div className="rounded-md border border-input px-3 py-2 text-sm leading-relaxed text-foreground">
+          Hi Alex, friendly reminder you owe LKR 1,000.00 for Dinner. Thanks!
+        </div>
+      </div>
+      <div className="flex w-full items-center justify-center gap-2 rounded-md bg-primary py-2 text-sm font-medium text-white">
+        <Send className="h-4 w-4" /> Send
+      </div>
+    </Card>
+  );
+}
+
+export function IlloReminderNotification() {
+  return (
+    <Card className="p-4">
+      <div className="flex gap-3">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
+          <Bell className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">Payment reminder</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Hi Alex, friendly reminder you owe LKR 1,000.00 for Dinner. Thanks!
+          </p>
+        </div>
       </div>
     </Card>
   );

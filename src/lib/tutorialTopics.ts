@@ -39,6 +39,13 @@ import {
   IlloPendingCard,
   IlloPendingConfirm,
   IlloAccountDeducted,
+  IlloScheduledToolbar,
+  IlloScheduledForm,
+  IlloScheduledRecurrence,
+  IlloScheduledDue,
+  IlloReminderTrigger,
+  IlloReminderDialog,
+  IlloReminderNotification,
 } from "@/components/tutorialIllustrations";
 
 // Data model for the Tutorial guides. Both the list (settings-tutorial.tsx) and the shared detail page
@@ -143,21 +150,22 @@ export const TUTORIAL_TOPICS: TutorialTopic[] = [
     desc: "Automate recurring income, bills and transfers",
     intro: "Set up transactions that recur on a chosen day each month.",
     steps: [
-      { caption: "Go to Settings → Scheduled transactions and tap Add." },
-      { caption: "Choose the type, amount, account, and day of the month." },
-      { caption: "On the due day, CashFlow prompts you to confirm and post it." },
+      { caption: "Settings → Scheduled, tap +.", illustration: IlloScheduledToolbar },
+      { caption: "Set amount, account, category.", illustration: IlloScheduledForm },
+      { caption: "Pick the recurring day + time.", illustration: IlloScheduledRecurrence },
+      { caption: "When due, Confirm to post it.", illustration: IlloScheduledDue },
     ],
   },
   {
     id: "reminders",
     icon: Bell,
     title: "Reminders",
-    desc: "Get nudged about payments and daily logging",
-    intro: "Choose which reminders and alerts CashFlow sends you.",
+    desc: "Nudge someone to settle up",
+    intro: "Send a friendly payment reminder to someone who owes you.",
     steps: [
-      { caption: "Go to Settings → Notifications." },
-      { caption: "Toggle reminders for splits, settlements, and a daily logging nudge." },
-      { caption: "Set your preferred daily reminder time." },
+      { caption: "On a person who owes you, tap 🔔.", illustration: IlloReminderTrigger },
+      { caption: "Edit the message, tap Send.", illustration: IlloReminderDialog },
+      { caption: "They get a Payment reminder alert.", illustration: IlloReminderNotification },
     ],
   },
   {
