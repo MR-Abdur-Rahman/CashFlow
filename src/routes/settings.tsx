@@ -32,8 +32,8 @@ const MAIN: Item[] = [
   {
     to: "/settings/account",
     icon: User,
-    title: "Account",
-    subtitle: "Profile, phone number, Google account",
+    title: "Profile",
+    subtitle: "Name, phone number, Google account",
   },
   {
     to: "/settings/privacy",
@@ -45,7 +45,7 @@ const MAIN: Item[] = [
     to: "/manage",
     icon: LayoutGrid,
     title: "Manage",
-    subtitle: "Categories, people, groups",
+    subtitle: "Categories, accounts, people, groups",
   },
   {
     to: "/settings/scheduled",
