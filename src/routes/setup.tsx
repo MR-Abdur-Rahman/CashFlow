@@ -6,13 +6,16 @@ import { profileQuery, myPhoneQuery } from "@/lib/queries";
 import { UserAvatar } from "@/components/UserAvatar";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
 import { toast } from "sonner";
-import { Camera, Image as ImageIcon, Trash2, Loader2, ArrowLeft } from "lucide-react";
+import { Camera, Image as ImageIcon, Trash2, Loader2, ArrowLeft, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CountryPickerSheet } from "@/components/CountryPickerSheet";
+import { COUNTRY_DIAL_CODES } from "@/lib/countries";
+import { currencyFlag } from "@/lib/format";
 
 // Like SplashScreen / auth.tsx, guided setup renders before PrefsApplier applies the theme, so the
 // light-theme token values are hardcoded here instead of using var(--…). Keeps it reliably light.
@@ -365,10 +368,19 @@ function PhoneStep({
 }) {
   const qc = useQueryClient();
   const { data: myPhone } = useQuery(myPhoneQuery());
+  const [country, setCountry] = useState("LK"); // ISO code — drives the flag + dial code
   const [code, setCode] = useState("+94");
   const [number, setNumber] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const inited = useRef(false);
+
+  const dialItems = COUNTRY_DIAL_CODES.map((c) => ({
+    key: c.country,
+    flag: currencyFlag(c.country),
+    name: c.name,
+    trailing: c.dial,
+  }));
 
   // Best-effort prefill if a number already exists (new users have none).
   useEffect(() => {
@@ -423,14 +435,16 @@ function PhoneStep({
         </p>
 
         <div className="mt-10 flex gap-2 text-left">
-          <input
-            type="text"
-            inputMode="tel"
-            aria-label="Country code"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            className="setup-field w-20 px-3 py-3.5 text-center text-sm"
-          />
+          <button
+            type="button"
+            aria-label="Select country code"
+            onClick={() => setPickerOpen(true)}
+            className="setup-field flex shrink-0 items-center gap-1.5 px-3 py-3.5 text-sm"
+          >
+            <span className="text-lg leading-none">{currencyFlag(country)}</span>
+            <span>{code}</span>
+            <ChevronDown className="h-4 w-4" style={{ color: LIGHT.muted }} />
+          </button>
           <input
             type="tel"
             inputMode="tel"
@@ -441,6 +455,22 @@ function PhoneStep({
             className="setup-field flex-1 px-4 py-3.5 text-sm"
           />
         </div>
+
+        <CountryPickerSheet
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          title="Choose country"
+          searchPlaceholder="Search country or code"
+          items={dialItems}
+          selectedKey={country}
+          onSelect={(iso) => {
+            const c = COUNTRY_DIAL_CODES.find((x) => x.country === iso);
+            if (c) {
+              setCountry(c.country);
+              setCode(c.dial);
+            }
+          }}
+        />
 
         <p className="mt-4 text-left text-xs" style={{ color: LIGHT.muted }}>
           Your number is never shown to other users unless you turn sharing on.
