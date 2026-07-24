@@ -13,6 +13,7 @@ import {
   UserPlus,
   Inbox,
   Download,
+  UserMinus,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -46,6 +47,8 @@ function getNotificationIcon(type: string) {
       return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Users };
     case "app_update":
       return { bg: "#1E3A5F", color: "#3B82F6", Icon: Download };
+    case "contact_account_deleted":
+      return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: UserMinus };
     default:
       return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Bell };
   }
@@ -126,6 +129,12 @@ export default function NotificationHistoryPage() {
     // Update-available → App Info, which auto-opens the shared update dialog.
     if (n.type === "app_update") {
       navigate("/settings/app-info?update=1");
+      return;
+    }
+
+    // A contact deleted their account (now a local contact) → the People list.
+    if (n.type === "contact_account_deleted") {
+      navigate("/manage");
       return;
     }
 

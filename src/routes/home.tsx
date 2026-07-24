@@ -39,6 +39,7 @@ import {
   Wallet,
   UserPlus,
   Download,
+  UserMinus,
 } from "lucide-react";
 import { format, startOfWeek, startOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -163,6 +164,8 @@ function getNotificationIcon(type: string) {
       return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Users };
     case "app_update":
       return { bg: "#1E3A5F", color: "#3B82F6", Icon: Download };
+    case "contact_account_deleted":
+      return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: UserMinus };
     default:
       return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Bell };
   }
@@ -1689,6 +1692,12 @@ function NotificationSheet({
     // Update-available → the App Info page, which auto-opens the shared update dialog.
     if (n.type === "app_update") {
       onNavigate("/settings/app-info?update=1");
+      return;
+    }
+
+    // A contact deleted their account (now a local contact) → the People list.
+    if (n.type === "contact_account_deleted") {
+      onNavigate("/manage");
       return;
     }
 
