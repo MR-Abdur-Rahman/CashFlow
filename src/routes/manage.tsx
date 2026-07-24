@@ -95,8 +95,9 @@ function Categories({
   const { data: cats = [] } = useQuery(categoriesQuery());
   const { data: allSubs = [] } = useQuery(allSubCategoriesQuery());
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [edit, setEdit] = useState<any>(null);
+  // Single source of truth for the category dialog: null = closed, otherwise the mode AND its target
+  // travel together in one value, so "which mode" and "which category" can never disagree.
+  const [action, setAction] = useState<{ mode: "create" } | { mode: "edit"; cat: any } | null>(null);
   const [q, setQ] = useState("");
 
   const del = useMutation({
@@ -134,10 +135,7 @@ function Categories({
         query={q}
         onQuery={setQ}
         placeholder="Search categories"
-        onAdd={() => {
-          setEdit(null);
-          setOpen(true);
-        }}
+        onAdd={() => setAction({ mode: "create" })}
       />
 
       {/* Expense categories */}
@@ -150,10 +148,7 @@ function Categories({
           {expenseCats.map((c: any) => (
             <SwipeRow
               key={c.id}
-              onEdit={() => {
-                setEdit(c);
-                setOpen(true);
-              }}
+              onEdit={() => setAction({ mode: "edit", cat: c })}
               onDelete={() => del.mutate(c.id)}
             >
               <button
@@ -180,10 +175,7 @@ function Categories({
           {incomeCats.map((c: any) => (
             <SwipeRow
               key={c.id}
-              onEdit={() => {
-                setEdit(c);
-                setOpen(true);
-              }}
+              onEdit={() => setAction({ mode: "edit", cat: c })}
               onDelete={() => del.mutate(c.id)}
             >
               <button
@@ -200,7 +192,14 @@ function Categories({
         </div>
       </div>
 
-      <CategoryDialog open={open} onOpenChange={setOpen} edit={edit} />
+      {/* Keyed by the exact target so switching categories, flipping create↔edit, or reopening after
+          a close (via "idle") always remounts the dialog fresh — the key change replaces every reset. */}
+      <CategoryDialog
+        key={action ? (action.mode === "edit" ? `edit-${action.cat.id}` : "create") : "idle"}
+        open={!!action}
+        onClose={() => setAction(null)}
+        edit={action?.mode === "edit" ? action.cat : null}
+      />
     </div>
   );
 }
@@ -375,12 +374,15 @@ function SubCategoryDialog({
 // ─── Category Dialog ───────────────────────────────────────────────────────
 function CategoryDialog({
   open,
-  onOpenChange,
+  onClose,
   edit,
 }: {
   open: boolean;
-  onOpenChange: (o: boolean) => void;
-  edit?: any;
+  onClose: () => void;
+  // The category being edited, or null for create mode. Remounted (via a key on the parent) whenever
+  // this target changes, so name/icon/type are seeded once from `edit` at mount and never need manual
+  // resetting — no stale values, no flash, no mode/target desync.
+  edit: { id: string; name: string; icon: string | null; type: string } | null;
 }) {
   const qc = useQueryClient();
   const [name, setName] = useState(edit?.name ?? "");
@@ -392,7 +394,7 @@ function CategoryDialog({
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
       const payload = { name, icon, type };
-      if (edit?.id) {
+      if (edit) {
         const { error } = await supabase.from("categories").update(payload).eq("id", edit.id);
         if (error) throw error;
       } else {
@@ -405,13 +407,13 @@ function CategoryDialog({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["categories"] });
       toast.success("Saved");
-      onOpenChange(false);
+      onClose();
     },
     onError: (e) => toast.error(e.message),
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} key={edit?.id ?? "new"}>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogTitle>{edit ? "Edit category" : "New category"}</DialogTitle>
         <form
