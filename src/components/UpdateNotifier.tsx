@@ -20,8 +20,14 @@ export function UpdateNotifier() {
   useEffect(() => {
     if (!import.meta.env.PROD) return; // no version.json in dev
     let stopped = false;
+    // Re-entrancy guard: mount/interval/focus/visibilitychange can fire check() near-simultaneously,
+    // and the localStorage + unread-notification guards sit behind async awaits (a TOCTOU race), so two
+    // overlapping runs could each insert. Serialize so only one runs at a time → exactly one insert.
+    let running = false;
 
     async function check() {
+      if (running) return;
+      running = true;
       try {
         const res = await fetch(`/version.json?t=${Date.now()}`, { cache: "no-store" });
         if (!res.ok) return;
@@ -55,6 +61,8 @@ export function UpdateNotifier() {
         localStorage.setItem(key, "1");
       } catch {
         // offline or transient — retry next tick
+      } finally {
+        running = false;
       }
     }
 
