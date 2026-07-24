@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { notificationsQuery } from "@/lib/queries";
+import { notificationsQuery, incomingRequestsQuery } from "@/lib/queries";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import {
   ArrowLeft,
   Users,
@@ -12,10 +11,13 @@ import {
   Wallet,
   CalendarClock,
   UserPlus,
+  Inbox,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
+import { ConnectionRequestActions } from "@/components/ConnectionRequestActions";
+import { RequestsSheet } from "@/components/RequestsSheet";
 
 // Colored circle icon per notification type (matches Home dropdown panel).
 function getNotificationIcon(type: string) {
@@ -39,6 +41,8 @@ function getNotificationIcon(type: string) {
       return { bg: "#1E3A5F", color: "#3B82F6", Icon: UserPlus };
     case "connection_accepted":
       return { bg: "#064E3B", color: "#10B981", Icon: Users };
+    case "connection_declined":
+      return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Users };
     default:
       return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Bell };
   }
@@ -76,34 +80,23 @@ function groupByDate(notifications: any[]) {
 
 export default function NotificationHistoryPage() {
   const { data: notifications = [] } = useQuery(notificationsQuery());
+  const { data: incomingReqs = [] } = useQuery(incomingRequestsQuery());
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [userId, setUserId] = useState<string | undefined>();
+  const [requestsOpen, setRequestsOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
   }, []);
 
   const grouped = useMemo(() => groupByDate(notifications as any[]), [notifications]);
-  const hasUnread = (notifications as any[]).some((n: any) => !n.is_read);
-
-  async function markAllRead() {
-    if (!userId) return;
-    if (!hasUnread) {
-      toast("All caught up!");
-      return;
-    }
-    const { error } = await supabase
-      .from("notifications")
-      .update({ is_read: true })
-      .eq("user_id", userId)
-      .eq("is_read", false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    qc.invalidateQueries({ queryKey: ["notifications"] });
-  }
+  // request id → current status, so a connection_request row shows Accept/Decline vs the outcome.
+  const statusById = useMemo(
+    () => new Map((incomingReqs as any[]).map((r: any) => [r.id, r.status])),
+    [incomingReqs],
+  );
+  const pendingCount = (incomingReqs as any[]).filter((r: any) => r.status === "pending").length;
 
   async function handleTap(n: any) {
     if (!n.is_read) {
@@ -121,11 +114,7 @@ export default function NotificationHistoryPage() {
       return;
     }
 
-    // Connection request → the Requests inbox; accepted → the People list.
-    if (n.type === "connection_request") {
-      navigate("/find-people?tab=requests");
-      return;
-    }
+    // Accepted connection → the People list. (Requests are actioned inline, not via tap.)
     if (n.type === "connection_accepted") {
       navigate("/manage");
       return;
@@ -169,13 +158,23 @@ export default function NotificationHistoryPage() {
         </Link>
         <button
           type="button"
-          onClick={markAllRead}
-          className="text-sm font-medium"
+          onClick={() => setRequestsOpen(true)}
+          aria-label="Connection requests"
+          className="relative inline-flex items-center gap-1.5 text-sm font-medium"
           style={{ color: "var(--primary)" }}
         >
-          Mark all read
+          <Inbox className="h-5 w-5" /> Requests
+          {pendingCount > 0 && (
+            <span
+              className="absolute -right-2 -top-2 inline-flex items-center justify-center rounded-full text-[10px] font-bold text-white px-1.5 min-w-[16px] h-4 leading-none"
+              style={{ background: "#EF4444" }}
+            >
+              {pendingCount}
+            </span>
+          )}
         </button>
       </div>
+      <RequestsSheet open={requestsOpen} onOpenChange={setRequestsOpen} />
 
       <h1 className="text-xl font-semibold text-foreground" style={{ padding: "0 16px 12px" }}>
         Notification History
@@ -219,19 +218,15 @@ export default function NotificationHistoryPage() {
             >
               {items.map((n: any, i: number) => {
                 const { bg, color, Icon } = getNotificationIcon(n.type);
-                return (
-                  <button
-                    key={n.id}
-                    type="button"
-                    onClick={() => handleTap(n)}
-                    className="w-full flex items-start text-left transition-colors active:opacity-80"
-                    style={{
-                      gap: 12,
-                      padding: "12px 16px",
-                      background: n.is_read ? "var(--card)" : "var(--secondary)",
-                      borderTop: i === 0 ? "none" : "1px solid var(--border)",
-                    }}
-                  >
+                const isRequest = n.type === "connection_request" && n.related_request_id;
+                const rowStyle = {
+                  gap: 12,
+                  padding: "12px 16px",
+                  background: n.is_read ? "var(--card)" : "var(--secondary)",
+                  borderTop: i === 0 ? "none" : "1px solid var(--border)",
+                } as const;
+                const inner = (
+                  <>
                     <div
                       className="shrink-0 rounded-full flex items-center justify-center"
                       style={{ width: 36, height: 36, background: bg }}
@@ -250,6 +245,30 @@ export default function NotificationHistoryPage() {
                         {formatNotifTime(n.created_at)}
                       </p>
                     </div>
+                  </>
+                );
+
+                // Connection requests aren't tap-to-navigate — they carry inline Accept/Decline.
+                if (isRequest) {
+                  return (
+                    <div key={n.id} className="w-full flex items-center" style={rowStyle}>
+                      {inner}
+                      <ConnectionRequestActions
+                        requestId={n.related_request_id}
+                        status={statusById.get(n.related_request_id) ?? "pending"}
+                      />
+                    </div>
+                  );
+                }
+                return (
+                  <button
+                    key={n.id}
+                    type="button"
+                    onClick={() => handleTap(n)}
+                    className="w-full flex items-start text-left transition-colors active:opacity-80"
+                    style={rowStyle}
+                  >
+                    {inner}
                     {!n.is_read && (
                       <span
                         className="shrink-0 mt-1.5 rounded-full"

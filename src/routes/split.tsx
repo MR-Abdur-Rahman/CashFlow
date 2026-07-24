@@ -13,7 +13,7 @@ import { bilateralBalance } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
 import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { UserAvatar } from "@/components/UserAvatar";
-import { Users, ChevronRight, Archive, CheckCircle, UserPlus, AtSign, QrCode } from "lucide-react";
+import { Users, ChevronRight, Archive, CheckCircle, UserPlus, AtSign } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -27,6 +27,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { Button } from "@/components/ui/button";
 import { AccountIcon } from "@/components/AccountIcon";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
+import { AddCashFlowPersonDialog } from "@/components/AddCashFlowPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { ListToolbar } from "@/components/ListToolbar";
 import { formatMoney } from "@/lib/format";
@@ -34,7 +35,7 @@ import { methodToAccountType } from "@/lib/settlement";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 export default function SplitPage() {
   const vis = useContactVisibility();
@@ -45,8 +46,8 @@ export default function SplitPage() {
   const allSettlements = balanceData?.settlements ?? [];
   const myPersonIds = balanceData?.myPersonIds ?? [];
   const currentUserId = balanceData?.currentUserId ?? null;
-  const navigate = useNavigate();
   const [addPerson, setAddPerson] = useState(false);
+  const [addCf, setAddCf] = useState(false);
   const [addGroup, setAddGroup] = useState(false);
   const [scanned, setScanned] = useState<{ name?: string; phone?: string } | undefined>();
   const [pq, setPq] = useState("");
@@ -113,8 +114,7 @@ export default function SplitPage() {
                   setAddPerson(true);
                 },
               },
-              { label: "Find by username", icon: AtSign, onClick: () => navigate("/find-people") },
-              { label: "Scan QR code", icon: QrCode, onClick: () => navigate("/settings/qr") },
+              { label: "Add CashFlow person", icon: AtSign, onClick: () => setAddCf(true) },
             ]}
           />
           <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
@@ -209,6 +209,7 @@ export default function SplitPage() {
       </Tabs>
 
       <AddPersonDialog open={addPerson} onOpenChange={setAddPerson} initial={scanned} />
+      <AddCashFlowPersonDialog open={addCf} onOpenChange={setAddCf} />
       <AddGroupDialog open={addGroup} onOpenChange={setAddGroup} />
     </div>
   );

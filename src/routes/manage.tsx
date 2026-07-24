@@ -28,14 +28,15 @@ import {
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
+import { AddCashFlowPersonDialog } from "@/components/AddCashFlowPersonDialog";
 import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { AddAccountSheet } from "@/components/AddAccountSheet";
 import { AccountIcon } from "@/components/AccountIcon";
 import { SwipeRow } from "@/components/SwipeRow";
 import { ListToolbar } from "@/components/ListToolbar";
-import { Plus, Archive, ChevronRight, ArrowLeft, UserPlus, AtSign, QrCode } from "lucide-react";
+import { Plus, Archive, ChevronRight, ArrowLeft, UserPlus, AtSign } from "lucide-react";
 import { formatMoney } from "@/lib/format";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useBack } from "@/lib/navBack";
 
 export default function ManagePage() {
@@ -554,9 +555,9 @@ function People() {
   const meId = balanceData?.currentUserId ?? null;
   const myPids = balanceData?.myPersonIds ?? [];
   const qc = useQueryClient();
-  const navigate = useNavigate();
   // Single source of truth: null = closed; else the mode + target travel together so they can't desync.
   const [action, setAction] = useState<{ mode: "create" } | { mode: "edit"; item: any } | null>(null);
+  const [addCf, setAddCf] = useState(false);
   const [q, setQ] = useState("");
 
   const del = useMutation({
@@ -590,8 +591,7 @@ function People() {
         placeholder="Search people or phone"
         addActions={[
           { label: "Add local person", icon: UserPlus, onClick: () => setAction({ mode: "create" }) },
-          { label: "Find by username", icon: AtSign, onClick: () => navigate("/find-people") },
-          { label: "Scan QR code", icon: QrCode, onClick: () => navigate("/settings/qr") },
+          { label: "Add CashFlow person", icon: AtSign, onClick: () => setAddCf(true) },
         ]}
       />
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
@@ -642,6 +642,7 @@ function People() {
         onOpenChange={(o) => !o && setAction(null)}
         edit={action?.mode === "edit" ? action.item : null}
       />
+      <AddCashFlowPersonDialog open={addCf} onOpenChange={setAddCf} />
     </div>
   );
 }

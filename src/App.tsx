@@ -44,7 +44,6 @@ import Setup from "./routes/setup";
 import Welcome from "./routes/welcome";
 import ResetPassword from "./routes/reset-password";
 import { ResetDeepLinkHandler } from "./components/ResetDeepLinkHandler";
-import FindPeople from "./routes/find-people";
 import SettingsUsername from "./routes/settings-username";
 import { supabase } from "./integrations/supabase/client";
 import { profileQuery } from "@/lib/queries";
@@ -202,7 +201,6 @@ function RoutedApp({
         />
         <Route path="/reports" element={session ? <Reports /> : <Navigate to="/auth" />} />
         <Route path="/manage" element={session ? <Manage /> : <Navigate to="/auth" />} />
-        <Route path="/find-people" element={session ? <FindPeople /> : <Navigate to="/auth" />} />
         <Route
           path="/settings/username"
           element={session ? <SettingsUsername /> : <Navigate to="/auth" />}

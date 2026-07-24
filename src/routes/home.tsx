@@ -14,7 +14,9 @@ import {
   subCategoriesQuery,
   splitBalancesQuery,
   scheduledTransactionsQuery,
+  incomingRequestsQuery,
 } from "@/lib/queries";
+import { ConnectionRequestActions } from "@/components/ConnectionRequestActions";
 import { settlementNetAfter } from "@/lib/balance";
 import { isDue } from "@/lib/scheduled";
 import { openScheduledPrompt } from "@/lib/scheduledPrompt";
@@ -35,6 +37,7 @@ import {
   Trash2,
   ShieldAlert,
   Wallet,
+  UserPlus,
 } from "lucide-react";
 import { format, startOfWeek, startOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -151,6 +154,12 @@ function getNotificationIcon(type: string) {
       return { bg: "#064E3B", color: "#10B981", Icon: Wallet };
     case "scheduled_due":
       return { bg: "#2E1065", color: "#A78BFA", Icon: CalendarClock };
+    case "connection_request":
+      return { bg: "#1E3A5F", color: "#3B82F6", Icon: UserPlus };
+    case "connection_accepted":
+      return { bg: "#064E3B", color: "#10B981", Icon: Users };
+    case "connection_declined":
+      return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Users };
     default:
       return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Bell };
   }
@@ -1651,6 +1660,8 @@ function NotificationSheet({
 }) {
   const qc = useQueryClient();
   const recent = notifications.slice(0, 10);
+  const { data: incomingReqs = [] } = useQuery(incomingRequestsQuery());
+  const statusById = new Map((incomingReqs as any[]).map((r: any) => [r.id, r.status]));
 
   async function markAllRead() {
     if (!userId) return;
@@ -1666,6 +1677,11 @@ function NotificationSheet({
     await supabase.from("notifications").update({ is_read: true }).eq("id", n.id);
     qc.invalidateQueries({ queryKey: ["notifications"] });
     onOpenChange(false);
+
+    if (n.type === "connection_accepted") {
+      onNavigate("/manage");
+      return;
+    }
 
     // Account selection (split payer, or settlement receiver) → Split page Pending tab.
     // settlement_account_needed is the legacy type, now routed to Pending too.
@@ -1749,14 +1765,14 @@ function NotificationSheet({
           ) : (
             recent.map((n: any) => {
               const { bg, color, Icon } = getNotificationIcon(n.type);
-              return (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => handleTap(n)}
-                  className="w-full flex items-start text-left transition-colors hover:bg-secondary active:bg-secondary"
-                  style={{ gap: 12, padding: "12px 16px", borderBottom: "1px solid var(--border)" }}
-                >
+              const isRequest = n.type === "connection_request" && n.related_request_id;
+              const rowStyle = {
+                gap: 12,
+                padding: "12px 16px",
+                borderBottom: "1px solid var(--border)",
+              } as const;
+              const inner = (
+                <>
                   <div
                     className="shrink-0 rounded-full flex items-center justify-center"
                     style={{ width: 36, height: 36, background: bg }}
@@ -1775,6 +1791,30 @@ function NotificationSheet({
                       {timeAgo(n.created_at)}
                     </p>
                   </div>
+                </>
+              );
+
+              // Connection requests carry inline Accept/Decline instead of tap-to-navigate.
+              if (isRequest) {
+                return (
+                  <div key={n.id} className="w-full flex items-center" style={rowStyle}>
+                    {inner}
+                    <ConnectionRequestActions
+                      requestId={n.related_request_id}
+                      status={statusById.get(n.related_request_id) ?? "pending"}
+                    />
+                  </div>
+                );
+              }
+              return (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => handleTap(n)}
+                  className="w-full flex items-start text-left transition-colors hover:bg-secondary active:bg-secondary"
+                  style={rowStyle}
+                >
+                  {inner}
                   {!n.is_read && (
                     <span
                       className="shrink-0 mt-1.5 rounded-full"
