@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { signInWithGoogle } from "@/lib/googleAuth";
 import { sendPasswordReset } from "@/lib/passwordReset";
+import { WaterFillLogo } from "@/components/WaterFillLogo";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -89,6 +90,58 @@ export default function AuthPage() {
     }
   }
 
+  // Post-send confirmation. Mirrors Setup 3/3's ("You're all set!") composition exactly: a flex-1
+  // region vertically centering the 96px water-fill logo + heading + subtitle, with the primary action
+  // pinned at the bottom and a secondary link beneath it (same w-full space-y-3 pt-6 stack).
+  if (view === "reset-sent") {
+    return (
+      <div
+        style={{
+          background: LIGHT.bg,
+          // Same safe-area math as Setup: .phone-frame already reserves the top inset, so subtract it
+          // to avoid overflow, and pad the bottom for the home-indicator inset.
+          minHeight: "calc(100dvh - env(safe-area-inset-top))",
+          paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
+        }}
+        className="flex flex-col px-6"
+      >
+        <div className="flex flex-1 flex-col items-center text-center">
+          <div className="flex flex-1 flex-col items-center justify-center">
+            <WaterFillLogo />
+            <h1 className="mt-8 text-2xl font-bold" style={{ color: LIGHT.fg }}>
+              Check your email
+            </h1>
+            <p className="mt-1.5 text-sm" style={{ color: LIGHT.muted }}>
+              We sent a password reset link to{" "}
+              <span style={{ color: LIGHT.fg }}>{email.trim()}</span>. Open it on this device to set a
+              new password.
+            </p>
+          </div>
+
+          <div className="w-full space-y-3 pt-6 shrink-0">
+            <button
+              type="button"
+              onClick={() => setView("auth")}
+              className="w-full rounded-xl py-3.5 text-sm font-semibold text-white"
+              style={{ background: "linear-gradient(90deg, #7C3AED 0%, #3B82F6 100%)" }}
+            >
+              Back to login
+            </button>
+            <button
+              type="button"
+              onClick={handleForgot}
+              disabled={resetLoading}
+              className="w-full text-sm font-medium disabled:opacity-60"
+              style={{ color: LIGHT.muted }}
+            >
+              {resetLoading ? "Sending…" : "Resend email"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{ background: LIGHT.bg }}
@@ -116,38 +169,6 @@ export default function AuthPage() {
           <img src="/favicon.svg" alt="CashFlow" style={{ height: 46, width: 46 }} />
         </div>
 
-        {view === "reset-sent" ? (
-          <div className="mt-6 text-center">
-            <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
-              Check your email
-            </h1>
-            <p className="mt-2 text-sm" style={{ color: LIGHT.muted }}>
-              We sent a password reset link to{" "}
-              <span style={{ color: LIGHT.fg }}>{email.trim()}</span>. Open it on this device to set a
-              new password.
-            </p>
-            <button
-              type="button"
-              onClick={handleForgot}
-              disabled={resetLoading}
-              className="mt-6 text-sm font-semibold disabled:opacity-60"
-              style={{ color: "#7C3AED" }}
-            >
-              {resetLoading ? "Sending…" : "Resend email"}
-            </button>
-            <div>
-              <button
-                type="button"
-                onClick={() => setView("auth")}
-                className="mt-3 text-sm"
-                style={{ color: LIGHT.muted }}
-              >
-                Back to login
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
         {/* Heading + subtitle */}
         <div className="mt-6 text-center">
           <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
@@ -279,8 +300,6 @@ export default function AuthPage() {
             {mode === "signin" ? "Sign up" : "Log in"}
           </button>
         </p>
-          </>
-        )}
       </div>
     </div>
   );
