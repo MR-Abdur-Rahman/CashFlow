@@ -453,7 +453,7 @@ export default function Home() {
             <Link
               to={`/accounts/${a.id}`}
               key={a.id}
-              className="shrink-0 w-40 h-[124px] rounded-xl border border-border bg-card p-3 snap-start flex flex-col active:opacity-80"
+              className="shrink-0 w-40 h-[124px] rounded-xl border border-border bg-card p-3 snap-start flex flex-col active:opacity-80 shadow-sm"
             >
               <AccountIcon
                 iconType={a.icon_type}
