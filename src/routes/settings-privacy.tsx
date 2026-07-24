@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { SettingsHeader } from "@/components/SettingsRows";
 import { PhoneVisibilitySettings } from "@/components/PhoneVisibilitySettings";
 import { ProfileVisibilitySettings } from "@/components/ProfileVisibilitySettings";
+import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
 import { cn } from "@/lib/utils";
 
 export default function PrivacyPage() {
@@ -26,6 +27,7 @@ export default function PrivacyPage() {
   const [delMethod, setDelMethod] = useState<"email" | "phone">("email");
   const [code, setCode] = useState("");
   const [sending, setSending] = useState(false);
+  const [changePwOpen, setChangePwOpen] = useState(false);
 
   function onContinueDelete() {
     if (!userId) return;
@@ -91,7 +93,7 @@ export default function PrivacyPage() {
 
       <button
         type="button"
-        onClick={() => navigate("/settings/change-password")}
+        onClick={() => setChangePwOpen(true)}
         className="flex w-full items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left active:bg-secondary/40"
       >
         <KeyRound className="h-5 w-5 text-muted-foreground shrink-0" />
@@ -103,6 +105,8 @@ export default function PrivacyPage() {
         </div>
         <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
       </button>
+
+      <ChangePasswordDialog open={changePwOpen} onOpenChange={setChangePwOpen} email={email} />
 
       <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
         <div>

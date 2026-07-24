@@ -20,7 +20,6 @@ import SplitGroup from "./routes/split-group";
 import SettingsAccount from "./routes/settings-account";
 import SettingsAccountEdit from "./routes/settings-account-edit";
 import SettingsPrivacy from "./routes/settings-privacy";
-import SettingsChangePassword from "./routes/settings-change-password";
 import SettingsHistory from "./routes/settings-history";
 import SettingsNotifications from "./routes/settings-notifications";
 import SettingsNotificationHistory from "./routes/settings-notification-history";
@@ -213,10 +212,6 @@ function RoutedApp({
         <Route
           path="/settings/privacy"
           element={session ? <SettingsPrivacy /> : <Navigate to="/auth" />}
-        />
-        <Route
-          path="/settings/change-password"
-          element={session ? <SettingsChangePassword /> : <Navigate to="/auth" />}
         />
         <Route path="/settings/qr" element={session ? <SettingsQr /> : <Navigate to="/auth" />} />
         <Route
