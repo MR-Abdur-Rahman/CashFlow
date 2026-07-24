@@ -461,6 +461,7 @@ export default function Home() {
                 iconColor={a.icon_color}
                 iconUrl={a.icon_url}
                 size={44}
+                className="shadow-md"
               />
               <p className="text-xs text-muted-foreground mt-2.5 truncate">
                 {[a.institution, a.label].filter(Boolean).join(" · ") || a.label}

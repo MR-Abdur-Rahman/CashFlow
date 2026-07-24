@@ -40,6 +40,7 @@ export function AccountIcon({
   fallback,
   size = 40,
   rounded = "rounded-xl",
+  className = "",
 }: {
   iconType?: string | null;
   iconName?: string | null;
@@ -48,6 +49,9 @@ export function AccountIcon({
   fallback?: string;
   size?: number;
   rounded?: string;
+  // Extra classes merged onto the rendered icon element (both the uploaded-image and preset-color
+  // branches), so callers can add e.g. a shadow uniformly regardless of icon type.
+  className?: string;
 }) {
   if (iconType === "upload" && iconUrl) {
     return (
@@ -55,7 +59,7 @@ export function AccountIcon({
         src={iconUrl}
         alt=""
         style={{ width: size, height: size }}
-        className={`${rounded} object-cover`}
+        className={`${rounded} object-cover ${className}`}
       />
     );
   }
@@ -64,7 +68,7 @@ export function AccountIcon({
   return (
     <div
       style={{ width: size, height: size, backgroundColor: bg }}
-      className={`${rounded} flex items-center justify-center text-white`}
+      className={`${rounded} flex items-center justify-center text-white ${className}`}
     >
       {fallback ? (
         <span className="font-semibold">{fallback}</span>
