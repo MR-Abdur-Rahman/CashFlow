@@ -23,6 +23,7 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [show, setShow] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -148,14 +149,25 @@ export default function ResetPasswordPage() {
                 </button>
               </div>
 
-              <input
-                type={show ? "text" : "password"}
-                placeholder="Confirm new password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                autoComplete="new-password"
-                className="rp-field w-full px-4 py-3.5 text-sm"
-              />
+              <div className="relative">
+                <input
+                  type={showConfirm ? "text" : "password"}
+                  placeholder="Confirm new password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  autoComplete="new-password"
+                  className="rp-field w-full px-4 py-3.5 pr-11 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((s) => !s)}
+                  aria-label={showConfirm ? "Hide password" : "Show password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  style={{ color: LIGHT.muted }}
+                >
+                  {showConfirm ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
 
               <button
                 type="submit"
