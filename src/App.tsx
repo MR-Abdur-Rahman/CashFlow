@@ -42,6 +42,8 @@ import { BackButtonHandler } from "./components/BackButtonHandler";
 import { SplashScreen, SPLASH_MIN_MS } from "./components/SplashScreen";
 import Setup from "./routes/setup";
 import Welcome from "./routes/welcome";
+import ResetPassword from "./routes/reset-password";
+import { ResetDeepLinkHandler } from "./components/ResetDeepLinkHandler";
 import { supabase } from "./integrations/supabase/client";
 import { profileQuery } from "@/lib/queries";
 import { syncGoogleEmail } from "@/lib/googleAuth";
@@ -139,7 +141,9 @@ function RoutedApp({
 
   // With a session but the profile not yet loaded, hold on the splash so we never flash /home before
   // the gate can decide. profileQuery is disabled without a userId, so this only waits when signed in.
-  if (session && profileLoading) {
+  // /reset-password is exempt: a recovery session shouldn't hide the set-new-password form behind a
+  // splash + profile fetch.
+  if (session && profileLoading && location.pathname !== "/reset-password") {
     return <SplashScreen />;
   }
 
@@ -151,7 +155,7 @@ function RoutedApp({
   // → gate sends them to /setup. If the row is somehow absent (profile == null), fall through to normal
   // routing rather than trap them in a loop.
   const needsSetup = !!session && profile != null && !onboarded;
-  if (needsSetup && location.pathname !== "/setup") {
+  if (needsSetup && location.pathname !== "/setup" && location.pathname !== "/reset-password") {
     return <Navigate to="/setup" replace />;
   }
   // A finished user should never sit on /setup. Hand off to /welcome (permissions → intro carousel →
@@ -162,14 +166,21 @@ function RoutedApp({
 
   // App chrome (nav, FAB, prompts) shows only once past setup — never over the guided-setup or intro
   // screens. /welcome renders full-screen post-setup (and on logged-in replay), so exclude it too.
-  const showChrome = !!session && !needsSetup && location.pathname !== "/welcome";
+  const showChrome =
+    !!session &&
+    !needsSetup &&
+    location.pathname !== "/welcome" &&
+    location.pathname !== "/reset-password";
 
   return (
     <div className="phone-frame">
       <BackButtonHandler />
+      <ResetDeepLinkHandler />
       <Routes>
         <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/home" />} />
         <Route path="/welcome" element={<Welcome />} />
+        {/* Public: the reset-password link can open while logged out or on a recovery session. */}
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<Navigate to={session ? "/home" : "/auth"} />} />
         <Route path="/setup" element={session ? <Setup /> : <Navigate to="/auth" />} />
         <Route path="/home" element={session ? <Home /> : <Navigate to="/auth" />} />

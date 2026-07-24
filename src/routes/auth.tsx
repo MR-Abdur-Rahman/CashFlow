@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { signInWithGoogle } from "@/lib/googleAuth";
+import { sendPasswordReset } from "@/lib/passwordReset";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -24,6 +25,23 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  // "reset-sent" swaps the form for a check-your-email confirmation after a reset link is sent.
+  const [view, setView] = useState<"auth" | "reset-sent">("auth");
+  const [resetLoading, setResetLoading] = useState(false);
+
+  async function handleForgot() {
+    const address = email.trim();
+    if (!address) return toast.error("Enter your email above, then tap Forgot Password.");
+    setResetLoading(true);
+    try {
+      await sendPasswordReset(address);
+      setView("reset-sent");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't send reset email");
+    } finally {
+      setResetLoading(false);
+    }
+  }
 
   async function handleGoogle() {
     setGoogleLoading(true);
@@ -98,6 +116,38 @@ export default function AuthPage() {
           <img src="/favicon.svg" alt="CashFlow" style={{ height: 46, width: 46 }} />
         </div>
 
+        {view === "reset-sent" ? (
+          <div className="mt-6 text-center">
+            <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
+              Check your email
+            </h1>
+            <p className="mt-2 text-sm" style={{ color: LIGHT.muted }}>
+              We sent a password reset link to{" "}
+              <span style={{ color: LIGHT.fg }}>{email.trim()}</span>. Open it on this device to set a
+              new password.
+            </p>
+            <button
+              type="button"
+              onClick={handleForgot}
+              disabled={resetLoading}
+              className="mt-6 text-sm font-semibold disabled:opacity-60"
+              style={{ color: "#7C3AED" }}
+            >
+              {resetLoading ? "Sending…" : "Resend email"}
+            </button>
+            <div>
+              <button
+                type="button"
+                onClick={() => setView("auth")}
+                className="mt-3 text-sm"
+                style={{ color: LIGHT.muted }}
+              >
+                Back to login
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
         {/* Heading + subtitle */}
         <div className="mt-6 text-center">
           <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
@@ -159,11 +209,12 @@ export default function AuthPage() {
             <div className="text-right">
               <button
                 type="button"
-                onClick={() => toast.message("Password reset is coming soon.")}
-                className="text-xs font-medium"
+                onClick={handleForgot}
+                disabled={resetLoading}
+                className="text-xs font-medium disabled:opacity-60"
                 style={{ color: "#7C3AED" }}
               >
-                Forgot Password?
+                {resetLoading ? "Sending…" : "Forgot Password?"}
               </button>
             </div>
           )}
@@ -228,6 +279,8 @@ export default function AuthPage() {
             {mode === "signin" ? "Sign up" : "Log in"}
           </button>
         </p>
+          </>
+        )}
       </div>
     </div>
   );

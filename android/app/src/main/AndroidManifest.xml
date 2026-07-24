@@ -30,6 +30,14 @@
                 <data android:scheme="cashflow" android:host="auth-callback" />
             </intent-filter>
 
+            <!-- Password-reset deep-link callback: cashflow://reset-callback -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="cashflow" android:host="reset-callback" />
+            </intent-filter>
+
         </activity>
 
         <provider
