@@ -1,6 +1,8 @@
+import { WaterFillLogo } from "./WaterFillLogo";
+
 // Branded launch splash shown while the initial session check runs (App.tsx `loading`).
-// The gradient lightning-bolt logo (public/favicon.svg, same asset as the App Info page) does a
-// two-beat "heartbeat" pulse then rests, looping every 1.4s.
+// The gradient lightning-bolt logo (public/favicon.svg) does the same sea-wave water-fill as Setup
+// step 3/3, looping (rise → hold → drain) since the splash stays up for an indeterminate time.
 //
 // Colors are the LIGHT-theme design tokens hardcoded on purpose: this renders before PrefsApplier
 // adds the `html.light` class, so `var(--background)` would still be the dark :root default. Hardcoding
@@ -11,29 +13,7 @@ export function SplashScreen() {
       className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 px-6 text-center"
       style={{ background: "oklch(0.99 0 0)" }}
     >
-      <style>{`
-        @keyframes cashflow-heartbeat {
-          0%   { transform: scale(1); }
-          10%  { transform: scale(1.12); }
-          20%  { transform: scale(1); }
-          30%  { transform: scale(1.12); }
-          40%  { transform: scale(1); }
-          100% { transform: scale(1); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .cashflow-splash-logo { animation: none !important; }
-        }
-      `}</style>
-
-      <img
-        src="/favicon.svg"
-        alt="CashFlow"
-        className="cashflow-splash-logo h-24 w-24"
-        style={{
-          transformOrigin: "center",
-          animation: "cashflow-heartbeat 1.4s ease-in-out infinite",
-        }}
-      />
+      <WaterFillLogo loop />
 
       <div className="space-y-1">
         <p className="text-2xl font-bold" style={{ color: "oklch(0.15 0 0)" }}>
