@@ -1,18 +1,20 @@
-import { Search, Plus, QrCode } from "lucide-react";
+import { Search, Plus, QrCode, UserPlus } from "lucide-react";
 
-// Search box + Add button (+ optional QR-scan button) row. Used above People/Group lists on the
-// Manage and Split pages so they share one style.
+// Search box + Add button (+ optional QR-scan / find-people buttons) row. Used above People/Group
+// lists on the Manage and Split pages so they share one style.
 export function ListToolbar({
   query,
   onQuery,
   onAdd,
   onScan,
+  onFind,
   placeholder = "Search",
 }: {
   query: string;
   onQuery: (v: string) => void;
   onAdd: () => void;
   onScan?: () => void;
+  onFind?: () => void;
   placeholder?: string;
 }) {
   return (
@@ -34,6 +36,16 @@ export function ListToolbar({
       >
         <Plus className="h-5 w-5" />
       </button>
+      {onFind && (
+        <button
+          type="button"
+          onClick={onFind}
+          aria-label="Find people"
+          className="h-10 w-10 shrink-0 rounded-lg bg-secondary text-foreground grid place-items-center active:opacity-80"
+        >
+          <UserPlus className="h-5 w-5" />
+        </button>
+      )}
       {onScan && (
         <button
           type="button"

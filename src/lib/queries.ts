@@ -514,7 +514,7 @@ export const profileQuery = (userId: string | undefined) =>
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "id, full_name, google_email, avatar_url, created_at, updated_at, onboarded_at, theme, currency_code, currency_symbol, thousand_separator, decimal_places, notify_splits, notify_settlement, notify_daily, daily_reminder_time, notification_prefs, phone_share_enabled, phone_share_scope, reminder_methods, profile_share_enabled",
+          "id, full_name, google_email, avatar_url, created_at, updated_at, onboarded_at, theme, currency_code, currency_symbol, thousand_separator, decimal_places, notify_splits, notify_settlement, notify_daily, daily_reminder_time, notification_prefs, phone_share_enabled, phone_share_scope, reminder_methods, profile_share_enabled, username, discoverable_by_username",
         )
         .eq("id", userId)
         .maybeSingle();
@@ -522,6 +522,26 @@ export const profileQuery = (userId: string | undefined) =>
       return data;
     },
     enabled: !!userId,
+  });
+
+// Incoming, still-pending connection requests for the current user (from search-based linking), with
+// the sender's minimal public info joined for display.
+export const incomingRequestsQuery = () =>
+  queryOptions({
+    queryKey: ["connection_requests", "incoming"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      // connection_requests isn't in the generated types yet — cast to reach it.
+      const { data, error } = await (supabase as any)
+        .from("connection_requests")
+        .select("id, from_user_id, created_at, from:from_user_id(full_name, avatar_url, username)")
+        .eq("to_user_id", u.user.id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
 // The current user's own phone number. Read via the my_phone() RPC because raw SELECT on

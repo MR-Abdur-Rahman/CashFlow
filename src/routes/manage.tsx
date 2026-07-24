@@ -571,10 +571,11 @@ function People() {
     onError: (e) => toast.error(e.message),
   });
 
-  // Filter by name / nickname (others hidden).
+  // Filter by name / nickname / phone number of the user's OWN saved contacts (a local-list filter —
+  // not a cross-user lookup of other people's private numbers).
   const filtered = (people as any[]).filter((p) => {
     if (!q.trim()) return true;
-    const hay = [contactDisplay(p).name, p.name, p.nickname]
+    const hay = [contactDisplay(p).name, p.name, p.nickname, p.phone_number]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
@@ -586,8 +587,9 @@ function People() {
       <ListToolbar
         query={q}
         onQuery={setQ}
-        placeholder="Search people"
+        placeholder="Search people or phone"
         onAdd={() => setAction({ mode: "create" })}
+        onFind={() => navigate("/find-people")}
         onScan={() => navigate("/settings/qr")}
       />
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">

@@ -428,6 +428,7 @@ export type Database = {
           currency_symbol: string
           daily_reminder_time: string | null
           decimal_places: number
+          discoverable_by_username: boolean
           full_name: string | null
           google_email: string | null
           id: string
@@ -444,6 +445,7 @@ export type Database = {
           theme: string
           thousand_separator: string
           updated_at: string
+          username: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -452,6 +454,7 @@ export type Database = {
           currency_symbol?: string
           daily_reminder_time?: string | null
           decimal_places?: number
+          discoverable_by_username?: boolean
           full_name?: string | null
           google_email?: string | null
           id: string
@@ -468,6 +471,7 @@ export type Database = {
           theme?: string
           thousand_separator?: string
           updated_at?: string
+          username?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -476,6 +480,7 @@ export type Database = {
           currency_symbol?: string
           daily_reminder_time?: string | null
           decimal_places?: number
+          discoverable_by_username?: boolean
           full_name?: string | null
           google_email?: string | null
           id?: string
@@ -492,6 +497,7 @@ export type Database = {
           theme?: string
           thousand_separator?: string
           updated_at?: string
+          username?: string | null
         }
         Relationships: []
       }

@@ -11,6 +11,7 @@ import {
   Bell,
   Wallet,
   CalendarClock,
+  UserPlus,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -34,6 +35,10 @@ function getNotificationIcon(type: string) {
       return { bg: "#064E3B", color: "#10B981", Icon: Wallet };
     case "scheduled_due":
       return { bg: "#2E1065", color: "#A78BFA", Icon: CalendarClock };
+    case "connection_request":
+      return { bg: "#1E3A5F", color: "#3B82F6", Icon: UserPlus };
+    case "connection_accepted":
+      return { bg: "#064E3B", color: "#10B981", Icon: Users };
     default:
       return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Bell };
   }
@@ -113,6 +118,16 @@ export default function NotificationHistoryPage() {
       n.type === "settlement_account_needed"
     ) {
       navigate("/split?tab=pending");
+      return;
+    }
+
+    // Connection request → the Requests inbox; accepted → the People list.
+    if (n.type === "connection_request") {
+      navigate("/find-people?tab=requests");
+      return;
+    }
+    if (n.type === "connection_accepted") {
+      navigate("/manage");
       return;
     }
 
