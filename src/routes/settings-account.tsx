@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { profileQuery, myPhoneQuery } from "@/lib/queries";
 import { UserAvatar } from "@/components/UserAvatar";
 import { PhotoPreviewDialog } from "@/components/PhotoPreviewDialog";
-import { User, Phone, Mail, Pencil, AtSign, ChevronRight } from "lucide-react";
+import { User, Phone, Mail, Pencil, AtSign } from "lucide-react";
 import { SettingsHeader } from "@/components/SettingsRows";
 import { Link } from "react-router-dom";
 
@@ -54,6 +54,11 @@ export default function AccountPage() {
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
         {[
           { icon: User, label: "Full name", value: fullName || "Add your name" },
+          {
+            icon: AtSign,
+            label: "Username",
+            value: (profile as any)?.username ? `@${(profile as any).username}` : "Not set",
+          },
           { icon: Phone, label: "Phone number", value: phone || "Add a phone number" },
           { icon: Mail, label: "Google account", value: google },
         ].map(({ icon: Icon, label, value }) => (
@@ -66,21 +71,6 @@ export default function AccountPage() {
           </div>
         ))}
       </div>
-
-      {/* Username — tappable, edited on its own screen (availability check + discovery toggle). */}
-      <Link
-        to="/settings/username"
-        className="flex items-center gap-4 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm active:bg-secondary/40"
-      >
-        <AtSign className="h-6 w-6 text-muted-foreground shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-muted-foreground">Username</p>
-          <p className="text-base text-foreground mt-0.5 truncate">
-            {(profile as any)?.username ? `@${(profile as any).username}` : "Set a username"}
-          </p>
-        </div>
-        <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
-      </Link>
     </div>
   );
 }

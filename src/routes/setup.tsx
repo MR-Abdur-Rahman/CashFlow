@@ -7,7 +7,21 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
 import { WaterFillLogo } from "@/components/WaterFillLogo";
 import { toast } from "sonner";
-import { Camera, Image as ImageIcon, Trash2, Loader2, ArrowLeft, ChevronDown } from "lucide-react";
+import {
+  Camera,
+  Image as ImageIcon,
+  Trash2,
+  Loader2,
+  ArrowLeft,
+  ChevronDown,
+  Check,
+  X,
+} from "lucide-react";
+import {
+  usernameAvailable,
+  usernameFormatError,
+  setUsername as setUsernameRpc,
+} from "@/lib/connections";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,7 +46,7 @@ const GRADIENT_H = "linear-gradient(90deg, #7C3AED 0%, #3B82F6 100%)";
 export default function SetupPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [step, setStep] = useState(0); // 0 = photo, 1 = phone, 2 = done
+  const [step, setStep] = useState(0); // 0 = profile info, 1 = done
 
   const [userId, setUserId] = useState<string | undefined>();
   const [googlePicture, setGooglePicture] = useState<string | null>(null);
@@ -64,7 +78,7 @@ export default function SetupPage() {
       }}
       className="flex flex-col px-6"
     >
-      {/* Header: back button on its own row, 3-segment progress bar centered full-width below it. */}
+      {/* Header: back button on its own row, 2-segment progress bar centered full-width below it. */}
       <div className="shrink-0 pt-4">
         <div className="flex h-9 items-center">
           {step >= 1 && (
@@ -80,7 +94,7 @@ export default function SetupPage() {
           )}
         </div>
         <div className="mt-3 flex items-center gap-2">
-          {[0, 1, 2].map((i) => (
+          {[0, 1].map((i) => (
             <span
               key={i}
               className="h-1.5 flex-1 rounded-full transition-all"
@@ -92,7 +106,7 @@ export default function SetupPage() {
 
       <div className="flex flex-1 flex-col min-h-0">
         {step === 0 && (
-          <PhotoStep
+          <ProfileStep
             userId={userId}
             profile={profile}
             googlePicture={googlePicture}
@@ -100,8 +114,7 @@ export default function SetupPage() {
             onContinue={() => setStep(1)}
           />
         )}
-        {step === 1 && <PhoneStep userId={userId} onContinue={() => setStep(2)} />}
-        {step === 2 && (
+        {step === 1 && (
           <DoneStep
             onFinish={async () => {
               if (!userId) return navigate("/home");
@@ -128,9 +141,10 @@ export default function SetupPage() {
   );
 }
 
-// ─── Step 1: Profile photo ───────────────────────────────────────────────────
-// Reuses the account-edit pick → crop → upload pipeline (same avatars bucket, same ImageCropDialog).
-function PhotoStep({
+// ─── Step 1: Profile (photo, name, username, phone) ─────────────────────────────
+// Photo + full name + username + phone in one step. Required: full name + an available username.
+// Optional: photo + phone. Reuses the account-edit pick → crop → upload pipeline for the avatar.
+function ProfileStep({
   userId,
   profile,
   googlePicture,
@@ -144,13 +158,61 @@ function PhotoStep({
   onContinue: () => void;
 }) {
   const qc = useQueryClient();
+  const { data: myPhone } = useQuery(myPhoneQuery());
   const [photo, setPhoto] = useState<string | null | undefined>(undefined); // undefined = not inited
   const [name, setName] = useState<string | undefined>(undefined); // undefined = not inited
+  const [username, setUsername] = useState("");
+  const [uStatus, setUStatus] = useState<
+    "idle" | "checking" | "available" | "taken" | "invalid"
+  >("idle");
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
+
+  // Phone (optional) — same country-code picker used elsewhere.
+  const [country, setCountry] = useState("LK");
+  const [code, setCode] = useState("+94");
+  const [number, setNumber] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const phoneInited = useRef(false);
+  const dialItems = COUNTRY_DIAL_CODES.map((c) => ({
+    key: c.country,
+    flag: currencyFlag(c.country),
+    name: c.name,
+    trailing: c.dial,
+  }));
+  useEffect(() => {
+    if (!phoneInited.current && myPhone) {
+      setNumber(myPhone);
+      phoneInited.current = true;
+    }
+  }, [myPhone]);
+
+  // Username availability (debounced). Starts blank; the user must choose an available one.
+  const normUser = username.trim().toLowerCase();
+  const uFormatErr = usernameFormatError(normUser);
+  useEffect(() => {
+    if (!normUser) {
+      setUStatus("idle");
+      return;
+    }
+    if (uFormatErr) {
+      setUStatus("invalid");
+      return;
+    }
+    setUStatus("checking");
+    const h = setTimeout(async () => {
+      try {
+        setUStatus((await usernameAvailable(normUser)) ? "available" : "taken");
+      } catch {
+        setUStatus("idle");
+      }
+    }, 350);
+    return () => clearTimeout(h);
+  }, [normUser, uFormatErr]);
 
   // Prefill once: existing profile avatar, else the Google photo (so Google users see theirs already).
   useEffect(() => {
@@ -217,27 +279,34 @@ function PhotoStep({
     }
   }
 
+  const canContinue = !!(name ?? "").trim() && uStatus === "available";
+
   async function handleContinue() {
     if (!userId) return onContinue();
-    const trimmed = (name ?? "").trim();
-    const updates: { avatar_url?: string; full_name?: string } = {};
-    // Persist the Google-prefill photo if it isn't on the row yet (so they keep it without re-picking).
-    if (photo && photo === googlePicture && profile && profile.avatar_url !== photo) {
-      updates.avatar_url = photo;
-    }
-    // Save the (possibly edited) name; skip the write if unchanged from what's stored.
-    if (trimmed && trimmed !== (profile?.full_name ?? "")) {
-      updates.full_name = trimmed;
-    }
-    if (Object.keys(updates).length) {
-      try {
-        await supabase.from("profiles").update(updates).eq("id", userId);
-        qc.invalidateQueries({ queryKey: ["profile"] });
-      } catch {
-        /* non-fatal — both are editable later in Settings */
+    if (!canContinue) return;
+    setSaving(true);
+    try {
+      // Username first (unique) — aborts here if it was taken in a race.
+      await setUsernameRpc(normUser);
+
+      const updates: { avatar_url?: string; full_name: string; phone_number: string | null } = {
+        full_name: (name ?? "").trim(),
+        phone_number: number.trim() ? `${code.trim()} ${number.trim()}`.trim() : null,
+      };
+      // Persist the Google-prefill photo if it isn't on the row yet.
+      if (photo && photo === googlePicture && profile && profile.avatar_url !== photo) {
+        updates.avatar_url = photo;
       }
+      const { error } = await supabase.from("profiles").update(updates).eq("id", userId);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["my-phone"] });
+      onContinue();
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not save profile");
+    } finally {
+      setSaving(false);
     }
-    onContinue();
   }
 
   return (
@@ -256,7 +325,7 @@ function PhotoStep({
           box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
         }
       `}</style>
-      <div className="flex flex-1 flex-col items-center justify-center min-h-0">
+      <div className="flex flex-1 flex-col items-center min-h-0 overflow-y-auto pt-2">
         <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
           Set up your profile
         </h1>
@@ -264,8 +333,8 @@ function PhotoStep({
           Help friends recognize you when you split
         </p>
 
-        {/* Tap-to-change avatar with gradient ring + camera badge */}
-        <div className="mt-8">
+        {/* Tap-to-change avatar with gradient ring + camera badge (optional) */}
+        <div className="mt-6">
           <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button type="button" disabled={busy} className="relative" aria-label="Change photo">
@@ -277,7 +346,7 @@ function PhotoStep({
                   className="block rounded-full"
                   style={{ background: LIGHT.bg, padding: 3 }}
                 >
-                  <UserAvatar url={photo ?? undefined} name={profile?.full_name ?? "You"} size={128} />
+                  <UserAvatar url={photo ?? undefined} name={profile?.full_name ?? "You"} size={112} />
                 </span>
               </span>
               <span
@@ -308,14 +377,88 @@ function PhotoStep({
         </DropdownMenu>
       </div>
 
-        {/* Full name — pre-filled from signup/Google, editable. Photo stays optional (avatar menu). */}
-        <input
-          type="text"
-          placeholder="Full name"
-          value={name ?? ""}
-          onChange={(e) => setName(e.target.value)}
-          autoComplete="name"
-          className="setup-field mt-6 w-full px-4 py-3.5 text-center text-sm"
+        {/* Fields: Full name (required) → Username (required, unique) → Phone (optional) */}
+        <div className="mt-6 w-full space-y-3 text-left">
+          <input
+            type="text"
+            placeholder="Full name"
+            value={name ?? ""}
+            onChange={(e) => setName(e.target.value)}
+            autoComplete="name"
+            className="setup-field w-full px-4 py-3.5 text-sm"
+          />
+
+          <div>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className="setup-field w-full px-4 py-3.5 pr-10 text-sm"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                {uStatus === "checking" && (
+                  <Loader2 className="h-4 w-4 animate-spin" style={{ color: LIGHT.muted }} />
+                )}
+                {uStatus === "available" && <Check className="h-4 w-4 text-income" />}
+                {(uStatus === "taken" || uStatus === "invalid") && (
+                  <X className="h-4 w-4 text-expense" />
+                )}
+              </span>
+            </div>
+            {uStatus === "invalid" && uFormatErr && (
+              <p className="mt-1 text-xs text-expense">{uFormatErr}</p>
+            )}
+            {uStatus === "taken" && (
+              <p className="mt-1 text-xs text-expense">That username is taken.</p>
+            )}
+            {uStatus === "available" && <p className="mt-1 text-xs text-income">Available.</p>}
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              aria-label="Select country code"
+              onClick={() => setPickerOpen(true)}
+              className="setup-field flex shrink-0 items-center gap-1.5 px-3 py-3.5 text-sm"
+            >
+              <span className="text-lg leading-none">{currencyFlag(country)}</span>
+              <span>{code}</span>
+              <ChevronDown className="h-4 w-4" style={{ color: LIGHT.muted }} />
+            </button>
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="Phone number (optional)"
+              value={number}
+              onChange={(e) => setNumber(e.target.value)}
+              className="setup-field flex-1 min-w-0 px-4 py-3.5 text-sm"
+            />
+          </div>
+          <p className="text-xs" style={{ color: LIGHT.muted }}>
+            Your number is never shown to other users unless you turn sharing on.
+          </p>
+        </div>
+
+        <CountryPickerSheet
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          title="Choose country"
+          searchPlaceholder="Search country or code"
+          items={dialItems}
+          selectedKey={country}
+          onSelect={(iso) => {
+            const c = COUNTRY_DIAL_CODES.find((x) => x.country === iso);
+            if (c) {
+              setCountry(c.country);
+              setCode(c.dial);
+            }
+          }}
         />
       </div>
 
@@ -349,140 +492,10 @@ function PhotoStep({
         onCropped={uploadPhoto}
       />
 
-      <div className="w-full pt-6 shrink-0">
-        <PrimaryButton onClick={handleContinue} disabled={busy || !(name ?? "").trim()}>
-          Continue
-        </PrimaryButton>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 2: Phone number ────────────────────────────────────────────────────
-// Writes phone_number via the same direct profiles update account-edit uses (read stays via my_phone()).
-function PhoneStep({
-  userId,
-  onContinue,
-}: {
-  userId: string | undefined;
-  onContinue: () => void;
-}) {
-  const qc = useQueryClient();
-  const { data: myPhone } = useQuery(myPhoneQuery());
-  const [country, setCountry] = useState("LK"); // ISO code — drives the flag + dial code
-  const [code, setCode] = useState("+94");
-  const [number, setNumber] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const inited = useRef(false);
-
-  const dialItems = COUNTRY_DIAL_CODES.map((c) => ({
-    key: c.country,
-    flag: currencyFlag(c.country),
-    name: c.name,
-    trailing: c.dial,
-  }));
-
-  // Best-effort prefill if a number already exists (new users have none).
-  useEffect(() => {
-    if (!inited.current && myPhone) {
-      setNumber(myPhone);
-      inited.current = true;
-    }
-  }, [myPhone]);
-
-  async function savePhone() {
-    if (!userId) return onContinue();
-    const combined = number.trim() ? `${code.trim()} ${number.trim()}`.trim() : null;
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ phone_number: combined })
-        .eq("id", userId);
-      if (error) throw error;
-      qc.invalidateQueries({ queryKey: ["my-phone"] });
-      onContinue();
-    } catch (err: any) {
-      toast.error(err.message ?? "Could not save number");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-1 flex-col text-center min-h-0">
-      <style>{`
-        .setup-field {
-          background: #FFFFFF;
-          border: 1px solid ${LIGHT.border};
-          color: ${LIGHT.fg};
-          border-radius: 13px;
-        }
-        .setup-field::placeholder { color: #9CA3AF; }
-        .setup-field:focus {
-          outline: none;
-          border-color: #7C3AED;
-          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
-        }
-      `}</style>
-
-      <div className="flex flex-1 flex-col justify-center min-h-0">
-        <h1 className="text-2xl font-bold" style={{ color: LIGHT.fg }}>
-          Add your phone number
-        </h1>
-        <p className="mt-1.5 text-sm" style={{ color: LIGHT.muted }}>
-          So friends can find and connect with you
-        </p>
-
-        <div className="mt-10 flex gap-2 text-left">
-          <button
-            type="button"
-            aria-label="Select country code"
-            onClick={() => setPickerOpen(true)}
-            className="setup-field flex shrink-0 items-center gap-1.5 px-3 py-3.5 text-sm"
-          >
-            <span className="text-lg leading-none">{currencyFlag(country)}</span>
-            <span>{code}</span>
-            <ChevronDown className="h-4 w-4" style={{ color: LIGHT.muted }} />
-          </button>
-          <input
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="Phone number"
-            value={number}
-            onChange={(e) => setNumber(e.target.value)}
-            className="setup-field flex-1 px-4 py-3.5 text-sm"
-          />
-        </div>
-
-        <CountryPickerSheet
-          open={pickerOpen}
-          onOpenChange={setPickerOpen}
-          title="Choose country"
-          searchPlaceholder="Search country or code"
-          items={dialItems}
-          selectedKey={country}
-          onSelect={(iso) => {
-            const c = COUNTRY_DIAL_CODES.find((x) => x.country === iso);
-            if (c) {
-              setCountry(c.country);
-              setCode(c.dial);
-            }
-          }}
-        />
-
-        <p className="mt-4 text-left text-xs" style={{ color: LIGHT.muted }}>
-          Your number is never shown to other users unless you turn sharing on.
-        </p>
-      </div>
-
-      <div className="w-full space-y-3 pt-6 shrink-0">
-        <PrimaryButton onClick={savePhone} disabled={saving || !number.trim()}>
+      <div className="w-full pt-4 shrink-0">
+        <PrimaryButton onClick={handleContinue} disabled={saving || busy || !canContinue}>
           {saving ? "Saving…" : "Continue"}
         </PrimaryButton>
-        <SkipLink onClick={onContinue} />
       </div>
     </div>
   );
@@ -539,19 +552,6 @@ function PrimaryButton({
       style={{ background: GRADIENT_H }}
     >
       {children}
-    </button>
-  );
-}
-
-function SkipLink({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full text-sm font-medium"
-      style={{ color: LIGHT.muted }}
-    >
-      Skip for now
     </button>
   );
 }

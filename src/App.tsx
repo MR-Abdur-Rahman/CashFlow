@@ -44,7 +44,6 @@ import Setup from "./routes/setup";
 import Welcome from "./routes/welcome";
 import ResetPassword from "./routes/reset-password";
 import { ResetDeepLinkHandler } from "./components/ResetDeepLinkHandler";
-import SettingsUsername from "./routes/settings-username";
 import { supabase } from "./integrations/supabase/client";
 import { profileQuery } from "@/lib/queries";
 import { syncGoogleEmail } from "@/lib/googleAuth";
@@ -201,10 +200,6 @@ function RoutedApp({
         />
         <Route path="/reports" element={session ? <Reports /> : <Navigate to="/auth" />} />
         <Route path="/manage" element={session ? <Manage /> : <Navigate to="/auth" />} />
-        <Route
-          path="/settings/username"
-          element={session ? <SettingsUsername /> : <Navigate to="/auth" />}
-        />
         <Route path="/settings" element={session ? <Settings /> : <Navigate to="/auth" />} />
         <Route
           path="/settings/account"
