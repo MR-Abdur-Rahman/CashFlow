@@ -3,13 +3,23 @@
 // overlapping wave layers scrolling horizontally at different speeds/opacities so the surface reads
 // like real ocean waves climbing to fill the logo.
 //
-// `loop=false` (default): fills once and holds — the Setup 3/3 "You're all set!" behaviour.
-// `loop=true`: tidal cycle — rise → hold full → drain → repeat — for the indeterminate splash. The
-// drain (rather than a hard reset to empty) avoids a jarring jump each cycle.
+// The fill runs ONCE (fill-mode forwards, so it holds at 100% when done):
+//   - durationMs   — how long the empty→full rise takes.
+//   - startOffsetMs — how much of that rise has *already* elapsed at mount, applied as a negative
+//                     animation-delay. The splash uses this to sync the fill to real elapsed time so
+//                     it reaches 100% right as the splash dismisses, and — because a negative delay
+//                     larger than durationMs lands past the end — stays held at 100% for slow loads
+//                     and resumes seamlessly across the App→RoutedApp splash remount.
 //
 // Colors are hardcoded (not theme tokens) on purpose: the splash paints before the theme class is
 // applied, and the effect is intentionally the same purple→blue in both light and dark.
-export function WaterFillLogo({ loop = false }: { loop?: boolean }) {
+export function WaterFillLogo({
+  durationMs = 2200,
+  startOffsetMs = 0,
+}: {
+  durationMs?: number;
+  startOffsetMs?: number;
+}) {
   return (
     <>
       <style>{`
@@ -24,16 +34,9 @@ export function WaterFillLogo({ loop = false }: { loop?: boolean }) {
           position: absolute; left: 0; width: 100%; height: 200px;
           top: calc(100% + 16px);
           background: linear-gradient(180deg, #7C3AED 0%, #3B82F6 100%);
+          animation: wl-rise 2.2s cubic-bezier(0.45, 0, 0.15, 1) forwards;
         }
-        .wl-water--once { animation: wl-rise 2.2s cubic-bezier(0.45, 0, 0.15, 1) forwards; }
-        .wl-water--loop { animation: wl-rise-loop 4s cubic-bezier(0.45, 0, 0.15, 1) infinite; }
         @keyframes wl-rise { to { top: -14px; } }
-        @keyframes wl-rise-loop {
-          0%   { top: calc(100% + 16px); }
-          50%  { top: -14px; }
-          70%  { top: -14px; }
-          100% { top: calc(100% + 16px); }
-        }
         .wl-wave {
           position: absolute; bottom: 100%; left: 0; width: 200%; height: 16px;
           background-repeat: repeat-x; background-size: 50% 100%; will-change: transform;
@@ -59,7 +62,10 @@ export function WaterFillLogo({ loop = false }: { loop?: boolean }) {
       <div className="wl">
         <img src="/favicon.svg" alt="" aria-hidden="true" className="wl-base" />
         <div className="wl-mask">
-          <div className={`wl-water ${loop ? "wl-water--loop" : "wl-water--once"}`}>
+          <div
+            className="wl-water"
+            style={{ animationDuration: `${durationMs}ms`, animationDelay: `-${startOffsetMs}ms` }}
+          >
             <span className="wl-wave wl-wave-1" />
             <span className="wl-wave wl-wave-2" />
             <span className="wl-wave wl-wave-3" />

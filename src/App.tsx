@@ -39,7 +39,7 @@ import { UpdatePrompt } from "./components/UpdatePrompt";
 import { NativeUpdateModal } from "./components/NativeUpdateModal";
 import { PermissionsOnboarding } from "./components/PermissionsOnboarding";
 import { BackButtonHandler } from "./components/BackButtonHandler";
-import { SplashScreen } from "./components/SplashScreen";
+import { SplashScreen, SPLASH_MIN_MS } from "./components/SplashScreen";
 import Setup from "./routes/setup";
 import Welcome from "./routes/welcome";
 import { supabase } from "./integrations/supabase/client";
@@ -80,7 +80,7 @@ function App() {
   const [scheduledClosedTick, setScheduledClosedTick] = useState(0);
 
   useEffect(() => {
-    const t = setTimeout(() => setMinElapsed(true), 2500);
+    const t = setTimeout(() => setMinElapsed(true), SPLASH_MIN_MS);
     return () => clearTimeout(t);
   }, []);
 
