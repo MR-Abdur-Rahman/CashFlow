@@ -13,7 +13,7 @@ import { bilateralBalance } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
 import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { UserAvatar } from "@/components/UserAvatar";
-import { Users, ChevronRight, Archive, CheckCircle } from "lucide-react";
+import { Users, ChevronRight, Archive, CheckCircle, UserPlus, AtSign, QrCode } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -104,11 +104,18 @@ export default function SplitPage() {
             query={pq}
             onQuery={setPq}
             placeholder="Search people"
-            onAdd={() => {
-              setScanned(undefined);
-              setAddPerson(true);
-            }}
-            onScan={() => navigate("/settings/qr")}
+            addActions={[
+              {
+                label: "Add local person",
+                icon: UserPlus,
+                onClick: () => {
+                  setScanned(undefined);
+                  setAddPerson(true);
+                },
+              },
+              { label: "Find by username", icon: AtSign, onClick: () => navigate("/find-people") },
+              { label: "Scan QR code", icon: QrCode, onClick: () => navigate("/settings/qr") },
+            ]}
           />
           <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
             {filteredPeople.length === 0 ? (

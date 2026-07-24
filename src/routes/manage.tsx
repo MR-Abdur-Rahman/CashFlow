@@ -33,7 +33,7 @@ import { AddAccountSheet } from "@/components/AddAccountSheet";
 import { AccountIcon } from "@/components/AccountIcon";
 import { SwipeRow } from "@/components/SwipeRow";
 import { ListToolbar } from "@/components/ListToolbar";
-import { Plus, Archive, ChevronRight, ArrowLeft } from "lucide-react";
+import { Plus, Archive, ChevronRight, ArrowLeft, UserPlus, AtSign, QrCode } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useBack } from "@/lib/navBack";
@@ -588,9 +588,11 @@ function People() {
         query={q}
         onQuery={setQ}
         placeholder="Search people or phone"
-        onAdd={() => setAction({ mode: "create" })}
-        onFind={() => navigate("/find-people")}
-        onScan={() => navigate("/settings/qr")}
+        addActions={[
+          { label: "Add local person", icon: UserPlus, onClick: () => setAction({ mode: "create" }) },
+          { label: "Find by username", icon: AtSign, onClick: () => navigate("/find-people") },
+          { label: "Scan QR code", icon: QrCode, onClick: () => navigate("/settings/qr") },
+        ]}
       />
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
         {filtered.length === 0 && (
