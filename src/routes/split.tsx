@@ -10,7 +10,7 @@ import {
   subCategoriesQuery,
 } from "@/lib/queries";
 import { bilateralBalance } from "@/lib/balance";
-import { contactDisplay } from "@/lib/people";
+import { contactDisplay, creatorDisplayName } from "@/lib/people";
 import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Users, ChevronRight, Archive, CheckCircle, UserPlus, AtSign } from "lucide-react";
@@ -250,6 +250,7 @@ function PendingTab({
 
 function PendingSettlementRow({ settlement, accounts }: { settlement: any; accounts: any[] }) {
   const qc = useQueryClient();
+  const vis = useContactVisibility();
   const [accountId, setAccountId] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -259,7 +260,8 @@ function PendingSettlementRow({ settlement, accounts }: { settlement: any; accou
   const allowedType = methodToAccountType[settlement.method as string];
   const filteredAccounts = allowedType ? accounts.filter((a) => a.type === allowedType) : accounts;
   const selectedAccount = filteredAccounts.find((a) => a.id === accountId);
-  const settlerName = settlement.creator?.full_name ?? "Someone";
+  // Respect profile visibility — a hidden settler shows the viewer's local name, not their live one.
+  const settlerName = creatorDisplayName(settlement, vis) || "Someone";
   const desc = settlement.description || settlement.splits?.description || "Settlement";
   const methodLabel = String(settlement.method ?? "transfer").replace("_", " ");
   // When the SETTLER was the creditor, the prompted party (me) is the DEBTOR: the money left
@@ -394,6 +396,7 @@ function PendingSettlementRow({ settlement, accounts }: { settlement: any; accou
 
 function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
   const qc = useQueryClient();
+  const vis = useContactVisibility();
   const [accountId, setAccountId] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [subCatId, setSubCatId] = useState("");
@@ -406,7 +409,8 @@ function PendingRow({ split, accounts }: { split: any; accounts: any[] }) {
 
   const selectedAccount = accounts.find((a) => a.id === accountId);
   const selectedCategory = (categories as any[]).find((c) => c.id === categoryId);
-  const creatorName = split.creator?.full_name ?? "Someone";
+  // Respect profile visibility — a hidden creator shows the viewer's local name, not their live one.
+  const creatorName = creatorDisplayName(split, vis) || "Someone";
 
   async function confirmSelection() {
     if (!selectedAccount || !categoryId || saving) return;

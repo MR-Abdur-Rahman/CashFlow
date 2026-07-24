@@ -507,6 +507,7 @@ function TxRow({ t }: { t: any }) {
 
 // ─── Split Row ──────────────────────────────────────────────────────────────
 function SplitRow({ s }: { s: any }) {
+  const vis = useContactVisibility();
   const shares = (s.split_shares ?? []) as any[];
   const total = Number(s.total_amount);
   const totalShares = shares.reduce((sum: number, sh: any) => sum + Number(sh.share_amount), 0);
@@ -522,7 +523,6 @@ function SplitRow({ s }: { s: any }) {
         ? `Split w/ ${shares[0]?.person_name ?? s.people?.name ?? ""}`
         : "Split");
 
-  const personName = s.people?.name ?? shares[0]?.person_name ?? "";
   const peopleName =
     shares.length > 2
       ? `${shares[0]?.person_name}, ${shares[1]?.person_name} +${shares.length - 2} more`
@@ -533,7 +533,9 @@ function SplitRow({ s }: { s: any }) {
   const groupName = s.groups?.name ?? "Group";
   const shareCount = shares.length + 1;
   const perShare = shareCount > 0 ? total / shareCount : 0;
-  const rowAv = splitRowAvatar(s);
+  // Resolver-driven name + avatar — respects profile visibility (hidden → local name / blank avatar).
+  const rowAv = splitRowAvatar(s, vis);
+  const personName = rowAv.name;
 
   return (
     <div className="bg-card">
