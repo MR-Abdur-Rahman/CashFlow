@@ -51,11 +51,11 @@ export async function setUsername(newUsername: string): Promise<string> {
 }
 
 // Local, client-side format check that mirrors the server's regex — for instant UI feedback.
-export const USERNAME_RE = /^[a-z][a-z0-9_]{2,19}$/;
+export const USERNAME_RE = /^[a-z][a-z0-9_]{7,19}$/;
 export function usernameFormatError(v: string): string | null {
   if (!v) return null;
   if (!USERNAME_RE.test(v)) {
-    return "3–20 chars: lowercase letters, numbers, underscore; must start with a letter";
+    return "8–20 chars: lowercase letters, numbers, underscore; must start with a letter";
   }
   return null;
 }
