@@ -465,8 +465,8 @@ function CategoryDialog({
 function Accounts() {
   const { data: accounts = [] } = useQuery(accountsQuery());
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [edit, setEdit] = useState<any>(null);
+  // Single source of truth: null = closed; else the mode + target travel together so they can't desync.
+  const [action, setAction] = useState<{ mode: "create" } | { mode: "edit"; item: any } | null>(null);
   const [q, setQ] = useState("");
 
   const del = useMutation({
@@ -497,10 +497,7 @@ function Accounts() {
         query={q}
         onQuery={setQ}
         placeholder="Search accounts"
-        onAdd={() => {
-          setEdit(null);
-          setOpen(true);
-        }}
+        onAdd={() => setAction({ mode: "create" })}
       />
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
         {filtered.length === 0 && (
@@ -511,10 +508,7 @@ function Accounts() {
         {filtered.map((a) => (
           <SwipeRow
             key={a.id}
-            onEdit={() => {
-              setEdit(a);
-              setOpen(true);
-            }}
+            onEdit={() => setAction({ mode: "edit", item: a })}
             onDelete={() => {
               if (confirm("Delete account?")) del.mutate(a.id);
             }}
@@ -541,7 +535,12 @@ function Accounts() {
           </SwipeRow>
         ))}
       </div>
-      <AddAccountSheet open={open} onOpenChange={setOpen} edit={edit} />
+      <AddAccountSheet
+        key={action ? (action.mode === "edit" ? `edit-${action.item.id}` : "create") : "idle"}
+        open={!!action}
+        onOpenChange={(o) => !o && setAction(null)}
+        edit={action?.mode === "edit" ? action.item : null}
+      />
     </div>
   );
 }
@@ -556,8 +555,8 @@ function People() {
   const myPids = balanceData?.myPersonIds ?? [];
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const [edit, setEdit] = useState<any>(null);
+  // Single source of truth: null = closed; else the mode + target travel together so they can't desync.
+  const [action, setAction] = useState<{ mode: "create" } | { mode: "edit"; item: any } | null>(null);
   const [q, setQ] = useState("");
 
   const del = useMutation({
@@ -588,10 +587,7 @@ function People() {
         query={q}
         onQuery={setQ}
         placeholder="Search people"
-        onAdd={() => {
-          setEdit(null);
-          setOpen(true);
-        }}
+        onAdd={() => setAction({ mode: "create" })}
         onScan={() => navigate("/settings/qr")}
       />
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
@@ -606,10 +602,7 @@ function People() {
           return (
             <SwipeRow
               key={p.id}
-              onEdit={() => {
-                setEdit(p);
-                setOpen(true);
-              }}
+              onEdit={() => setAction({ mode: "edit", item: p })}
               onDelete={() => {
                 if (confirm("Delete person?")) del.mutate(p.id);
               }}
@@ -639,7 +632,12 @@ function People() {
           );
         })}
       </div>
-      <AddPersonDialog open={open} onOpenChange={setOpen} edit={edit} />
+      <AddPersonDialog
+        key={action ? (action.mode === "edit" ? `edit-${action.item.id}` : "create") : "idle"}
+        open={!!action}
+        onOpenChange={(o) => !o && setAction(null)}
+        edit={action?.mode === "edit" ? action.item : null}
+      />
     </div>
   );
 }
@@ -649,8 +647,8 @@ function Groups() {
   const [q, setQ] = useState("");
   const { data: groups = [] } = useQuery(groupsQuery());
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [edit, setEdit] = useState<any>(null);
+  // Single source of truth: null = closed; else the mode + target travel together so they can't desync.
+  const [action, setAction] = useState<{ mode: "create" } | { mode: "edit"; item: any } | null>(null);
 
   const archive = useMutation({
     mutationFn: async (id: string) => {
@@ -691,10 +689,7 @@ function Groups() {
         query={q}
         onQuery={setQ}
         placeholder="Search groups"
-        onAdd={() => {
-          setEdit(null);
-          setOpen(true);
-        }}
+        onAdd={() => setAction({ mode: "create" })}
       />
 
       <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
@@ -704,10 +699,7 @@ function Groups() {
         {activeGroups.map((g: any) => (
           <SwipeRow
             key={g.id}
-            onEdit={() => {
-              setEdit(g);
-              setOpen(true);
-            }}
+            onEdit={() => setAction({ mode: "edit", item: g })}
             onDelete={() => archive.mutate(g.id)}
           >
             <Link
@@ -751,7 +743,12 @@ function Groups() {
         </>
       )}
 
-      <AddGroupDialog open={open} onOpenChange={setOpen} edit={edit} />
+      <AddGroupDialog
+        key={action ? (action.mode === "edit" ? `edit-${action.item.id}` : "create") : "idle"}
+        open={!!action}
+        onOpenChange={(o) => !o && setAction(null)}
+        edit={action?.mode === "edit" ? action.item : null}
+      />
     </div>
   );
 }
