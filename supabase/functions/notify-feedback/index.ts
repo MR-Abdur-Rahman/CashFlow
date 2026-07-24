@@ -57,28 +57,35 @@ Deno.serve(async (req: Request) => {
   const name: string = row.name ?? "";
   const email: string = row.email ?? "";
   const message: string = row.message ?? "";
-  const imagePath: string | null = row.image_path ?? null;
 
-  // Attach the screenshot/recording via a short-lived signed URL (private bucket). Best-effort: if
-  // it can't be signed, we still send the text and note that the attachment was unavailable.
+  // Prefer the multi-attachment array; fall back to the legacy singular column for older rows. Dedupe
+  // so a row carrying both image_paths and image_path (= its first element) doesn't double-attach.
+  const rawPaths: string[] = Array.isArray(row.image_paths) ? row.image_paths.filter(Boolean) : [];
+  if (rawPaths.length === 0 && row.image_path) rawPaths.push(row.image_path);
+  const imagePaths: string[] = [...new Set(rawPaths)];
+
+  // Attach every screenshot/recording via short-lived signed URLs (private bucket). Best-effort per
+  // file: any that can't be signed are noted but never block the email or the others.
   const attachments: Array<{ filename: string; path: string }> = [];
-  let attachNote = "";
-  if (imagePath) {
-    try {
-      const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-      const { data, error } = await supabase.storage
-        .from("feedback")
-        .createSignedUrl(imagePath, 900);
-      if (error || !data?.signedUrl) throw error ?? new Error("no signed url");
-      attachments.push({
-        filename: imagePath.split("/").pop() || "attachment",
-        path: data.signedUrl,
-      });
-    } catch (e) {
-      console.error("attachment sign failed", e);
-      attachNote = `<p><em>(An attachment was uploaded but could not be included: ${esc(imagePath)})</em></p>`;
+  const failedPaths: string[] = [];
+  if (imagePaths.length) {
+    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    for (const p of imagePaths) {
+      try {
+        const { data, error } = await supabase.storage.from("feedback").createSignedUrl(p, 900);
+        if (error || !data?.signedUrl) throw error ?? new Error("no signed url");
+        attachments.push({ filename: p.split("/").pop() || "attachment", path: data.signedUrl });
+      } catch (e) {
+        console.error("attachment sign failed", p, e);
+        failedPaths.push(p);
+      }
     }
   }
+  const attachNote = failedPaths.length
+    ? `<p><em>(${failedPaths.length} attachment(s) were uploaded but could not be included: ${esc(
+        failedPaths.join(", "),
+      )})</em></p>`
+    : "";
 
   const html = `
     <h2>New CashFlow feedback</h2>
@@ -86,7 +93,13 @@ Deno.serve(async (req: Request) => {
     <p><strong>Email:</strong> ${esc(email)}</p>
     <p><strong>Message:</strong></p>
     <p>${esc(message).replace(/\n/g, "<br>")}</p>
-    ${attachments.length ? "<p><strong>Attachment:</strong> see attached file.</p>" : ""}
+    ${
+      attachments.length
+        ? `<p><strong>Attachments (${attachments.length}):</strong> see attached file(s) — ${attachments
+            .map((a) => esc(a.filename))
+            .join(", ")}.</p>`
+        : ""
+    }
     ${attachNote}
   `;
 

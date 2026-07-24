@@ -7,12 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 
+// Up to this many screenshots/recordings per submission — enough for a full repro, bounded so the
+// notification email (which attaches every file) stays sane.
+const MAX_ATTACHMENTS = 5;
+
+type Attachment = { file: File; preview: string; isVideo: boolean };
+
 export default function FeedbackPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [text, setText] = useState("");
-  const [preview, setPreview] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [sending, setSending] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -27,16 +32,29 @@ export default function FeedbackPage() {
     });
   }, []);
 
-  function pick(f: File) {
-    setFile(f);
-    const reader = new FileReader();
-    reader.onload = () => setPreview(reader.result as string);
-    reader.readAsDataURL(f);
+  // Append newly-picked files up to the cap, building a data-URL preview for each.
+  function pick(files: File[]) {
+    setAttachments((prev) => {
+      const room = MAX_ATTACHMENTS - prev.length;
+      if (room <= 0) {
+        toast.error(`You can attach up to ${MAX_ATTACHMENTS} files`);
+        return prev;
+      }
+      if (files.length > room) toast.message(`Only the first ${room} more were added (max ${MAX_ATTACHMENTS})`);
+      const added: Attachment[] = files.slice(0, room).map((file) => {
+        const att: Attachment = { file, preview: "", isVideo: (file.type || "").startsWith("video/") };
+        const reader = new FileReader();
+        reader.onload = () =>
+          setAttachments((cur) => cur.map((a) => (a.file === file ? { ...a, preview: reader.result as string } : a)));
+        reader.readAsDataURL(file);
+        return att;
+      });
+      return [...prev, ...added];
+    });
   }
 
-  function clearAttachment() {
-    setFile(null);
-    setPreview(null);
+  function removeAttachment(file: File) {
+    setAttachments((prev) => prev.filter((a) => a.file !== file));
   }
 
   async function send() {
@@ -44,17 +62,18 @@ export default function FeedbackPage() {
     if (!text.trim()) return;
     setSending(true);
     try {
-      // Upload the attachment (if any) to the private feedback bucket; the Edge Function attaches it
-      // to the email. Best-effort — a failed upload still sends the text feedback.
-      let imagePath: string | null = null;
-      if (file) {
+      // Upload every attachment to the private feedback bucket; the Edge Function attaches them all to
+      // the email. Best-effort — a file that fails to upload is skipped, the rest (and the text) still
+      // send.
+      const imagePaths: string[] = [];
+      for (const { file } of attachments) {
         const ext = file.name.split(".").pop()?.toLowerCase() || "png";
         const path = `${userId ?? "anon"}/${crypto.randomUUID()}.${ext}`;
         const { error: upErr } = await supabase.storage
           .from("feedback")
           .upload(path, file, { contentType: file.type || undefined });
-        if (upErr) toast.error(`Attachment couldn't upload: ${upErr.message}`);
-        else imagePath = path;
+        if (upErr) toast.error(`"${file.name}" couldn't upload: ${upErr.message}`);
+        else imagePaths.push(path);
       }
 
       const { error } = await (supabase as any).from("feedback").insert({
@@ -62,12 +81,15 @@ export default function FeedbackPage() {
         name: name.trim() || null,
         email: email.trim(),
         message: text.trim(),
-        image_path: imagePath,
+        // New array carries every attachment; keep the legacy singular column populated with the first
+        // for backward compatibility with older readers.
+        image_path: imagePaths[0] ?? null,
+        image_paths: imagePaths.length ? imagePaths : null,
       });
       if (error) return toast.error(error.message);
       toast.success("Feedback sent");
       setText("");
-      clearAttachment();
+      setAttachments([]);
     } finally {
       setSending(false);
     }
@@ -105,46 +127,67 @@ export default function FeedbackPage() {
 
         <div className="space-y-2">
           <div>
-            <p className="text-sm font-medium">Screenshots or recordings (optional)</p>
+            <p className="text-sm font-medium">
+              Screenshots or recordings (optional)
+              {attachments.length > 0 && (
+                <span className="text-muted-foreground font-normal">
+                  {" "}
+                  · {attachments.length}/{MAX_ATTACHMENTS}
+                </span>
+              )}
+            </p>
             <p className="text-xs text-muted-foreground">
-              Tap screenshot to edit or remove sensitive info
+              Add up to {MAX_ATTACHMENTS}. Remove any sensitive info before attaching.
             </p>
           </div>
 
-          {preview ? (
-            <div className="relative h-20 w-20">
-              <img
-                src={preview}
-                alt="Attachment"
-                className="h-20 w-20 rounded-xl object-cover border border-border"
-              />
+          <div className="flex flex-wrap gap-2">
+            {attachments.map(({ file, preview, isVideo }) => (
+              <div key={`${file.name}-${file.lastModified}-${file.size}`} className="relative h-20 w-20">
+                {isVideo ? (
+                  <video
+                    src={preview || undefined}
+                    className="h-20 w-20 rounded-xl object-cover border border-border bg-secondary"
+                    muted
+                    playsInline
+                  />
+                ) : (
+                  <img
+                    src={preview || undefined}
+                    alt={file.name}
+                    className="h-20 w-20 rounded-xl object-cover border border-border bg-secondary"
+                  />
+                )}
+                <button
+                  type="button"
+                  aria-label={`Remove ${file.name}`}
+                  onClick={() => removeAttachment(file)}
+                  className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-secondary text-foreground border border-border"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+            {attachments.length < MAX_ATTACHMENTS && (
               <button
                 type="button"
-                aria-label="Remove"
-                onClick={clearAttachment}
-                className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-secondary text-foreground border border-border"
+                onClick={() => fileRef.current?.click()}
+                className="grid h-20 w-20 place-items-center rounded-xl border border-border bg-card text-muted-foreground active:bg-secondary/40"
               >
-                <X className="h-3.5 w-3.5" />
+                <ImagePlus className="h-6 w-6" />
               </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="grid h-20 w-20 place-items-center rounded-xl border border-border bg-card text-muted-foreground active:bg-secondary/40"
-            >
-              <ImagePlus className="h-6 w-6" />
-            </button>
-          )}
+            )}
+          </div>
           <input
             ref={fileRef}
             type="file"
             accept="image/*,video/*"
+            multiple
             className="hidden"
             onChange={(e) => {
-              const f = e.target.files?.[0];
+              const fs = Array.from(e.target.files ?? []);
               e.target.value = "";
-              if (f) pick(f);
+              if (fs.length) pick(fs);
             }}
           />
         </div>
