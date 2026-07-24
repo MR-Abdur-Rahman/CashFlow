@@ -12,6 +12,7 @@ import {
   CalendarClock,
   UserPlus,
   Inbox,
+  Download,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -43,6 +44,8 @@ function getNotificationIcon(type: string) {
       return { bg: "#064E3B", color: "#10B981", Icon: Users };
     case "connection_declined":
       return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Users };
+    case "app_update":
+      return { bg: "#1E3A5F", color: "#3B82F6", Icon: Download };
     default:
       return { bg: "var(--muted)", color: "var(--muted-foreground)", Icon: Bell };
   }
@@ -117,6 +120,12 @@ export default function NotificationHistoryPage() {
     // Accepted connection → the People list. (Requests are actioned inline, not via tap.)
     if (n.type === "connection_accepted") {
       navigate("/manage");
+      return;
+    }
+
+    // Update-available → App Info, which auto-opens the shared update dialog.
+    if (n.type === "app_update") {
+      navigate("/settings/app-info?update=1");
       return;
     }
 

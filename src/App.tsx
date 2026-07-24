@@ -20,6 +20,7 @@ import SplitGroup from "./routes/split-group";
 import SettingsAccount from "./routes/settings-account";
 import SettingsAccountEdit from "./routes/settings-account-edit";
 import SettingsPrivacy from "./routes/settings-privacy";
+import SettingsChangePassword from "./routes/settings-change-password";
 import SettingsHistory from "./routes/settings-history";
 import SettingsNotifications from "./routes/settings-notifications";
 import SettingsNotificationHistory from "./routes/settings-notification-history";
@@ -35,7 +36,7 @@ import SettingsTutorialDetail from "./routes/settings-tutorial-detail";
 import SettingsScheduled from "./routes/settings-scheduled";
 import { ScheduledDuePrompt } from "@/components/ScheduledDuePrompt";
 import { BottomNav } from "./components/BottomNav";
-import { UpdatePrompt } from "./components/UpdatePrompt";
+import { UpdateNotifier } from "./components/UpdateNotifier";
 import { NativeUpdateModal } from "./components/NativeUpdateModal";
 import { PermissionsOnboarding } from "./components/PermissionsOnboarding";
 import { BackButtonHandler } from "./components/BackButtonHandler";
@@ -213,6 +214,10 @@ function RoutedApp({
           path="/settings/privacy"
           element={session ? <SettingsPrivacy /> : <Navigate to="/auth" />}
         />
+        <Route
+          path="/settings/change-password"
+          element={session ? <SettingsChangePassword /> : <Navigate to="/auth" />}
+        />
         <Route path="/settings/qr" element={session ? <SettingsQr /> : <Navigate to="/auth" />} />
         <Route
           path="/settings/preferences"
@@ -265,7 +270,7 @@ function RoutedApp({
       {showChrome && <PermissionsOnboarding />}
       {showChrome && <NativeUpdateModal retrySignal={scheduledClosedTick} />}
       {showChrome && <ScheduledDuePrompt onClosed={onScheduledClosed} />}
-      <UpdatePrompt />
+      {showChrome && <UpdateNotifier />}
     </div>
   );
 }

@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
 import { Button } from "@/components/ui/button";
 import { UpdateAvailableDialog } from "@/components/UpdateAvailableDialog";
-import { getCurrentVersion, getLatestVersion, minorOf, type LatestVersion } from "@/lib/appVersion";
+import { getLatestVersion, type LatestVersion } from "@/lib/appVersion";
 
 // WhatsApp-style App Info: bare back arrow (no title), centered icon/name/version, footer copyright.
 // The version comes ONLY from the native build (App.getInfo) — never hardcoded or read from a web
@@ -27,26 +27,45 @@ export default function AppInfoPage() {
       .catch(() => setVersion(null));
   }, [native]);
 
-  // Same behavior as the old Tutorial & Update "Check for updates" row: minor-only comparison; opens
-  // the update dialog when behind, else a toast.
+  // Unified update check for ALL types (patch/minor/major). TEMPORARY: pre-bundling, every update is
+  // just a new web bundle, so "is an update available?" == "does /version.json's buildId differ from the
+  // running bundle?" (the same signal the old patch banner used). Once bundled into the APK, minor/major
+  // will need APK-download handling instead — revisit then (see project_bundled_conversion_plan).
   async function checkForUpdates() {
     if (checking) return;
-    if (!native) return toast("The web app is always up to date");
     setChecking(true);
     try {
-      const [cur, data] = await Promise.all([getCurrentVersion(), getLatestVersion()]);
-      if (data?.version && cur && minorOf(data.version) > minorOf(cur)) {
-        setLatest(data);
+      const [ver, data] = await Promise.all([
+        fetch(`/version.json?t=${Date.now()}`, { cache: "no-store" })
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null),
+        getLatestVersion(),
+      ]);
+      const updateAvailable =
+        typeof __BUILD_ID__ !== "undefined" && !!ver?.buildId && ver.buildId !== __BUILD_ID__;
+      if (updateAvailable) {
+        // Fall back to a notes-less entry if app-version.json is missing so the dialog still shows.
+        setLatest(data ?? { version: webVersion ?? version ?? "", releaseNotes: [] });
         setDlgOpen(true);
-      } else if (data?.version) {
-        toast("You're on the latest version");
       } else {
-        toast.error("Couldn't check for updates");
+        toast("You're on the latest version");
       }
     } finally {
       setChecking(false);
     }
   }
+
+  // Opened from the "Update available" notification (…/app-info?update=1) — auto-run the same check so
+  // the shared dialog appears without a second tap.
+  const [params] = useSearchParams();
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (params.get("update") === "1" && !autoRan.current) {
+      autoRan.current = true;
+      void checkForUpdates();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
 
   useEffect(() => {
     // Full combined version — written to public/build-version.json by version-bump.yml on every push

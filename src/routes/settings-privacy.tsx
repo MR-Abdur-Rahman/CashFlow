@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Trash2, Mail, Phone } from "lucide-react";
+import { Trash2, Mail, Phone, KeyRound, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -88,6 +88,21 @@ export default function PrivacyPage() {
         <p className="text-xs uppercase tracking-wider text-muted-foreground px-1">Phone number</p>
         <PhoneVisibilitySettings userId={userId} />
       </div>
+
+      <button
+        type="button"
+        onClick={() => navigate("/settings/change-password")}
+        className="flex w-full items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left active:bg-secondary/40"
+      >
+        <KeyRound className="h-5 w-5 text-muted-foreground shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">Change password</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Update the password you use to log in
+          </p>
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+      </button>
 
       <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
         <div>

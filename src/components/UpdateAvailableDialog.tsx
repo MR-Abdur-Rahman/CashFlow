@@ -67,9 +67,18 @@ export function UpdateAvailableDialog({
                 <li key={i}>{n}</li>
               ))}
             </ul>
-            <Button className="mt-2 w-full" disabled>
-              Continue
-            </Button>
+            {/* Centered two-button row (Skip / Continue), matching the app's confirm-dialog style. */}
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button variant="ghost" onClick={skip}>
+                Skip
+              </Button>
+              {/* TEMPORARY: pre-bundling, every update type (patch/minor/major) is just a new web bundle,
+                  so reloading applies it — which is correct for ALL of them right now. Once the app is
+                  bundled into the APK, patch/minor/major will need different handling (downloading a new
+                  APK instead of a simple reload) and this unified reload-on-Continue MUST be revisited.
+                  See project_bundled_conversion_plan. */}
+              <Button onClick={() => window.location.reload()}>Continue</Button>
+            </div>
           </>
         )}
       </DialogContent>
