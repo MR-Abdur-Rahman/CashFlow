@@ -16,13 +16,16 @@ export type ContactVis = {
 export function contactDisplay(p: any, vis?: ContactVis): { name: string; avatarUrl: string | null } {
   if (!p) return { name: "?", avatarUrl: null };
   const linked = p.linked ?? null;
-  const isHidden = !!p.linked_user_id && !!vis?.hidden.has(p.linked_user_id);
-  // A contact is "linked" if it carries either the linked_user_id scalar OR the embedded `linked`
-  // profile join. Several split-row queries embed `linked:linked_user_id(...)` WITHOUT also
-  // selecting the linked_user_id column, so keying off the scalar alone would misread a linked
-  // contact as local and drop the synced profile photo. When hidden, we deliberately treat it as
-  // non-linked so the local name/photo are used.
-  const isLinked = (p.linked_user_id != null || linked != null) && !isHidden;
+  // The linked user's id, needed to honour profile visibility (vis.hidden). CRITICAL: several
+  // split/settlement-row queries embed `linked:linked_user_id(id, ...)` WITHOUT also selecting the
+  // linked_user_id scalar, so we must derive the id from the embedded profile's `id` too — otherwise
+  // the hidden check silently no-ops and the synced name/photo leak through despite "Show my profile"
+  // being off. (The embedded profile's id === linked_user_id.)
+  const linkedUid = p.linked_user_id ?? linked?.id ?? null;
+  const isHidden = !!linkedUid && !!vis?.hidden.has(linkedUid);
+  // A contact is "linked" if it carries either the linked user id OR the embedded `linked` join. When
+  // hidden, we deliberately treat it as non-linked so the local name/photo are used.
+  const isLinked = (linkedUid != null || linked != null) && !isHidden;
   const name = p.nickname || (isLinked ? (linked?.full_name ?? p.name) : p.name) || "?";
   const avatarUrl = isLinked ? (linked?.avatar_url ?? null) : (p.avatar_url ?? null);
   return { name, avatarUrl };

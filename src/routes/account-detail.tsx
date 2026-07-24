@@ -101,7 +101,7 @@ export default function AccountDetail() {
       const { data, error } = await supabase
         .from("splits")
         .select(
-          "*, split_shares(*, person:people(id, name, nickname, avatar_url, linked:linked_user_id(full_name, avatar_url))), groups:group_id(name, avatar_url), people:person_id(name, nickname, avatar_url, linked:linked_user_id(full_name, avatar_url))",
+          "*, split_shares(*, person:people(id, name, nickname, avatar_url, linked:linked_user_id(id, full_name, avatar_url))), groups:group_id(name, avatar_url), people:person_id(name, nickname, avatar_url, linked:linked_user_id(id, full_name, avatar_url))",
         )
         // Any split that used THIS account — whether the current user paid ("me") or they confirmed
         // it as the payer on a pending split someone else created. RLS already limits to splits the
@@ -124,7 +124,7 @@ export default function AccountDetail() {
       const { data, error } = await supabase
         .from("settlements")
         .select(
-          "*, person:person_id(name, nickname, avatar_url, linked:linked_user_id(full_name, avatar_url)), creator:created_by(full_name, avatar_url), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name)), accounts:account_id(label, institution)",
+          "*, person:person_id(name, nickname, avatar_url, linked:linked_user_id(id, full_name, avatar_url)), creator:created_by(full_name, avatar_url), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name)), accounts:account_id(label, institution)",
         )
         .or(`account_id.eq.${accountId},receiver_account_id.eq.${accountId}`)
         .gte("created_at", dateFrom)

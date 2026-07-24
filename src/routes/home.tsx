@@ -220,7 +220,7 @@ export default function Home() {
       const { data, error } = await supabase
         .from("settlements")
         .select(
-          "*, person:person_id(name, nickname, avatar_url, linked:linked_user_id(full_name, avatar_url)), creator:created_by(full_name, avatar_url), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name))",
+          "*, person:person_id(name, nickname, avatar_url, linked:linked_user_id(id, full_name, avatar_url)), creator:created_by(full_name, avatar_url), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name))",
         )
         .gte("created_at", dateFrom)
         .lte("created_at", dateTo + "T23:59:59.999");

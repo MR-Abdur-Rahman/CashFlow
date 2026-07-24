@@ -83,7 +83,7 @@ export default function HistoryPage() {
       const { data } = await supabase
         .from("settlements")
         .select(
-          "*, person:person_id(name, nickname, avatar_url, linked:linked_user_id(full_name, avatar_url)), creator:created_by(full_name, avatar_url), accounts:account_id(label, institution), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(description, paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name))",
+          "*, person:person_id(name, nickname, avatar_url, linked:linked_user_id(id, full_name, avatar_url)), creator:created_by(full_name, avatar_url), accounts:account_id(label, institution), split_shares:split_share_id(person_name, share_amount, person:people(linked_user_id)), splits:split_id(description, paid_by, created_by, creator:created_by(full_name), paid_by_person:paid_by_person_id(linked_user_id, name))",
         )
         .order("created_at", { ascending: false });
       return (data ?? []).map((s: any) => ({ ...s, _uid: u.user!.id }));
