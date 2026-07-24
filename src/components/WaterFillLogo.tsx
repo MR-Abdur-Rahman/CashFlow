@@ -3,23 +3,38 @@
 // overlapping wave layers scrolling horizontally at different speeds/opacities so the surface reads
 // like real ocean waves climbing to fill the logo.
 //
-// The fill runs ONCE (fill-mode forwards, so it holds at 100% when done):
-//   - durationMs   — how long the empty→full rise takes.
-//   - startOffsetMs — how much of that rise has *already* elapsed at mount, applied as a negative
-//                     animation-delay. The splash uses this to sync the fill to real elapsed time so
-//                     it reaches 100% right as the splash dismisses, and — because a negative delay
-//                     larger than durationMs lands past the end — stays held at 100% for slow loads
-//                     and resumes seamlessly across the App→RoutedApp splash remount.
+// Two ways to drive the WATER LEVEL:
+//   - Uncontrolled (no `fill`): a one-shot CSS animation rises empty→full over `durationMs` and holds
+//     (fill-mode forwards). This is the Setup 3/3 behaviour — unchanged.
+//   - Controlled (`fill` 0..1): the level is positioned directly from this value every render, with the
+//     CSS rise disabled. The splash drives `fill` from a requestAnimationFrame loop so it tracks real
+//     elapsed time and can hold at 100% for an indeterminate load.
+// Either way the three wave layers scroll via CSS — that's decorative surface motion, independent of
+// the fill level.
 //
 // Colors are hardcoded (not theme tokens) on purpose: the splash paints before the theme class is
 // applied, and the effect is intentionally the same purple→blue in both light and dark.
+
+// The 96px logo's water body sits at top:112px when empty and top:-14px when full (see the .wl-water
+// rules below), so a 0..1 fill maps linearly onto that 126px travel.
+const EMPTY_TOP = 112;
+const FULL_TOP = -14;
+
 export function WaterFillLogo({
+  fill,
   durationMs = 2200,
   startOffsetMs = 0,
 }: {
+  // If provided (0..1), the water level is driven directly from this value (JS/real-time controlled).
+  // If omitted, the level runs the one-shot CSS rise instead.
+  fill?: number;
   durationMs?: number;
   startOffsetMs?: number;
 }) {
+  const controlled = fill != null;
+  const clamped = Math.max(0, Math.min(1, fill ?? 0));
+  const topPx = EMPTY_TOP + clamped * (FULL_TOP - EMPTY_TOP);
+
   return (
     <>
       <style>{`
@@ -55,7 +70,6 @@ export function WaterFillLogo({
         }
         @keyframes wl-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @media (prefers-reduced-motion: reduce) {
-          .wl-water { top: -14px; animation: none; }
           .wl-wave { animation: none; }
         }
       `}</style>
@@ -64,7 +78,12 @@ export function WaterFillLogo({
         <div className="wl-mask">
           <div
             className="wl-water"
-            style={{ animationDuration: `${durationMs}ms`, animationDelay: `-${startOffsetMs}ms` }}
+            style={
+              controlled
+                ? // Level driven by the real-time `fill` value; disable the CSS rise so it can't fight it.
+                  { animation: "none", top: `${topPx}px` }
+                : { animationDuration: `${durationMs}ms`, animationDelay: `-${startOffsetMs}ms` }
+            }
           >
             <span className="wl-wave wl-wave-1" />
             <span className="wl-wave wl-wave-2" />
