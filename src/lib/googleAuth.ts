@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
+import { clearRecoveryPending } from "./passwordReset";
 
 const NATIVE_REDIRECT = "cashflow://auth-callback";
 
@@ -40,6 +41,11 @@ export async function signInWithGoogle(): Promise<void> {
     const { Browser } = await import("@capacitor/browser");
     const { App } = await import("@capacitor/app");
 
+    // A Google sign-in and a password-recovery both come back on cashflow://auth-callback with a ?code.
+    // Clear any pending-recovery flag now so this OAuth callback is never mistaken for recovery by
+    // ResetDeepLinkHandler.
+    clearRecoveryPending();
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: NATIVE_REDIRECT, skipBrowserRedirect: true },
@@ -49,9 +55,6 @@ export async function signInWithGoogle(): Promise<void> {
     // Deep link back into the app → exchange the ?code for a session → close the in-app browser.
     const sub = await App.addListener("appUrlOpen", async ({ url }) => {
       if (!url.startsWith(NATIVE_REDIRECT)) return;
-      // Password-recovery callbacks share this deep link but are tagged ?type=recovery and handled by
-      // ResetDeepLinkHandler — never treat one as an OAuth sign-in.
-      if (new URL(url).searchParams.get("type") === "recovery") return;
       const code = new URL(url).searchParams.get("code");
       try {
         if (code) {
