@@ -215,8 +215,9 @@ function SubCategoryPage({
 }) {
   const { data: subs = [] } = useQuery(subCategoriesQuery(cat.id));
   const qc = useQueryClient();
-  const [addOpen, setAddOpen] = useState(false);
-  const [editSub, setEditSub] = useState<any>(null);
+  // Single source of truth for the sub-category dialog: null = closed, otherwise the mode AND its
+  // target travel together in one value, so "which mode" and "which sub-category" can never disagree.
+  const [action, setAction] = useState<{ mode: "create" } | { mode: "edit"; sub: any } | null>(null);
 
   const del = useMutation({
     mutationFn: async (id: string) => {
@@ -249,10 +250,7 @@ function SubCategoryPage({
       <Button
         className="w-full"
         variant="outline"
-        onClick={() => {
-          setEditSub(null);
-          setAddOpen(true);
-        }}
+        onClick={() => setAction({ mode: "create" })}
       >
         <Plus className="h-4 w-4 mr-2" /> Add sub-category
       </Button>
@@ -264,10 +262,7 @@ function SubCategoryPage({
         {(subs as any[]).map((s) => (
           <SwipeRow
             key={s.id}
-            onEdit={() => {
-              setEditSub(s);
-              setAddOpen(true);
-            }}
+            onEdit={() => setAction({ mode: "edit", sub: s })}
             onDelete={() => del.mutate(s.id)}
           >
             <div className="flex items-center gap-3 p-3 bg-card">
@@ -278,11 +273,15 @@ function SubCategoryPage({
         ))}
       </div>
 
+      {/* Keyed by the exact target so switching sub-categories, flipping create↔edit, or reopening
+          after a close (via "idle") always remounts the dialog with fresh form state — the key change
+          replaces every manual reset. */}
       <SubCategoryDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
+        key={action ? (action.mode === "edit" ? `edit-${action.sub.id}` : "create") : "idle"}
+        open={!!action}
+        onClose={() => setAction(null)}
         categoryId={cat.id}
-        edit={editSub}
+        edit={action?.mode === "edit" ? action.sub : null}
       />
     </div>
   );
@@ -291,14 +290,17 @@ function SubCategoryPage({
 // ─── Sub-category Dialog ───────────────────────────────────────────────────
 function SubCategoryDialog({
   open,
-  onOpenChange,
+  onClose,
   categoryId,
   edit,
 }: {
   open: boolean;
-  onOpenChange: (o: boolean) => void;
+  onClose: () => void;
   categoryId: string;
-  edit?: any;
+  // The sub-category being edited, or null for create mode. This component is remounted (via a key on
+  // the parent) whenever this target changes, so name/icon are seeded once from `edit` at mount and
+  // never need manual resetting — no stale values, no flash, no mode/target desync.
+  edit: { id: string; name: string; icon: string | null } | null;
 }) {
   const qc = useQueryClient();
   const [name, setName] = useState(edit?.name ?? "");
@@ -308,7 +310,7 @@ function SubCategoryDialog({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
-      if (edit?.id) {
+      if (edit) {
         const { error } = await supabase
           .from("sub_categories")
           .update({ name, icon } as any)
@@ -325,25 +327,13 @@ function SubCategoryDialog({
       qc.invalidateQueries({ queryKey: ["sub_categories", categoryId] });
       qc.invalidateQueries({ queryKey: ["sub_categories_all"] });
       toast.success("Saved");
-      setName("");
-      setIcon("📦");
-      onOpenChange(false);
+      onClose();
     },
     onError: (e) => toast.error(e.message),
   });
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) {
-          setName(edit?.name ?? "");
-          setIcon(edit?.icon ?? "📦");
-        }
-        onOpenChange(o);
-      }}
-      key={edit?.id ?? "new"}
-    >
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogTitle>{edit ? "Edit sub-category" : "Add sub-category"}</DialogTitle>
         <form
