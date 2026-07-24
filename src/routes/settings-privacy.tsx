@@ -57,9 +57,9 @@ export default function PrivacyPage() {
       >
         <Trash2 className="h-5 w-5 text-expense shrink-0" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-expense">Delete account</p>
+          <p className="text-sm font-medium text-expense">Delete Profile</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Permanently delete your account and data
+            Permanently delete your profile and data
           </p>
         </div>
       </button>

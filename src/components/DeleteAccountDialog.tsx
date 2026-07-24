@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { sendPasswordReset } from "@/lib/passwordReset";
@@ -42,10 +42,11 @@ function PwInput({
   );
 }
 
-// Two-step delete-account dialog (mirrors ChangePasswordDialog's sizing/style). Step 1: a warning +
-// Cancel/Continue. Step 2: verify the current password (real reauth via signInWithPassword) before
-// deleting. Deletion is a plain profiles row delete — the on_profile_delete cascade handles the rest
-// (keeps other users' saved contact name, unlinks, notifies them). No email OTP, no unsettled-split gate.
+// Two-step delete-PROFILE dialog. On open it checks account_deletion_blockers (conditions where the
+// user is a dependency for OTHER people's data) and, if any, lists them instead of a confirm step.
+// Otherwise: Step 1 warning → Step 2 password reauth → the delete-account Edge Function (which does the
+// real, complete deletion via admin.deleteUser). No client-side profiles.delete(); the Edge Function
+// re-checks the blockers server-side too.
 export function DeleteAccountDialog({
   open,
   onOpenChange,
@@ -63,6 +64,8 @@ export function DeleteAccountDialog({
   const [busy, setBusy] = useState(false);
   const [resetSending, setResetSending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // null = still checking; [] = no blockers; [..] = reasons the user must resolve first.
+  const [blockers, setBlockers] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -70,6 +73,11 @@ export function DeleteAccountDialog({
     setCurrent("");
     setErr(null);
     setBusy(false);
+    setBlockers(null);
+    (supabase as any)
+      .rpc("account_deletion_blockers")
+      .then(({ data }: { data: string[] | null }) => setBlockers(data ?? []))
+      .catch(() => setBlockers([]));
   }, [open]);
 
   async function confirmDelete() {
@@ -84,16 +92,25 @@ export function DeleteAccountDialog({
         setErr("Current password is incorrect");
         return;
       }
-      // Delete the profile — the BEFORE DELETE cascade trigger does the rest.
-      const { error } = await supabase.from("profiles").delete().eq("id", userId);
-      if (error) throw error;
+      // Real, complete deletion happens in the Edge Function (auth user + cascade + storage).
+      const { error } = await supabase.functions.invoke("delete-account");
+      if (error) {
+        let msg = "Couldn't delete your profile";
+        try {
+          const body = await (error as any).context?.json?.();
+          if (Array.isArray(body?.blockers) && body.blockers.length) msg = body.blockers.join("\n");
+          else if (body?.error) msg = body.error;
+        } catch {
+          /* keep the generic message */
+        }
+        setErr(msg);
+        return;
+      }
       await supabase.auth.signOut();
       onOpenChange(false);
       navigate("/auth");
     } catch (e: any) {
-      const m = e?.message ?? "Couldn't delete account";
-      setErr(m);
-      toast.error(m);
+      setErr(e?.message ?? "Couldn't delete your profile");
     } finally {
       setBusy(false);
     }
@@ -118,30 +135,59 @@ export function DeleteAccountDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xs">
         {step === "confirm" ? (
-          <>
-            <DialogTitle>Delete your account?</DialogTitle>
-            <DialogDescription>
-              This permanently deletes your account and all your data. This cannot be undone.
-            </DialogDescription>
-            <div className="mt-2 flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button
-                className="bg-expense hover:bg-expense/90"
-                onClick={() => {
-                  setErr(null);
-                  setStep("password");
-                }}
-              >
-                Continue
-              </Button>
-            </div>
-          </>
+          blockers === null ? (
+            <>
+              <DialogTitle>Delete your profile?</DialogTitle>
+              <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Checking…
+              </div>
+            </>
+          ) : blockers.length > 0 ? (
+            <>
+              <DialogTitle>Resolve these first</DialogTitle>
+              <DialogDescription>
+                Your profile can't be deleted yet — it's still linked to other people's data:
+              </DialogDescription>
+              <ul className="mt-1 space-y-2">
+                {blockers.map((b, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-foreground">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-expense mt-0.5" />
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-2 flex justify-end">
+                <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                  Close
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogTitle>Delete your profile?</DialogTitle>
+              <DialogDescription>
+                This permanently deletes your profile and all your data. This cannot be undone.
+              </DialogDescription>
+              <div className="mt-2 flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-expense hover:bg-expense/90"
+                  onClick={() => {
+                    setErr(null);
+                    setStep("password");
+                  }}
+                >
+                  Continue
+                </Button>
+              </div>
+            </>
+          )
         ) : (
           <>
             <DialogTitle>Confirm your password</DialogTitle>
-            <DialogDescription>Enter your password to permanently delete your account.</DialogDescription>
+            <DialogDescription>Enter your password to permanently delete your profile.</DialogDescription>
             <div className="mt-1 space-y-2">
               <PwInput
                 value={current}
@@ -152,7 +198,7 @@ export function DeleteAccountDialog({
                 placeholder="Current password"
                 autoComplete="current-password"
               />
-              {err && <p className="text-xs text-expense">{err}</p>}
+              {err && <p className="whitespace-pre-line text-xs text-expense">{err}</p>}
               <div className="text-right">
                 <button
                   type="button"
@@ -174,7 +220,7 @@ export function DeleteAccountDialog({
                 disabled={!current || busy}
                 onClick={confirmDelete}
               >
-                {busy ? "Deleting…" : "Delete account"}
+                {busy ? "Deleting…" : "Delete profile"}
               </Button>
             </div>
           </>
