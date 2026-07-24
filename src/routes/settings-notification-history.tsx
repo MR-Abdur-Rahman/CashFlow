@@ -132,9 +132,9 @@ export default function NotificationHistoryPage() {
       return;
     }
 
-    // A contact deleted their account (now a local contact) → the People list.
+    // A contact deleted their account → open that specific (now local) contact; fall back to People.
     if (n.type === "contact_account_deleted") {
-      navigate("/manage");
+      navigate(n.related_person_id ? `/split/person/${n.related_person_id}` : "/manage");
       return;
     }
 

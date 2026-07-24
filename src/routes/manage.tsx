@@ -612,7 +612,7 @@ function People() {
               }}
             >
               <Link
-                to={`/split/person/${p.id}`}
+                to={`/manage/person/${p.id}`}
                 className="flex items-center gap-3 p-3 bg-card active:bg-secondary/40"
               >
                 <UserAvatar url={avatarUrl} name={name} size={36} />

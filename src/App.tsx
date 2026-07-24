@@ -200,6 +200,12 @@ function RoutedApp({
         />
         <Route path="/reports" element={session ? <Reports /> : <Navigate to="/auth" />} />
         <Route path="/manage" element={session ? <Manage /> : <Navigate to="/auth" />} />
+        {/* Same person-detail component as /split/person/:personId — mounted under Manage so back
+            returns to Manage's People tab (see parentOf in navBack.ts). */}
+        <Route
+          path="/manage/person/:personId"
+          element={session ? <SplitPerson /> : <Navigate to="/auth" />}
+        />
         <Route path="/settings" element={session ? <Settings /> : <Navigate to="/auth" />} />
         <Route
           path="/settings/account"

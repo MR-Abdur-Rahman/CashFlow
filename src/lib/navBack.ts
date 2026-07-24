@@ -21,6 +21,8 @@ export function parentOf(pathname: string): string | null {
   // Section drill-downs
   if (/^\/accounts\/[^/]+$/.test(pathname)) return "/accounts";
   if (/^\/split\/(person|group)\/[^/]+$/.test(pathname)) return "/split";
+  // The SAME person-detail component is also mounted under Manage; back returns to Manage's People tab.
+  if (/^\/manage\/person\/[^/]+$/.test(pathname)) return "/manage?tab=people";
 
   // Settings sub-pages that nest deeper than the Settings hub
   if (pathname === "/settings/account/edit") return "/settings/account";

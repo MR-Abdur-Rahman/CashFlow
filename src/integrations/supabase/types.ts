@@ -254,6 +254,7 @@ export type Database = {
           id: string
           is_read: boolean | null
           message: string
+          related_person_id: string | null
           related_request_id: string | null
           related_settlement_id: string | null
           related_split_id: string | null
@@ -266,6 +267,7 @@ export type Database = {
           id?: string
           is_read?: boolean | null
           message: string
+          related_person_id?: string | null
           related_request_id?: string | null
           related_settlement_id?: string | null
           related_split_id?: string | null
@@ -278,6 +280,7 @@ export type Database = {
           id?: string
           is_read?: boolean | null
           message?: string
+          related_person_id?: string | null
           related_request_id?: string | null
           related_settlement_id?: string | null
           related_split_id?: string | null
