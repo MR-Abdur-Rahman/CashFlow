@@ -448,7 +448,10 @@ export default function Home() {
       {/* Accounts */}
       <div>
         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">Accounts</p>
-        <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 snap-x snap-mandatory">
+        {/* py-2/-my-2: give the horizontal scroller vertical room so the cards' shadow isn't clipped
+            by overflow-x-auto (which forces overflow-y to clip); the negative margin cancels it so
+            layout/spacing is unchanged. */}
+        <div className="flex gap-3 overflow-x-auto py-2 -my-2 -mx-4 px-4 snap-x snap-mandatory">
           {accounts.map((a) => (
             <Link
               to={`/accounts/${a.id}`}
