@@ -2,14 +2,16 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
-import { NATIVE_RESET_REDIRECT } from "@/lib/passwordReset";
+import { NATIVE_AUTH_CALLBACK } from "@/lib/passwordReset";
 
-// Native only. Catches the password-reset deep link (cashflow://reset-callback?code=…) whether the app
-// was cold-started by tapping the email link (App.getLaunchUrl) or was already running (appUrlOpen),
-// exchanges the PKCE code for a recovery session, then routes to the set-new-password screen.
+// Native only. Password-recovery links come back on the SAME deep link Google OAuth uses
+// (cashflow://auth-callback) — the intent-filter for it is already registered in the shipped app, so no
+// APK rebuild is needed. They're tagged ?type=recovery so we can tell them apart from an OAuth sign-in
+// callback: recovery ones we handle here; anything else we ignore and leave to googleAuth's handler.
 //
-// Uses its own scheme host (reset-callback) so it never competes with the Google OAuth one-shot
-// listener on auth-callback. Mounted once, high in the tree, so it works even while logged out.
+// Catches the link whether the app was cold-started by tapping it (App.getLaunchUrl) or was already
+// running (appUrlOpen), exchanges the PKCE ?code for a recovery session, and routes to the
+// set-new-password screen. Mounted once, high in the tree, so it works even while logged out.
 export function ResetDeepLinkHandler() {
   const navigate = useNavigate();
 
@@ -19,13 +21,15 @@ export function ResetDeepLinkHandler() {
     let sub: { remove: () => void } | null = null;
 
     async function handleUrl(url: string | null | undefined) {
-      if (!url || !url.startsWith(NATIVE_RESET_REDIRECT)) return;
-      const code = new URL(url).searchParams.get("code");
-      // Go to the reset screen regardless; it surfaces an "invalid/expired link" state if the exchange
-      // failed or produced no recovery session.
+      if (!url || !url.startsWith(NATIVE_AUTH_CALLBACK)) return;
+      const params = new URL(url).searchParams;
+      if (params.get("type") !== "recovery") return; // OAuth sign-in callback → not ours
+      const code = params.get("code");
       if (code) {
         await supabase.auth.exchangeCodeForSession(code).catch(() => {});
       }
+      // Route to the reset screen regardless; it surfaces an invalid/expired state if the exchange
+      // failed or produced no recovery session.
       navigate("/reset-password");
     }
 

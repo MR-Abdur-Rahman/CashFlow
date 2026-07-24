@@ -22,20 +22,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Google OAuth deep-link callback: cashflow://auth-callback -->
+            <!-- Deep-link callback for Google OAuth (cashflow://auth-callback) and password recovery
+                 (same host, tagged ?type=recovery). One filter serves both. -->
             <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="cashflow" android:host="auth-callback" />
-            </intent-filter>
-
-            <!-- Password-reset deep-link callback: cashflow://reset-callback -->
-            <intent-filter android:autoVerify="false">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="cashflow" android:host="reset-callback" />
             </intent-filter>
 
         </activity>

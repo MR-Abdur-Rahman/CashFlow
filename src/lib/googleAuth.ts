@@ -49,6 +49,9 @@ export async function signInWithGoogle(): Promise<void> {
     // Deep link back into the app → exchange the ?code for a session → close the in-app browser.
     const sub = await App.addListener("appUrlOpen", async ({ url }) => {
       if (!url.startsWith(NATIVE_REDIRECT)) return;
+      // Password-recovery callbacks share this deep link but are tagged ?type=recovery and handled by
+      // ResetDeepLinkHandler — never treat one as an OAuth sign-in.
+      if (new URL(url).searchParams.get("type") === "recovery") return;
       const code = new URL(url).searchParams.get("code");
       try {
         if (code) {
