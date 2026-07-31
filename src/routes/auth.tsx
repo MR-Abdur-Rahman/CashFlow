@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { signInWithGoogle } from "@/lib/googleAuth";
 import { sendPasswordReset } from "@/lib/passwordReset";
@@ -19,6 +19,7 @@ const LIGHT = {
 
 export default function AuthPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -56,10 +57,13 @@ export default function AuthPage() {
   }
 
   useEffect(() => {
+    // ?add=1 comes from Switch Account → "Add account": the user is signed in and deliberately
+    // wants the sign-in screen anyway, so don't bounce them home. Matches AuthGate in App.tsx.
+    if (searchParams.get("add") === "1") return;
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate("/home");
     });
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   // Email + password flow. Supabase calls themselves are UNCHANGED — only the post-signup destination
   // (guided setup) and the removed emailRedirectTo differ from before.

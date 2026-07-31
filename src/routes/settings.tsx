@@ -18,6 +18,7 @@ import {
   UserPlus,
   CalendarClock,
   LogOut,
+  Repeat,
 } from "lucide-react";
 
 type Item = {
@@ -168,6 +169,17 @@ export default function SettingsPage() {
         {MAIN.map((item) => (
           <RowLink key={item.to ?? item.title} {...item} />
         ))}
+      </div>
+
+      {/* Switch account — sits with Sign out rather than in the category list above, since both
+          are session actions. Deliberately does NOT replace Sign out. */}
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <RowLink
+          to="/settings/switch-account"
+          icon={Repeat}
+          title="Switch account"
+          subtitle="Jump between profiles signed in on this device"
+        />
       </div>
 
       {/* Sign out — small, centered */}

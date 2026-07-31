@@ -1,4 +1,11 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useSearchParams,
+} from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Capacitor } from "@capacitor/core";
@@ -33,6 +40,7 @@ import SettingsAppInfo from "./routes/settings-app-info";
 import SettingsTutorial from "./routes/settings-tutorial";
 import SettingsTutorialDetail from "./routes/settings-tutorial-detail";
 import SettingsScheduled from "./routes/settings-scheduled";
+import SettingsSwitchAccount from "./routes/settings-switch-account";
 import { ScheduledDuePrompt } from "@/components/ScheduledDuePrompt";
 import { BottomNav } from "./components/BottomNav";
 import { UpdateNotifier } from "./components/UpdateNotifier";
@@ -68,6 +76,14 @@ function GlobalFab() {
       <AddTransactionSheet open={open} onOpenChange={setOpen} defaultTab={tab} />
     </>
   );
+}
+
+// /auth normally bounces a signed-in user to /home. Switch Account needs to reach it anyway to add
+// a second profile, so ?add=1 opts out. auth.tsx's own redirect effect honours the same flag.
+function AuthGate({ session }: { session: unknown }) {
+  const [params] = useSearchParams();
+  if (session && params.get("add") !== "1") return <Navigate to="/home" />;
+  return <Auth />;
 }
 
 function App() {
@@ -177,7 +193,7 @@ function RoutedApp({
       <BackButtonHandler />
       <ResetDeepLinkHandler />
       <Routes>
-        <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/home" />} />
+        <Route path="/auth" element={<AuthGate session={session} />} />
         <Route path="/welcome" element={<Welcome />} />
         {/* Public: the reset-password link can open while logged out or on a recovery session. */}
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -218,6 +234,10 @@ function RoutedApp({
         <Route
           path="/settings/privacy"
           element={session ? <SettingsPrivacy /> : <Navigate to="/auth" />}
+        />
+        <Route
+          path="/settings/switch-account"
+          element={session ? <SettingsSwitchAccount /> : <Navigate to="/auth" />}
         />
         <Route path="/settings/qr" element={session ? <SettingsQr /> : <Navigate to="/auth" />} />
         <Route

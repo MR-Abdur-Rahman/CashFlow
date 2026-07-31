@@ -13,7 +13,7 @@ import { getAccount, saveAccount, updateTokens } from "@/lib/accountStore";
 
 let started = false;
 
-async function capture(session: Session | null): Promise<void> {
+export async function captureSession(session: Session | null): Promise<void> {
   if (!session?.user || !session.refresh_token || !session.access_token) return;
   const uid = session.user.id;
 
@@ -58,7 +58,7 @@ export function initAccountSync(): void {
     // supabase-js DEADLOCKS if you call its methods synchronously inside this callback — the same
     // reason App.tsx:106 defers syncGoogleEmail. Everything below touches the DB, so defer it all.
     if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "USER_UPDATED") {
-      setTimeout(() => void capture(session), 0);
+      setTimeout(() => void captureSession(session), 0);
       return;
     }
 
