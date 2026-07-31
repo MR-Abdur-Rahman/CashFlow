@@ -1073,6 +1073,11 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
         }}
       >
         <AmountInput value={amount} onChange={setAmount} accent="text-income" />
+        <DescriptionInput
+          value={description}
+          onChange={setDescription}
+          placeholder="e.g. Salary, Freelance payment"
+        />
         <div className="space-y-1.5">
           <Label>From</Label>
           <div className="flex gap-2 rounded-lg bg-secondary p-1">
@@ -1131,11 +1136,6 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
           </Select>
         </div>
         <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
-        <DescriptionInput
-          value={description}
-          onChange={setDescription}
-          placeholder="e.g. Salary, Freelance payment"
-        />
         <TransactionAttachments
           pending={pending}
           onPendingChange={setPending}
@@ -1243,6 +1243,11 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
         }}
       >
         <AmountInput value={amount} onChange={setAmount} accent="text-expense" />
+        <DescriptionInput
+          value={description}
+          onChange={setDescription}
+          placeholder="e.g. Lunch, Groceries, Fuel"
+        />
         <div className="space-y-1.5">
           <Label>From account</Label>
           <Select value={accountId} onValueChange={setAccountId}>
@@ -1274,11 +1279,6 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
-        <DescriptionInput
-          value={description}
-          onChange={setDescription}
-          placeholder="e.g. Lunch, Groceries, Fuel"
-        />
         <TransactionAttachments
           pending={pending}
           onPendingChange={setPending}
@@ -1383,6 +1383,11 @@ function TransferForm({ onClose }: { onClose: () => void }) {
       }}
     >
       <AmountInput value={amount} onChange={setAmount} accent="text-transfer" />
+      <DescriptionInput
+        value={description}
+        onChange={setDescription}
+        placeholder="e.g. Move to savings"
+      />
       <div className="space-y-1.5">
         <Label>From account</Label>
         <Select value={fromId} onValueChange={setFromId}>
@@ -1414,11 +1419,6 @@ function TransferForm({ onClose }: { onClose: () => void }) {
         </Select>
       </div>
       <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
-      <DescriptionInput
-        value={description}
-        onChange={setDescription}
-        placeholder="e.g. Move to savings"
-      />
       <TransactionAttachments
         pending={pending}
         onPendingChange={setPending}

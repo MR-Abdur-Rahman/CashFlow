@@ -1543,6 +1543,18 @@ export function EditTxSheet({
           </div>
 
           <div className="space-y-1.5">
+            <Label>Description</Label>
+            {/* Plain <input> matching SplitForm's filled-field style, not the shadcn <Input>. */}
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. Dinner, Groceries, Trip"
+              className="w-full text-sm text-foreground placeholder:text-muted-foreground outline-none px-3 py-2.5 bg-secondary border border-border rounded-lg"
+            />
+          </div>
+
+          <div className="space-y-1.5">
             <Label>{txn.type === "transfer" ? "From account" : "Account"}</Label>
             <Select value={accountId} onValueChange={setAccountId}>
               <SelectTrigger>
@@ -1680,24 +1692,6 @@ export function EditTxSheet({
                 className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground outline-none"
               />
             </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Description</Label>
-            {/* Plain <input> matching SplitForm's filled-field style, not the shadcn <Input>. */}
-            <input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={
-                txn.type === "income"
-                  ? "e.g. Salary, Freelance payment"
-                  : txn.type === "transfer"
-                    ? "e.g. Move to savings"
-                    : "e.g. Lunch, Groceries, Fuel"
-              }
-              className="w-full text-sm text-foreground placeholder:text-muted-foreground outline-none px-3 py-2.5 bg-secondary border border-border rounded-lg"
-            />
           </div>
 
           <TransactionAttachments
