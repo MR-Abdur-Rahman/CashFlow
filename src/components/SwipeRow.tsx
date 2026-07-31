@@ -19,11 +19,12 @@ const TAP_SLOP = 8;
 
 // A tap that lands on a real control inside the row (the avatar button on split rows) belongs to
 // that control, not to the row.
+//
+// Real elements only — NOT [role='button']. closest() walks up from the tap target, and the row
+// wrapper below carries role="button" whenever onClick is passed, so including that selector made
+// every tap match the wrapper itself and swallowed the very taps this guard exists to allow.
 function hitsInteractive(target: EventTarget | null): boolean {
-  return (
-    target instanceof Element &&
-    !!target.closest("button, a, input, textarea, select, [role='button']")
-  );
+  return target instanceof Element && !!target.closest("button, a, input, textarea, select");
 }
 
 export function SwipeRow({
