@@ -1684,10 +1684,19 @@ export function EditTxSheet({
 
           <div className="space-y-1.5">
             <Label>Description</Label>
-            <Input
+            {/* Plain <input> matching SplitForm's filled-field style, not the shadcn <Input>. */}
+            <input
+              type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Shown as the title in lists"
+              placeholder={
+                txn.type === "income"
+                  ? "e.g. Salary, Freelance payment"
+                  : txn.type === "transfer"
+                    ? "e.g. Move to savings"
+                    : "e.g. Lunch, Groceries, Fuel"
+              }
+              className="w-full text-sm text-foreground placeholder:text-muted-foreground outline-none px-3 py-2.5 bg-secondary border border-border rounded-lg"
             />
           </div>
 

@@ -120,17 +120,24 @@ export function AddTransactionSheet({
 function DescriptionInput({
   value,
   onChange,
+  placeholder,
 }: {
   value: string;
   onChange: (s: string) => void;
+  placeholder: string;
 }) {
   return (
     <div className="space-y-1.5">
       <Label>Description</Label>
-      <Input
+      {/* Plain <input>, not the shadcn <Input>: matches SplitForm's filled-field style (bg-secondary
+          with a same-colour border, so it reads as borderless) rather than Input's transparent
+          outlined default. Same px-3 py-2.5 bg-secondary rounded-lg as the picker buttons. */}
+      <input
+        type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Shown as the title in lists"
+        placeholder={placeholder}
+        className="w-full text-sm text-foreground placeholder:text-muted-foreground outline-none px-3 py-2.5 bg-secondary border border-border rounded-lg"
       />
     </div>
   );
@@ -1124,7 +1131,11 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
           </Select>
         </div>
         <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
-        <DescriptionInput value={description} onChange={setDescription} />
+        <DescriptionInput
+          value={description}
+          onChange={setDescription}
+          placeholder="e.g. Salary, Freelance payment"
+        />
         <TransactionAttachments
           pending={pending}
           onPendingChange={setPending}
@@ -1263,7 +1274,11 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
-        <DescriptionInput value={description} onChange={setDescription} />
+        <DescriptionInput
+          value={description}
+          onChange={setDescription}
+          placeholder="e.g. Lunch, Groceries, Fuel"
+        />
         <TransactionAttachments
           pending={pending}
           onPendingChange={setPending}
@@ -1399,7 +1414,11 @@ function TransferForm({ onClose }: { onClose: () => void }) {
         </Select>
       </div>
       <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
-      <DescriptionInput value={description} onChange={setDescription} />
+      <DescriptionInput
+        value={description}
+        onChange={setDescription}
+        placeholder="e.g. Move to savings"
+      />
       <TransactionAttachments
         pending={pending}
         onPendingChange={setPending}
