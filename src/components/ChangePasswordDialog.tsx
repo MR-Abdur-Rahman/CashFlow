@@ -31,7 +31,7 @@ function PwInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         autoComplete={autoComplete}
-        className="w-full rounded-lg border border-border bg-card py-2.5 px-3 pr-10 text-sm text-foreground outline-none focus:border-primary placeholder:text-muted-foreground"
+        className="w-full rounded-lg border border-border bg-secondary py-2.5 px-3 pr-10 text-sm text-foreground outline-none focus:border-primary placeholder:text-muted-foreground"
       />
       <button
         type="button"

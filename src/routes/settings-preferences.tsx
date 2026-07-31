@@ -40,7 +40,9 @@ export default function PreferencesPage() {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
   }, []);
   const { data: profile } = useQuery(profileQuery(userId));
-  const theme = (profile as any)?.theme ?? "light";
+  // Matches PrefsApplier's fallback — if these disagree the toggle can show Light while the app
+  // paints dark. Dark is the design system's primary theme (index.css :root).
+  const theme = (profile as any)?.theme ?? "dark";
   const currencyCode = (profile as any)?.currency_code ?? "LKR";
   const thousand = (profile as any)?.thousand_separator ?? ",";
   const decimals = (profile as any)?.decimal_places ?? 2;

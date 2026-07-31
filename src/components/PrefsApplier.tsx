@@ -20,7 +20,10 @@ export function PrefsApplier() {
   const { data: profile } = useQuery(profileQuery(userId));
 
   useEffect(() => {
-    const theme = (profile as any)?.theme ?? "light";
+    // Fall back to dark, not light: dark is the design system's primary theme (index.css defines it
+    // on :root and light is the html.light override), so an unloaded profile should paint the
+    // default rather than flash the opposite theme. Display only — nothing here writes `theme`.
+    const theme = (profile as any)?.theme ?? "dark";
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
     root.classList.toggle("light", theme === "light");
