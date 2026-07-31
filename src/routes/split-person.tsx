@@ -5,7 +5,15 @@ import {
   splitBalancesQuery,
   contactPhonesQuery,
 } from "@/lib/queries";
-import { settlementNetAfter, bilateralBalance, splitBilateralContribution } from "@/lib/balance";
+import {
+  settlementNetAfter,
+  bilateralBalance,
+  splitBilateralContribution,
+  getPayerAuthId,
+  isIndividualSplit,
+  payerIsUser,
+  payerIsTarget,
+} from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
 import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -139,10 +147,12 @@ export default function PersonDetail() {
   const visibleSplits = useMemo(
     () =>
       (splits as any[]).filter((s) => {
-        const payerAuthId = getPayerAuthId(s);
-        if (!payerAuthId) return true; // can't determine payer → show
-        const targetLui = s._targetLinkedUserId;
-        return payerAuthId === s._currentUserId || (!!targetLui && payerAuthId === targetLui);
+        const target = { id: s._targetPersonId, linked_user_id: s._targetLinkedUserId };
+        const myPersonIds: string[] = s._myPersonIds ?? [];
+        if (payerIsUser(s, s._currentUserId ?? null, myPersonIds)) return true;
+        if (payerIsTarget(s, target)) return true;
+        // Unresolvable payer → show rather than hide; only a confirmed third party is filtered out.
+        return !getPayerAuthId(s) && !s.paid_by_person_id;
       }),
     [splits],
   );
@@ -466,40 +476,23 @@ export default function PersonDetail() {
   );
 }
 
-// ─── Helper: resolve a split's payer to an auth user id ───────────────────
-function getPayerAuthId(split: any): string | null {
-  if (split.paid_by_person_id) {
-    const ps = (split.split_shares ?? []).find(
-      (ss: any) => ss.person_id === split.paid_by_person_id,
-    );
-    if (ps?.person?.linked_user_id) return ps.person.linked_user_id;
-  }
-  if (split.paid_by === "me") return split.created_by; // "me" always means the creator
-  if (split.paid_by) {
-    const m = (split.split_shares ?? []).find(
-      (ss: any) => ss.person?.name === split.paid_by || ss.person_name === split.paid_by,
-    );
-    if (m?.person?.linked_user_id) return m.person.linked_user_id;
-  }
-  return null;
-}
-
 // ─── Helper: bilateral lent/owe amount for a People/Group row on the person page ───
 // Returns the TARGET person's (or current user's) specific share — not the whole-split total.
-// Individual rows return undefined (already correct: only two people involved).
+// Individual rows return undefined: SplitDirectRow's own two-person math is already correct there.
+//
+// This is the unsigned display twin of splitBilateralContribution — same payer identification, via
+// the shared payerIsUser/payerIsTarget helpers, so a row can never disagree with the balance card.
 function bilateralRowAmount(s: any): number | undefined {
-  const shares = (s.split_shares ?? []) as any[];
-  const isGroup = s.type === "group";
-  const isIndividual = !isGroup && shares.length <= 1;
-  if (isIndividual) return undefined;
+  if (isIndividualSplit(s)) return undefined;
 
+  const shares = (s.split_shares ?? []) as any[];
   const total = Number(s.total_amount);
   const sumShares = shares.reduce((a: number, sh: any) => a + Number(sh.share_amount), 0);
   const currentUserId: string | null = s._currentUserId ?? null;
   const targetLui: string | null = s._targetLinkedUserId ?? null;
   const targetPid: string | undefined = s._targetPersonId;
   const myPersonIds: string[] = s._myPersonIds ?? [];
-  const payer = getPayerAuthId(s);
+  const target = { id: targetPid, linked_user_id: targetLui };
 
   const targetShareEntry = shares.find(
     (ss: any) =>
@@ -509,10 +502,10 @@ function bilateralRowAmount(s: any): number | undefined {
     (ss: any) => myPersonIds.includes(ss.person_id) || ss.person?.linked_user_id === currentUserId,
   );
 
-  if (payer && payer === currentUserId) {
+  if (payerIsUser(s, currentUserId, myPersonIds)) {
     if (targetShareEntry) return Number(targetShareEntry.share_amount);
     if (targetLui && s.created_by === targetLui) return total - sumShares;
-  } else if (payer && targetLui && payer === targetLui) {
+  } else if (payerIsTarget(s, target)) {
     if (myShareEntry) return Number(myShareEntry.share_amount);
     if (s.created_by === currentUserId) return total - sumShares;
   }

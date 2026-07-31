@@ -75,7 +75,11 @@ export function SplitDirectRow({
     : 0;
   const creatorImplicit = total - totalShares; // creator's own (unrecorded) portion
   const youLent = isIncoming ? total - myShareAmt : totalShares; // what others owe the viewer
-  const youOwe = isIncoming ? myShareAmt : creatorImplicit; // what the viewer owes
+  // On a two-person split the counterparty's single row IS the bilateral amount — the same figure
+  // shown as "You lent" when the viewer paid — so when they paid instead, the viewer owes exactly
+  // that. creatorImplicit (total − Σ shares) is 0 for this shape and only describes the viewer's
+  // unrecorded portion of a MULTI-participant split, where it stays correct.
+  const youOwe = isIncoming ? myShareAmt : isPerson ? totalShares : creatorImplicit;
   // Per-share = the actual recorded amount per participant (avoids guessing creator inclusion).
   const perShare = shares.length > 0 ? totalShares / shares.length : total;
   const owersCount = shares.length; // people who owe the viewer when the viewer paid
