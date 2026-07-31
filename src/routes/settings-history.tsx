@@ -7,7 +7,8 @@ import {
   peopleQuery,
 } from "@/lib/queries";
 import { settlementNetAfter } from "@/lib/balance";
-import { EditSplitSheet, EditTxSheet } from "./home";
+import { EditSplitSheet } from "./home";
+import { TransactionDetailSheet } from "@/components/TransactionDetailSheet";
 import { SplitDirectRow } from "@/components/SplitDirectRow";
 import { SettlementRow } from "@/components/SettlementRow";
 import { settlementDirection, shareRemaining } from "@/lib/settlement";
@@ -368,6 +369,8 @@ export default function HistoryPage() {
                   key={item.id}
                   onEdit={() => setEditTxn(item)}
                   onDelete={() => setDeleteTxn(item)}
+                  // Row renders a split branch when t.is_split; only the plain branch is tappable.
+                  onClick={item.is_split ? undefined : () => setEditTxn(item)}
                 >
                   <Row t={item} />
                 </SwipeRow>
@@ -378,7 +381,7 @@ export default function HistoryPage() {
       ))}
 
       {editTxn && (
-        <EditTxSheet
+        <TransactionDetailSheet
           txn={editTxn}
           open={!!editTxn}
           onOpenChange={(o) => {

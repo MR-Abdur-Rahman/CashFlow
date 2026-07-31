@@ -13,10 +13,24 @@ const SwipeContext = createContext<{
 // Unique id counter
 let idCounter = 0;
 
+// Pointer travel below this many px counts as a tap, not a swipe. Small enough that a deliberate
+// swipe never reads as a tap, large enough to absorb the jitter of a finger press.
+const TAP_SLOP = 8;
+
+// A tap that lands on a real control inside the row (the avatar button on split rows) belongs to
+// that control, not to the row.
+function hitsInteractive(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    !!target.closest("button, a, input, textarea, select, [role='button']")
+  );
+}
+
 export function SwipeRow({
   children,
   onEdit,
   onDelete,
+  onClick,
   className,
   canEdit = true,
   canDelete = true,
@@ -26,6 +40,8 @@ export function SwipeRow({
   children: ReactNode;
   onEdit?: () => void;
   onDelete?: () => void;
+  // Opt-in: tapping the row body fires this. Rows that pass nothing stay swipe-only.
+  onClick?: () => void;
   className?: string;
   canEdit?: boolean;
   canDelete?: boolean;
@@ -36,6 +52,7 @@ export function SwipeRow({
   const [x, setX] = useState(0);
   const startX = useRef<number | null>(null);
   const startOffset = useRef(0);
+  const travel = useRef(0);
   const rowId = useRef(`swipe-${++idCounter}`).current;
   const { openId, setOpenId } = useContext(SwipeContext);
 
@@ -49,17 +66,18 @@ export function SwipeRow({
   function begin(clientX: number) {
     startX.current = clientX;
     startOffset.current = x;
+    travel.current = 0;
   }
 
   function move(clientX: number) {
     if (startX.current === null) return;
-    const dx = clientX - startX.current + startOffset.current;
-    setX(Math.max(-ACTION_WIDTH, Math.min(0, dx)));
+    const delta = clientX - startX.current;
+    travel.current = Math.max(travel.current, Math.abs(delta));
+    setX(Math.max(-ACTION_WIDTH, Math.min(0, delta + startOffset.current)));
   }
 
-  function end() {
-    if (startX.current === null) return;
-    startX.current = null;
+  // Settle the gesture as a swipe: snap open or closed by which half it ended past.
+  function settle() {
     const newX = x < -ACTION_WIDTH / 2 ? -ACTION_WIDTH : 0;
     setX(newX);
     if (newX !== 0) {
@@ -68,6 +86,32 @@ export function SwipeRow({
     } else {
       if (openId === rowId) setOpenId(null);
     }
+  }
+
+  function end(target?: EventTarget | null) {
+    if (startX.current === null) return;
+    startX.current = null;
+
+    if (travel.current >= TAP_SLOP) {
+      settle();
+      return;
+    }
+
+    // A tap. Snap back any sub-threshold jitter rather than leaving the row a few px off.
+    const wasOpen = startOffset.current !== 0;
+    setX(0);
+    if (openId === rowId) setOpenId(null);
+
+    // Tapping an open row closes the action strip — it does not also open the detail sheet.
+    if (wasOpen) return;
+    if (onClick && !hitsInteractive(target ?? null)) onClick();
+  }
+
+  // Pointer left / gesture aborted: resolve the swipe but never treat it as a tap.
+  function cancel() {
+    if (startX.current === null) return;
+    startX.current = null;
+    settle();
   }
 
   return (
@@ -116,13 +160,27 @@ export function SwipeRow({
         }}
         onTouchStart={(e) => begin(e.touches[0].clientX)}
         onTouchMove={(e) => move(e.touches[0].clientX)}
-        onTouchEnd={end}
+        onTouchEnd={(e) => end(e.target)}
+        onTouchCancel={cancel}
         onMouseDown={(e) => begin(e.clientX)}
         onMouseMove={(e) => {
           if (startX.current !== null) move(e.clientX);
         }}
-        onMouseUp={end}
-        onMouseLeave={end}
+        onMouseUp={(e) => end(e.target)}
+        onMouseLeave={cancel}
+        // Keyboard parity for the tap affordance; swipe-only rows stay non-focusable.
+        role={onClick ? "button" : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        onKeyDown={
+          onClick
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onClick();
+                }
+              }
+            : undefined
+        }
       >
         {children}
       </div>

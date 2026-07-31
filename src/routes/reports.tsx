@@ -37,7 +37,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SwipeRow } from "@/components/SwipeRow";
 import { deleteSettlement as deleteSettlementRpc } from "@/lib/deleteSettlement";
-import { EditTxSheet, EditSplitSheet } from "@/routes/home";
+import { EditSplitSheet } from "@/routes/home";
+import { TransactionDetailSheet } from "@/components/TransactionDetailSheet";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import {
   AlertDialog,
@@ -875,6 +876,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
                   key={item.id}
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
+                  onClick={item.is_split ? undefined : () => setEditItem(item)}
                 >
                   <ExpenseRow t={item} />
                 </SwipeRow>
@@ -897,6 +899,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
                   key={item.id}
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
+                  onClick={item.is_split ? undefined : () => setEditItem(item)}
                 >
                   <IncomeRow t={item} />
                 </SwipeRow>
@@ -928,7 +931,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
 
       {/* Edit sheets */}
       {editItem && (editItem._type === "exp" || editItem._type === "inc") && (
-        <EditTxSheet
+        <TransactionDetailSheet
           txn={editItem}
           open={!!editItem}
           onOpenChange={(o) => {

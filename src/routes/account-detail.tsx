@@ -38,7 +38,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useNavigate, useParams } from "react-router-dom";
 import { useBack } from "@/lib/navBack";
-import { EditSplitSheet, EditTxSheet } from "@/routes/home";
+import { EditSplitSheet } from "@/routes/home";
+import { TransactionDetailSheet } from "@/components/TransactionDetailSheet";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import { SettlementRow } from "@/components/SettlementRow";
 import { settlementDirection, shareRemaining } from "@/lib/settlement";
@@ -315,6 +316,7 @@ export default function AccountDetail() {
                 key={item.id}
                 onEdit={() => setEditTxn(item)}
                 onDelete={() => setDeleteTxn(item)}
+                onClick={item.is_split ? undefined : () => setEditTxn(item)}
               >
                 <TxRow t={item} />
               </SwipeRow>
@@ -400,7 +402,7 @@ export default function AccountDetail() {
       </AlertDialog>
 
       {editTxn && (
-        <EditTxSheet
+        <TransactionDetailSheet
           txn={editTxn}
           open={!!editTxn}
           onOpenChange={(o) => {
