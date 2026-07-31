@@ -984,6 +984,41 @@ export type Database = {
           },
         ]
       }
+      transaction_attachments: {
+        Row: {
+          created_at: string
+          file_name: string | null
+          file_path: string
+          id: string
+          transaction_id: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string | null
+          file_path: string
+          id?: string
+          transaction_id: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string | null
+          file_path?: string
+          id?: string
+          transaction_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           account_id: string | null
@@ -991,11 +1026,14 @@ export type Database = {
           category_id: string | null
           created_at: string
           date: string
+          description: string | null
           id: string
           income_person_id: string | null
           income_source_text: string | null
           income_source_type: string | null
           is_split: boolean
+          location_lat: number | null
+          location_lng: number | null
           note: string | null
           split_id: string | null
           sub_category_id: string | null
@@ -1010,11 +1048,14 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           date?: string
+          description?: string | null
           id?: string
           income_person_id?: string | null
           income_source_text?: string | null
           income_source_type?: string | null
           is_split?: boolean
+          location_lat?: number | null
+          location_lng?: number | null
           note?: string | null
           split_id?: string | null
           sub_category_id?: string | null
@@ -1029,11 +1070,14 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           date?: string
+          description?: string | null
           id?: string
           income_person_id?: string | null
           income_source_text?: string | null
           income_source_type?: string | null
           is_split?: boolean
+          location_lat?: number | null
+          location_lng?: number | null
           note?: string | null
           split_id?: string | null
           sub_category_id?: string | null

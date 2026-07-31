@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { transactionsQuery, peopleQuery } from "@/lib/queries";
 import { formatMoney } from "@/lib/format";
+import { purgeAttachmentsFor } from "@/lib/attachments";
 import { useState, useMemo } from "react";
 import {
   PieChart,
@@ -138,9 +139,12 @@ function PieLabel({ cx, cy, midAngle, outerRadius, name, percent }: any) {
 // ─── Row Components ───────────────────────────────────────────────────────────
 
 function ExpenseRow({ t }: { t: any }) {
-  const catLabel = t.categories?.name
-    ? `${t.categories.name}${t.sub_categories?.name ? " · " + t.sub_categories.name : ""}`
-    : "Expense";
+  // Description overrides the derived label; see the same fallback in home.tsx TxRowInner.
+  const catLabel =
+    t.description ||
+    (t.categories?.name
+      ? `${t.categories.name}${t.sub_categories?.name ? " · " + t.sub_categories.name : ""}`
+      : "Expense");
   const account = t.accounts
     ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ")
     : "";
@@ -249,7 +253,10 @@ function SplitItemRow({ s, highlightPerson }: { s: any; highlightPerson?: string
 }
 
 function IncomeRow({ t }: { t: any }) {
-  const label = t.income_source_text ?? t.people?.name ?? null ?? t.categories?.name ?? "Income";
+  // Description overrides the derived label; see the same fallback in home.tsx TxRowInner.
+  // The old expression had a stray `?? null` that made the `categories` arm dead code — dropping
+  // that arm preserves the existing behaviour and clears the always-nullish warning.
+  const label = t.description || t.income_source_text || t.people?.name || "Income";
   const account = t.accounts
     ? [t.accounts.institution, t.accounts.label].filter(Boolean).join(" · ")
     : "";
@@ -979,6 +986,8 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
                 setDeleteItem(null);
                 let error: any = null;
                 if (item._type === "exp" || item._type === "inc") {
+                  // Purge storage first — the cascade removes the rows holding the object paths.
+                  await purgeAttachmentsFor(item.id);
                   ({ error } = await supabase.from("transactions").delete().eq("id", item.id));
                   if (!error) {
                     qc.invalidateQueries({ queryKey: ["transactions"] });

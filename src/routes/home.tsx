@@ -24,6 +24,15 @@ import { formatMoney, greeting, formatDateTime } from "@/lib/format";
 import { SplitDirectRow } from "@/components/SplitDirectRow";
 import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { AccountIcon } from "@/components/AccountIcon";
+import { TransactionAttachments } from "@/components/TransactionAttachments";
+import {
+  listAttachments,
+  purgeAttachmentsFor,
+  uploadPending,
+  type Coords,
+  type PendingAttachment,
+  type SavedAttachment,
+} from "@/lib/attachments";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -623,6 +632,9 @@ export default function Home() {
               className="bg-destructive text-white"
               onClick={async () => {
                 if (!deleteTxn) return;
+                // Must run first: the cascade takes the attachment rows with the transaction, and
+                // their storage paths go with them. Postgres can't delete storage objects.
+                await purgeAttachmentsFor(deleteTxn.id);
                 const { error } = await supabase
                   .from("transactions")
                   .delete()
@@ -736,13 +748,17 @@ function TxRowInner({ t }: { t: any }) {
   const Icon = isIncome ? ArrowDownLeft : isExpense ? ArrowUpRight : ArrowLeftRight;
   const sign = isIncome ? "+" : isTransfer ? "" : "-";
 
-  const title = t.categories
-    ? `${t.sub_categories?.icon ?? t.categories.icon ?? ""} ${t.categories.name}${t.sub_categories ? " · " + t.sub_categories.name : ""}`
-    : isIncome
-      ? (t.income_source_text ?? "Income")
-      : isTransfer
-        ? "Transfer"
-        : "Expense";
+  // A user-written description wins the first line; otherwise fall back to the derived label.
+  // Same idiom SplitRowContent already uses for splits.description.
+  const title =
+    t.description ||
+    (t.categories
+      ? `${t.sub_categories?.icon ?? t.categories.icon ?? ""} ${t.categories.name}${t.sub_categories ? " · " + t.sub_categories.name : ""}`
+      : isIncome
+        ? (t.income_source_text ?? "Income")
+        : isTransfer
+          ? "Transfer"
+          : "Expense");
 
   const sub = isTransfer
     ? `${t.accounts?.label ?? ""} → ${t.to_account?.label ?? ""}`
@@ -1411,6 +1427,27 @@ export function EditTxSheet({
   const [personId, setPersonId] = useState(txn.income_person_id ?? "");
   const [sourceText, setSourceText] = useState(txn.income_source_text ?? "");
 
+  const [description, setDescription] = useState(txn.description ?? "");
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const [saved, setSaved] = useState<SavedAttachment[]>([]);
+  const [location, setLocation] = useState<Coords | null>(
+    txn.location_lat != null && txn.location_lng != null
+      ? { lat: Number(txn.location_lat), lng: Number(txn.location_lng) }
+      : null,
+  );
+
+  // Signed URLs expire, so re-sign on each open rather than caching them with the transaction.
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    listAttachments(txn.id).then((rows) => {
+      if (alive) setSaved(rows);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [open, txn.id]);
+
   const { data: accounts = [] } = useQuery(accountsQuery());
   const { data: people = [] } = useQuery(peopleQuery());
   const { data: cats = [] } = useQuery({
@@ -1447,6 +1484,9 @@ export function EditTxSheet({
           category_id: categoryId || null,
           sub_category_id: subCatId || null,
           note: note || null,
+          description: description.trim() || null,
+          location_lat: location?.lat ?? null,
+          location_lng: location?.lng ?? null,
           date,
           time,
           ...(txn.type === "income"
@@ -1459,6 +1499,16 @@ export function EditTxSheet({
         })
         .eq("id", txn.id);
       if (error) throw error;
+
+      // Unlike a new transaction, the id already exists — anything newly attached in this session
+      // can upload straight away.
+      if (pending.length) {
+        const { data: u } = await supabase.auth.getUser();
+        if (u.user) {
+          const { failed } = await uploadPending(u.user.id, txn.id, pending);
+          if (failed.length) toast.error(`Couldn't attach: ${failed.join(", ")}`);
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Transaction updated");
@@ -1633,9 +1683,24 @@ export function EditTxSheet({
           </div>
 
           <div className="space-y-1.5">
-            <Label>Note</Label>
-            <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
+            <Label>Description</Label>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Shown as the title in lists"
+            />
           </div>
+
+          <TransactionAttachments
+            pending={pending}
+            onPendingChange={setPending}
+            saved={saved}
+            onSavedChange={setSaved}
+            location={location}
+            onLocationChange={setLocation}
+          >
+            <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
+          </TransactionAttachments>
         </div>
         <div className="p-4 pt-2 border-t border-border bg-card">
           <Button

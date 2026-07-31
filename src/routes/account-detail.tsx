@@ -5,6 +5,7 @@ import { AccountIcon } from "@/components/AccountIcon";
 import { UserAvatar } from "@/components/UserAvatar";
 import { splitRowAvatar } from "@/lib/people";
 import { formatMoney, formatDateTime } from "@/lib/format";
+import { purgeAttachmentsFor } from "@/lib/attachments";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
@@ -426,6 +427,8 @@ export default function AccountDetail() {
               onClick={async () => {
                 if (!deleteTxn) return;
                 const txn = deleteTxn;
+                // Purge storage first — the cascade removes the rows holding the object paths.
+                await purgeAttachmentsFor(txn.id);
                 const { error } = await supabase.from("transactions").delete().eq("id", txn.id);
                 if (error) {
                   toast.error(error.message);
@@ -463,13 +466,16 @@ function TxRow({ t }: { t: any }) {
   const Icon = isIncome ? ArrowDownLeft : isTransfer ? ArrowLeftRight : ArrowUpRight;
   const sign = isIncome ? "+" : isTransfer ? "" : "-";
 
-  const title = t.categories
-    ? `${t.sub_categories?.icon ?? t.categories.icon ?? ""} ${t.categories.name}${t.sub_categories ? " · " + t.sub_categories.name : ""}`
-    : isIncome
-      ? (t.income_source_text ?? "Income")
-      : isTransfer
-        ? "Transfer"
-        : "Expense";
+  // Description overrides the derived label; see the same fallback in home.tsx TxRowInner.
+  const title =
+    t.description ||
+    (t.categories
+      ? `${t.sub_categories?.icon ?? t.categories.icon ?? ""} ${t.categories.name}${t.sub_categories ? " · " + t.sub_categories.name : ""}`
+      : isIncome
+        ? (t.income_source_text ?? "Income")
+        : isTransfer
+          ? "Transfer"
+          : "Expense");
 
   const sub = isTransfer
     ? `${t.accounts?.label ?? ""} → ${t.to_account?.label ?? ""}`

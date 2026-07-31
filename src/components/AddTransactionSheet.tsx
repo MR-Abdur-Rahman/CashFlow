@@ -32,6 +32,8 @@ import { AddGroupDialog } from "@/components/AddGroupDialog";
 import { QrScannerDialog } from "@/components/QrScannerDialog";
 import { AmountInput } from "@/components/AmountInput";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { TransactionAttachments } from "@/components/TransactionAttachments";
+import { uploadPending, type Coords, type PendingAttachment } from "@/lib/attachments";
 
 type Tab = "income" | "expense" | "transfer" | "split";
 
@@ -111,6 +113,36 @@ export function AddTransactionSheet({
   );
 }
 
+
+// Description overrides the row's first line in every transaction list when set; when empty the row
+// falls back to its computed label (category · sub-category / income source / "Transfer"). Distinct
+// from Note, which stays a detail-view-only field.
+function DescriptionInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (s: string) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label>Description</Label>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Shown as the title in lists"
+      />
+    </div>
+  );
+}
+
+// A new transaction has no id until its insert returns, so files can only upload afterwards. A
+// failed upload must never discard the transaction the user just saved — report and move on.
+async function saveAttachments(userId: string, txnId: string, pending: PendingAttachment[]) {
+  if (!pending.length) return;
+  const { failed } = await uploadPending(userId, txnId, pending);
+  if (failed.length) toast.error(`Couldn't attach: ${failed.join(", ")}`);
+}
 
 function DateTime({
   date,
@@ -961,6 +993,9 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [time, setTime] = useState(format(new Date(), "HH:mm"));
   const [note, setNote] = useState("");
+  const [description, setDescription] = useState("");
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const [location, setLocation] = useState<Coords | null>(null);
   const [personPickerOpen, setPersonPickerOpen] = useState(false);
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
 
@@ -972,19 +1007,27 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
-      const { error } = await supabase.from("transactions").insert({
-        user_id: u.user.id,
-        type: "income",
-        amount: Number(amount),
-        account_id: accountId || null,
-        income_source_type: sourceType,
-        income_person_id: sourceType === "person" && personId ? personId : null,
-        income_source_text: sourceType === "source" ? sourceText : null,
-        date,
-        time,
-        note: note || null,
-      });
+      const { data: row, error } = await supabase
+        .from("transactions")
+        .insert({
+          user_id: u.user.id,
+          type: "income",
+          amount: Number(amount),
+          account_id: accountId || null,
+          income_source_type: sourceType,
+          income_person_id: sourceType === "person" && personId ? personId : null,
+          income_source_text: sourceType === "source" ? sourceText : null,
+          date,
+          time,
+          note: note || null,
+          description: description.trim() || null,
+          location_lat: location?.lat ?? null,
+          location_lng: location?.lng ?? null,
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+      await saveAttachments(u.user.id, row.id, pending);
     },
     onSuccess: () => {
       toast.success("Income added");
@@ -1081,10 +1124,15 @@ function IncomeForm({ onClose }: { onClose: () => void }) {
           </Select>
         </div>
         <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
-        <div className="space-y-1.5">
-          <Label>Note</Label>
+        <DescriptionInput value={description} onChange={setDescription} />
+        <TransactionAttachments
+          pending={pending}
+          onPendingChange={setPending}
+          location={location}
+          onLocationChange={setLocation}
+        >
           <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
-        </div>
+        </TransactionAttachments>
       </FormShell>
       <PersonPickerSheet
         open={personPickerOpen}
@@ -1117,6 +1165,9 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [time, setTime] = useState(format(new Date(), "HH:mm"));
   const [note, setNote] = useState("");
+  const [description, setDescription] = useState("");
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const [location, setLocation] = useState<Coords | null>(null);
   const [catPickerOpen, setCatPickerOpen] = useState(false);
 
   useEffect(() => {
@@ -1127,18 +1178,26 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
-      const { error } = await supabase.from("transactions").insert({
-        user_id: u.user.id,
-        type: "expense",
-        amount: Number(amount),
-        account_id: accountId || null,
-        category_id: categoryId || null,
-        sub_category_id: subCatId || null,
-        date,
-        time,
-        note: note || null,
-      });
+      const { data: row, error } = await supabase
+        .from("transactions")
+        .insert({
+          user_id: u.user.id,
+          type: "expense",
+          amount: Number(amount),
+          account_id: accountId || null,
+          category_id: categoryId || null,
+          sub_category_id: subCatId || null,
+          date,
+          time,
+          note: note || null,
+          description: description.trim() || null,
+          location_lat: location?.lat ?? null,
+          location_lng: location?.lng ?? null,
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+      await saveAttachments(u.user.id, row.id, pending);
     },
     onSuccess: () => {
       toast.success("Expense added");
@@ -1204,10 +1263,15 @@ function ExpenseForm({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
-        <div className="space-y-1.5">
-          <Label>Note</Label>
+        <DescriptionInput value={description} onChange={setDescription} />
+        <TransactionAttachments
+          pending={pending}
+          onPendingChange={setPending}
+          location={location}
+          onLocationChange={setLocation}
+        >
           <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
-        </div>
+        </TransactionAttachments>
       </FormShell>
       <CategoryPickerSheet
         open={catPickerOpen}
@@ -1234,6 +1298,9 @@ function TransferForm({ onClose }: { onClose: () => void }) {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [time, setTime] = useState(format(new Date(), "HH:mm"));
   const [note, setNote] = useState("");
+  const [description, setDescription] = useState("");
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const [location, setLocation] = useState<Coords | null>(null);
 
   useEffect(() => {
     if (accounts[0]?.id) setFromId(accounts[0].id);
@@ -1245,17 +1312,25 @@ function TransferForm({ onClose }: { onClose: () => void }) {
       if (fromId === toId) throw new Error("Choose two different accounts");
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
-      const { error } = await supabase.from("transactions").insert({
-        user_id: u.user.id,
-        type: "transfer",
-        amount: Number(amount),
-        account_id: fromId || null,
-        to_account_id: toId || null,
-        date,
-        time,
-        note: note || null,
-      });
+      const { data: row, error } = await supabase
+        .from("transactions")
+        .insert({
+          user_id: u.user.id,
+          type: "transfer",
+          amount: Number(amount),
+          account_id: fromId || null,
+          to_account_id: toId || null,
+          date,
+          time,
+          note: note || null,
+          description: description.trim() || null,
+          location_lat: location?.lat ?? null,
+          location_lng: location?.lng ?? null,
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+      await saveAttachments(u.user.id, row.id, pending);
     },
     onSuccess: () => {
       toast.success("Transfer recorded");
@@ -1324,10 +1399,15 @@ function TransferForm({ onClose }: { onClose: () => void }) {
         </Select>
       </div>
       <DateTime date={date} time={time} setDate={setDate} setTime={setTime} />
-      <div className="space-y-1.5">
-        <Label>Note</Label>
+      <DescriptionInput value={description} onChange={setDescription} />
+      <TransactionAttachments
+        pending={pending}
+        onPendingChange={setPending}
+        location={location}
+        onLocationChange={setLocation}
+      >
         <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
-      </div>
+      </TransactionAttachments>
     </FormShell>
   );
 }

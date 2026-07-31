@@ -14,6 +14,7 @@ import { settlementDirection, shareRemaining } from "@/lib/settlement";
 import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import { formatMoney } from "@/lib/format";
+import { purgeAttachmentsFor } from "@/lib/attachments";
 import { Input } from "@/components/ui/input";
 import { useState, useMemo } from "react";
 import {
@@ -482,6 +483,8 @@ export default function HistoryPage() {
               className="bg-destructive text-white hover:bg-destructive/90"
               onClick={async () => {
                 if (!deleteTxn) return;
+                // Purge storage first — the cascade removes the rows holding the object paths.
+                await purgeAttachmentsFor(deleteTxn.id);
                 const { error } = await supabase
                   .from("transactions")
                   .delete()
@@ -596,15 +599,18 @@ function Row({ t }: { t: any }) {
   }
 
   const sign = isIncome ? "+" : isTransfer ? "" : "-";
-  const title = t.categories
-    ? `${t.sub_categories?.icon ?? t.categories.icon ?? ""} ${t.categories.name}${t.sub_categories ? " · " + t.sub_categories.name : ""}`
-    : isIncome
-      ? (t.income_source_text ?? "Income")
-      : isTransfer
-        ? "Transfer"
-        : isSplit
-          ? "Split"
-          : "Expense";
+  // Description overrides the derived label; see the same fallback in home.tsx TxRowInner.
+  const title =
+    t.description ||
+    (t.categories
+      ? `${t.sub_categories?.icon ?? t.categories.icon ?? ""} ${t.categories.name}${t.sub_categories ? " · " + t.sub_categories.name : ""}`
+      : isIncome
+        ? (t.income_source_text ?? "Income")
+        : isTransfer
+          ? "Transfer"
+          : isSplit
+            ? "Split"
+            : "Expense");
   const sub = isTransfer
     ? `${t.accounts?.label ?? ""} → ${t.to_account?.label ?? ""}`
     : isIncome

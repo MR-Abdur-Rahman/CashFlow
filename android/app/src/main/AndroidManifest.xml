@@ -53,5 +53,18 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Transaction attachments: gallery picking. READ_MEDIA_IMAGES is the Android 13+ permission;
+         READ_EXTERNAL_STORAGE covers 12 and below and must be capped or Play flags it. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- Attaching a location to a transaction. Coarse is enough for a map pin, but the plugin's
+         enableHighAccuracy path needs fine; both are runtime-prompted, never silent. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
 </manifest>
