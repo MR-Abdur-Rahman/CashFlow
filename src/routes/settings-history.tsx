@@ -9,6 +9,7 @@ import {
 import { settlementNetAfter } from "@/lib/balance";
 import { EditSplitSheet } from "./home";
 import { TransactionDetailSheet } from "@/components/TransactionDetailSheet";
+import { TransactionViewSheet, type TxnRow } from "@/components/TransactionViewSheet";
 import { SplitDirectRow } from "@/components/SplitDirectRow";
 import { SettlementRow } from "@/components/SettlementRow";
 import { settlementDirection, shareRemaining } from "@/lib/settlement";
@@ -109,6 +110,7 @@ export default function HistoryPage() {
   const [period, setPeriod] = useState<Period>("monthly");
   const [anchor, setAnchor] = useState(new Date());
   const [editTxn, setEditTxn] = useState<any | null>(null);
+  const [viewTxn, setViewTxn] = useState<TxnRow | null>(null);
   const [deleteTxn, setDeleteTxn] = useState<any | null>(null);
   const [editSplit, setEditSplit] = useState<any | null>(null);
   const [deleteSplit, setDeleteSplit] = useState<any | null>(null);
@@ -370,7 +372,7 @@ export default function HistoryPage() {
                   onEdit={() => setEditTxn(item)}
                   onDelete={() => setDeleteTxn(item)}
                   // Row renders a split branch when t.is_split; only the plain branch is tappable.
-                  onClick={item.is_split ? undefined : () => setEditTxn(item)}
+                  onClick={item.is_split ? undefined : () => setViewTxn(item)}
                 >
                   <Row t={item} />
                 </SwipeRow>
@@ -379,6 +381,16 @@ export default function HistoryPage() {
           </div>
         </div>
       ))}
+
+      {viewTxn && (
+        <TransactionViewSheet
+          txn={viewTxn}
+          open={!!viewTxn}
+          onOpenChange={(o) => {
+            if (!o) setViewTxn(null);
+          }}
+        />
+      )}
 
       {editTxn && (
         <TransactionDetailSheet

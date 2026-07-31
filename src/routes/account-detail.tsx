@@ -40,6 +40,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useBack } from "@/lib/navBack";
 import { EditSplitSheet } from "@/routes/home";
 import { TransactionDetailSheet } from "@/components/TransactionDetailSheet";
+import { TransactionViewSheet, type TxnRow } from "@/components/TransactionViewSheet";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import { SettlementRow } from "@/components/SettlementRow";
 import { settlementDirection, shareRemaining } from "@/lib/settlement";
@@ -72,6 +73,7 @@ export default function AccountDetail() {
   const [anchor, setAnchor] = useState(new Date());
   const [edit, setEdit] = useState(false);
   const [editTxn, setEditTxn] = useState<any | null>(null);
+  const [viewTxn, setViewTxn] = useState<TxnRow | null>(null);
   const [deleteTxn, setDeleteTxn] = useState<any | null>(null);
   const [editSplit, setEditSplit] = useState<any | null>(null);
   const [deleteSplitItem, setDeleteSplitItem] = useState<any | null>(null);
@@ -316,7 +318,7 @@ export default function AccountDetail() {
                 key={item.id}
                 onEdit={() => setEditTxn(item)}
                 onDelete={() => setDeleteTxn(item)}
-                onClick={item.is_split ? undefined : () => setEditTxn(item)}
+                onClick={item.is_split ? undefined : () => setViewTxn(item)}
               >
                 <TxRow t={item} />
               </SwipeRow>
@@ -400,6 +402,16 @@ export default function AccountDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {viewTxn && (
+        <TransactionViewSheet
+          txn={viewTxn}
+          open={!!viewTxn}
+          onOpenChange={(o) => {
+            if (!o) setViewTxn(null);
+          }}
+        />
+      )}
 
       {editTxn && (
         <TransactionDetailSheet

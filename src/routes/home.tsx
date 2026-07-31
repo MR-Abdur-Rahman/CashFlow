@@ -25,6 +25,7 @@ import { SplitDirectRow } from "@/components/SplitDirectRow";
 import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { AccountIcon } from "@/components/AccountIcon";
 import { TransactionDetailSheet } from "@/components/TransactionDetailSheet";
+import { TransactionViewSheet, type TxnRow } from "@/components/TransactionViewSheet";
 import { purgeAttachmentsFor } from "@/lib/attachments";
 import {
   ArrowDownLeft,
@@ -189,6 +190,7 @@ function timeAgo(dateStr: string): string {
 export default function Home() {
   const navigate = useNavigate();
   const [editTxn, setEditTxn] = useState<any>(null);
+  const [viewTxn, setViewTxn] = useState<TxnRow | null>(null);
   const [deleteTxn, setDeleteTxn] = useState<any>(null);
   const [editSplit, setEditSplit] = useState<any>(null);
   const [deleteSplit, setDeleteSplit] = useState<any>(null);
@@ -578,7 +580,7 @@ export default function Home() {
                     onDelete={() => setDeleteTxn(item)}
                     // Tap-to-view for plain transactions only. TxRowInner delegates split-backed
                     // rows to SplitRowContent, which keeps its own sheet and stays swipe-only.
-                    onClick={item.is_split ? undefined : () => setEditTxn(item)}
+                    onClick={item.is_split ? undefined : () => setViewTxn(item)}
                   >
                     <TxRowInner t={item} />
                   </SwipeRow>
@@ -599,6 +601,17 @@ export default function Home() {
           navigate(path);
         }}
       />
+
+      {/* Tap a row → read-only view. Swipe → Edit still opens the form sheet below. */}
+      {viewTxn && (
+        <TransactionViewSheet
+          txn={viewTxn}
+          open={!!viewTxn}
+          onOpenChange={(o) => {
+            if (!o) setViewTxn(null);
+          }}
+        />
+      )}
 
       {editTxn && (
         <TransactionDetailSheet

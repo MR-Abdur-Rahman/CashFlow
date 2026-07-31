@@ -39,6 +39,7 @@ import { SwipeRow } from "@/components/SwipeRow";
 import { deleteSettlement as deleteSettlementRpc } from "@/lib/deleteSettlement";
 import { EditSplitSheet } from "@/routes/home";
 import { TransactionDetailSheet } from "@/components/TransactionDetailSheet";
+import { TransactionViewSheet, type TxnRow } from "@/components/TransactionViewSheet";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import {
   AlertDialog,
@@ -405,6 +406,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
   const [drillAnchor, setDrillAnchor] = useState(new Date());
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
   const [editItem, setEditItem] = useState<any>(null);
+  const [viewItem, setViewItem] = useState<TxnRow | null>(null);
   const [deleteItem, setDeleteItem] = useState<any>(null);
   const qc = useQueryClient();
 
@@ -876,7 +878,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
                   key={item.id}
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
-                  onClick={item.is_split ? undefined : () => setEditItem(item)}
+                  onClick={item.is_split ? undefined : () => setViewItem(item)}
                 >
                   <ExpenseRow t={item} />
                 </SwipeRow>
@@ -899,7 +901,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
                   key={item.id}
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
-                  onClick={item.is_split ? undefined : () => setEditItem(item)}
+                  onClick={item.is_split ? undefined : () => setViewItem(item)}
                 >
                   <IncomeRow t={item} />
                 </SwipeRow>
@@ -930,6 +932,16 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       </div>
 
       {/* Edit sheets */}
+      {viewItem && (viewItem._type === "exp" || viewItem._type === "inc") && (
+        <TransactionViewSheet
+          txn={viewItem}
+          open={!!viewItem}
+          onOpenChange={(o) => {
+            if (!o) setViewItem(null);
+          }}
+        />
+      )}
+
       {editItem && (editItem._type === "exp" || editItem._type === "inc") && (
         <TransactionDetailSheet
           txn={editItem}
