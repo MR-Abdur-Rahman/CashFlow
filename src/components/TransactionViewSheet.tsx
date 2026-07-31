@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, ExternalLink, MapPin, X } from "lucide-react";
-import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, ExternalLink, MapPin } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AccountIcon } from "@/components/AccountIcon";
 import { peopleQuery } from "@/lib/queries";
 import { formatDateTime, formatMoney } from "@/lib/format";
@@ -10,8 +15,9 @@ import { listAttachments, mapsUrl, type SavedAttachment } from "@/lib/attachment
 // Read-only detail view for a plain transaction, opened by TAPPING a row. The swipe → Edit action
 // still opens TransactionDetailSheet (the form); this one has no inputs, no mutation and no save.
 //
-// Shares TransactionDetailSheet's shell exactly (bottom sheet, bg-card, rounded-t-3xl, X top-right)
-// so the two read as the same surface in two modes.
+// Deliberately a CENTERED DIALOG, not a bottom sheet — matching DeleteAccountDialog — so a glance
+// is visibly a different kind of surface from the editable sheet rather than an identical-looking
+// panel you might start typing into. TransactionDetailSheet stays a bottom Sheet.
 //
 // Degrades by page: reports.tsx selects transactions with a narrower join (no account icon fields,
 // no sub-category icon) than transactionsQuery, so icons simply fall back rather than break.
@@ -82,27 +88,17 @@ export function TransactionViewSheet({
     : null;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="bg-card border-border rounded-t-3xl p-0 h-[80dvh] flex flex-col"
-      >
-        <SheetTitle className="sr-only">Transaction details</SheetTitle>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* Same shell as DeleteAccountDialog: max-w-xs on the shared DialogContent, which supplies the
+          rounded-2xl card, bg-background, the bg-black/80 overlay and the top-right X. Unlike
+          SheetContent, DialogContent injects that close button itself — so there is none here.
+          grid-rows keeps the title fixed while only the body scrolls, so the X can't scroll away. */}
+      <DialogContent className="max-w-xs max-h-[85dvh] grid-rows-[auto_minmax(0,1fr)]">
+        {/* Radix warns without a description; the fields below are the description. */}
+        <DialogDescription className="sr-only">Transaction details</DialogDescription>
+        <DialogTitle className="capitalize pr-8">{txn.type}</DialogTitle>
 
-        <div className="px-5 pt-5 pb-3 border-b border-border flex items-center justify-between gap-3">
-          <span className="capitalize text-base font-semibold">{txn.type}</span>
-          <SheetClose asChild>
-            <button
-              type="button"
-              aria-label="Close"
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground active:bg-secondary/60"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </SheetClose>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="overflow-y-auto">
           {/* Amount — colour-coded by type, matching the list rows */}
           <div className="flex flex-col items-center py-3">
             <div
@@ -203,8 +199,8 @@ export function TransactionViewSheet({
             )}
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
