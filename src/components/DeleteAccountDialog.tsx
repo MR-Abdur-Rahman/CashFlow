@@ -6,6 +6,7 @@ import { Eye, EyeOff, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { sendPasswordReset } from "@/lib/passwordReset";
+import { removeAccount } from "@/lib/accountStore";
 
 // Same show/hide password input used by ChangePasswordDialog.
 function PwInput({
@@ -106,7 +107,12 @@ export function DeleteAccountDialog({
         setErr(msg);
         return;
       }
-      await supabase.auth.signOut();
+      // The Edge Function already ran admin.deleteUser, which destroys the auth user and every
+      // session it had anywhere — so there is nothing left for a global signOut to revoke, and
+      // asking for one is a pointless (likely failing) round-trip. This call is local cleanup only.
+      await supabase.auth.signOut({ scope: "local" });
+      // Drop the remembered record too, or a deleted profile would linger in Switch Account forever.
+      await removeAccount(userId);
       onOpenChange(false);
       navigate("/auth");
     } catch (e: any) {

@@ -133,7 +133,11 @@ export default function SettingsPage() {
   async function signOut() {
     await qc.cancelQueries();
     qc.clear();
-    await supabase.auth.signOut();
+    // scope: "local" — the default is "global", which revokes the user's sessions on EVERY device.
+    // That would also invalidate the refresh token remembered for this account (and any other
+    // session they have elsewhere), so signing out here would break switching back to it.
+    // The remembered record is deliberately kept: staying switchable after sign-out is the point.
+    await supabase.auth.signOut({ scope: "local" });
     navigate("/auth");
   }
 

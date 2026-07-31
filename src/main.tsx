@@ -8,8 +8,13 @@ import { Toaster } from "sonner";
 import "./index.css";
 import App from "./App.tsx";
 import { SwipeProvider } from "./components/SwipeRow";
+import { initAccountSync } from "./lib/accountSync";
 
 const queryClient = new QueryClient();
+
+// Remember every account that signs in, and keep the active one's stored tokens current.
+// Registered here (not inside a component) so it runs once and can't be torn down by a remount.
+initAccountSync();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
