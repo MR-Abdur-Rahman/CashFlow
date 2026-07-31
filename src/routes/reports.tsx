@@ -28,6 +28,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, ArrowLeft, Users } from "lucide
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/UserAvatar";
 import { splitRowAvatar } from "@/lib/people";
+import { createdAtSortKey } from "@/lib/settlement";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
@@ -687,7 +688,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
       }
     } else if (isExpensePerson) {
       (drillSettlements as any[]).forEach((s) =>
-        items.push({ ...s, _type: "set-exp", _sort: s.created_at ?? "" }),
+        items.push({ ...s, _type: "set-exp", _sort: createdAtSortKey(s.created_at) }),
       );
     } else if (isIncomeSource) {
       (incTxns as any[]).forEach((t) =>
@@ -698,7 +699,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
         items.push({ ...t, _type: "inc", _sort: `${t.date}T${t.time ?? "00:00"}` }),
       );
       (drillSettlements as any[]).forEach((s) =>
-        items.push({ ...s, _type: "set-inc", _sort: s.created_at ?? "" }),
+        items.push({ ...s, _type: "set-inc", _sort: createdAtSortKey(s.created_at) }),
       );
     }
     return items.sort((a, b) => b._sort.localeCompare(a._sort));

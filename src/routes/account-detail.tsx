@@ -43,7 +43,12 @@ import { TransactionDetailSheet } from "@/components/TransactionDetailSheet";
 import { TransactionViewSheet, type TxnRow } from "@/components/TransactionViewSheet";
 import { SettlementEditSheet } from "@/components/SettlementEditSheet";
 import { SettlementRow } from "@/components/SettlementRow";
-import { settlementDirection, shareRemaining } from "@/lib/settlement";
+import {
+  settlementDirection,
+  shareRemaining,
+  dateTimeSortKey,
+  createdAtSortKey,
+} from "@/lib/settlement";
 import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { format } from "date-fns";
 import {
@@ -148,12 +153,12 @@ export default function AccountDetail() {
       .map((t) => ({
         ...t,
         _itemType: "txn" as const,
-        _sortKey: (t.created_at ?? `${t.date}T${t.time ?? "00:00"}`) as string,
+        _sortKey: dateTimeSortKey(t.date, t.time),
       }));
     const splitItems = (splits as any[]).map((s) => ({
       ...s,
       _itemType: "split" as const,
-      _sortKey: s.created_at ?? `${s.date}T${s.time ?? "00:00"}`,
+      _sortKey: dateTimeSortKey(s.date, s.time),
     }));
     const settlementItems = (settlements as any[]).map((s) => {
       const { iPaid, otherName, otherAvatar } = settlementDirection(s, userId, undefined, vis);
@@ -161,7 +166,7 @@ export default function AccountDetail() {
       return {
         ...s,
         _itemType: "settlement" as const,
-        _sortKey: (s.created_at ?? "") as string,
+        _sortKey: createdAtSortKey(s.created_at),
         _iPaid: iPaid,
         _otherName: otherName,
         _otherAvatar: otherAvatar,
@@ -171,6 +176,7 @@ export default function AccountDetail() {
           settlementNetAfter(netSplits, netSettlements, s, netMeId, netMyPids) ?? undefined,
       };
     });
+    // date DESC + time DESC (the values the user set), NOT created_at.
     return [...txnItems, ...splitItems, ...settlementItems].sort((a, b) =>
       b._sortKey.localeCompare(a._sortKey),
     );

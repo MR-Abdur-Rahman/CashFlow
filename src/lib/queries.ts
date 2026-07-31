@@ -222,7 +222,8 @@ export const incomingSplitsQuery = () =>
         )
         .in("id", splitIds)
         .neq("created_by", u.user.id)
-        .order("date", { ascending: false });
+        .order("date", { ascending: false })
+        .order("time", { ascending: false });
       if (e3) throw e3;
 
       // Step 4: tag each split with incoming flag and current user's person_id
@@ -443,7 +444,8 @@ export const groupSplitsQuery = (groupId: string) =>
         .from("splits")
         .select("*, split_shares(*), settlements(*), groups:group_id(name), people:person_id(name)")
         .eq("group_id", groupId)
-        .order("date", { ascending: false });
+        .order("date", { ascending: false })
+        .order("time", { ascending: false });
       if (error) throw error;
       return data;
     },

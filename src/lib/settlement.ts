@@ -1,5 +1,22 @@
 // Shared settlement row helpers (kept out of the component file so React Fast Refresh stays happy).
+import { format } from "date-fns";
 import { contactDisplay, type ContactVis } from "./people";
+
+// ─── Activity-feed sort keys ────────────────────────────────────────────────
+// Mixed feeds (transactions + splits + settlements) must order by the date/time the USER set,
+// not by `created_at` (the DB insertion timestamp). Transactions and splits carry local
+// wall-clock `date` + `time` columns; settlements have neither — only `created_at`
+// (timestamptz, UTC). Rendering that into a LOCAL wall-clock string puts both kinds on the same
+// scale, so one lexicographic compare interleaves them correctly. Comparing a UTC `created_at`
+// string against a local `date`+`time` string skews by the UTC offset (5h30m in IST).
+
+/** Sort key for rows with user-set `date` + `time` columns (transactions, splits). */
+export const dateTimeSortKey = (date?: string | null, time?: string | null) =>
+  `${date ?? "1970-01-01"}T${String(time ?? "00:00:00").slice(0, 8)}`;
+
+/** Sort key for rows that only have `created_at` (settlements), as a LOCAL wall-clock string. */
+export const createdAtSortKey = (createdAt?: string | null) =>
+  createdAt ? format(new Date(createdAt), "yyyy-MM-dd'T'HH:mm:ss") : "";
 
 // Maps a settlement's payment `method` to the account `type` that can receive/send it.
 // Used to filter account dropdowns (SettleUpDialog + the Pending-tab settlement row) so a
