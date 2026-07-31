@@ -49,11 +49,26 @@ Deno.serve(async (req: Request) => {
   const service = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
   // Purge the user's storage objects (not covered by the DB cascade). Best-effort per bucket.
-  for (const bucket of ["avatars", "feedback"]) {
+  // Everything is keyed under `${callerId}/…`, but some buckets nest a further level — avatars keeps
+  // people/ and groups/ sub-folders, transaction-attachments keys by transaction id — and storage
+  // `list` is not recursive: it returns those sub-folders as entries with a null id, whose paths are
+  // not removable. So descend one level and collect the real objects.
+  for (const bucket of ["avatars", "feedback", "transaction-attachments"]) {
     try {
-      const { data: files } = await service.storage.from(bucket).list(callerId);
-      if (files && files.length) {
-        await service.storage.from(bucket).remove(files.map((f) => `${callerId}/${f.name}`));
+      const paths: string[] = [];
+      const { data: top } = await service.storage.from(bucket).list(callerId);
+      for (const entry of top ?? []) {
+        if (entry.id === null) {
+          const { data: nested } = await service.storage.from(bucket).list(`${callerId}/${entry.name}`);
+          for (const f of nested ?? []) {
+            if (f.id !== null) paths.push(`${callerId}/${entry.name}/${f.name}`);
+          }
+        } else {
+          paths.push(`${callerId}/${entry.name}`);
+        }
+      }
+      if (paths.length) {
+        await service.storage.from(bucket).remove(paths);
       }
     } catch (_e) {
       // ignore — storage cleanup shouldn't block account deletion
