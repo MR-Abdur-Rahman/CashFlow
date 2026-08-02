@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { transactionsQuery, peopleQuery } from "@/lib/queries";
 import { formatMoney } from "@/lib/format";
 import { purgeAttachmentsFor } from "@/lib/attachments";
-import { useState, useMemo } from "react";
+import { useState, useMemo, type Dispatch, type SetStateAction } from "react";
 import {
   PieChart,
   Pie,
@@ -402,9 +402,24 @@ function PeriodNav({
 }
 
 // ─── Drill Page ───────────────────────────────────────────────────────────────
-function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => void }) {
-  const [drillPeriod, setDrillPeriod] = useState<Period>("monthly");
-  const [drillAnchor, setDrillAnchor] = useState(new Date());
+// Period + anchor are OWNED BY THE PARENT, not local state: drilling into a slice must land on the
+// same range the chart was showing, and changing the range here carries back out so the two
+// selectors can never disagree.
+function DrillPage({
+  drillItem,
+  onBack,
+  drillPeriod,
+  drillAnchor,
+  setDrillPeriod,
+  setDrillAnchor,
+}: {
+  drillItem: DrillItem;
+  onBack: () => void;
+  drillPeriod: Period;
+  drillAnchor: Date;
+  setDrillPeriod: Dispatch<SetStateAction<Period>>;
+  setDrillAnchor: Dispatch<SetStateAction<Date>>;
+}) {
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
   const [editItem, setEditItem] = useState<any>(null);
   const [viewItem, setViewItem] = useState<TxnRow | null>(null);
@@ -1041,7 +1056,7 @@ function DrillPage({ drillItem, onBack }: { drillItem: DrillItem; onBack: () => 
 
 // ─── Main Reports Page ────────────────────────────────────────────────────────
 export default function ReportsPage() {
-  const [period, setPeriod] = useState<Period>("monthly");
+  const [period, setPeriod] = useState<Period>("weekly");
   const [anchor, setAnchor] = useState(new Date());
   const [tab, setTab] = useState<"income" | "expense">("expense");
   const [drillItem, setDrillItem] = useState<DrillItem | null>(null);
@@ -1193,6 +1208,10 @@ export default function ReportsPage() {
           onBack={() => {
             setDrillItem(null);
           }}
+          drillPeriod={period}
+          drillAnchor={anchor}
+          setDrillPeriod={setPeriod}
+          setDrillAnchor={setAnchor}
         />
       </div>
     );
