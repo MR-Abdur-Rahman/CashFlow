@@ -7,7 +7,6 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AccountIcon } from "@/components/AccountIcon";
 import { peopleQuery } from "@/lib/queries";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { listAttachments, mapsUrl, type SavedAttachment } from "@/lib/attachments";
@@ -19,8 +18,8 @@ import { listAttachments, mapsUrl, type SavedAttachment } from "@/lib/attachment
 // is visibly a different kind of surface from the editable sheet rather than an identical-looking
 // panel you might start typing into. TransactionDetailSheet stays a bottom Sheet.
 //
-// Degrades by page: reports.tsx selects transactions with a narrower join (no account icon fields,
-// no sub-category icon) than transactionsQuery, so icons simply fall back rather than break.
+// Degrades by page: reports.tsx selects transactions with a narrower join than transactionsQuery
+// (no sub-category icon), so the category emoji is simply omitted rather than breaking.
 // Transaction rows arrive from Supabase joins loosely typed, and the joined columns differ by page
 // (reports selects fewer than transactionsQuery). One alias beats spreading `any` across the four
 // call sites' state declarations.
@@ -125,23 +124,9 @@ export function TransactionViewSheet({
             )}
 
             {accountLabel && (
-              <Field label={isTransfer ? "From account" : "Account"}>
-                <span className="inline-flex items-center gap-2">
-                  <AccountIcon
-                    iconType={txn.accounts?.icon_type}
-                    iconName={txn.accounts?.icon_name}
-                    iconColor={txn.accounts?.icon_color}
-                    iconUrl={txn.accounts?.icon_url}
-                    fallback={txn.accounts?.label ?? ""}
-                    size={20}
-                    rounded="rounded-md"
-                  />
-                  {accountLabel}
-                </span>
-              </Field>
+              <Field label={isTransfer ? "From account" : "Account"}>{accountLabel}</Field>
             )}
 
-            {/* to_account is joined without icon fields, so the destination is text-only. */}
             {isTransfer && txn.to_account && (
               <Field label="To account">
                 {[txn.to_account.institution, txn.to_account.label].filter(Boolean).join(" · ")}
