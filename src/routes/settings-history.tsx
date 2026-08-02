@@ -373,6 +373,7 @@ export default function HistoryPage() {
                   onDelete={() => setDeleteTxn(item)}
                   // Row renders a split branch when t.is_split; only the plain branch is tappable.
                   onClick={item.is_split ? undefined : () => setViewTxn(item)}
+                  requireDoubleTap
                 >
                   <Row t={item} />
                 </SwipeRow>

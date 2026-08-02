@@ -17,6 +17,13 @@ let idCounter = 0;
 // swipe never reads as a tap, large enough to absorb the jitter of a finger press.
 const TAP_SLOP = 8;
 
+// Double-tap window for rows that opt into requireDoubleTap. No timer is involved: a lone tap has
+// no action to defer, so the second tap fires onClick immediately and a first tap just records
+// where and when it landed. That keeps zero latency and leaves nothing pending for a later swipe
+// to race. The distance check stops two taps at opposite ends of a tall row from pairing.
+const DOUBLE_TAP_MS = 300;
+const DOUBLE_TAP_SLOP = 28;
+
 // A tap that lands on a real control inside the row (the avatar button on split rows) belongs to
 // that control, not to the row.
 //
@@ -32,6 +39,7 @@ export function SwipeRow({
   onEdit,
   onDelete,
   onClick,
+  requireDoubleTap = false,
   className,
   canEdit = true,
   canDelete = true,
@@ -43,6 +51,10 @@ export function SwipeRow({
   onDelete?: () => void;
   // Opt-in: tapping the row body fires this. Rows that pass nothing stay swipe-only.
   onClick?: () => void;
+  // Opt-in again: require TWO taps to fire onClick. Off by default so existing consumers (the
+  // account switcher, category pickers) keep single-tap. Touch only — the keyboard path below
+  // stays single-activation, since a double keypress would be an accessibility regression.
+  requireDoubleTap?: boolean;
   className?: string;
   canEdit?: boolean;
   canDelete?: boolean;
@@ -55,6 +67,9 @@ export function SwipeRow({
   const startOffset = useRef(0);
   const travel = useRef(0);
   const rowId = useRef(`swipe-${++idCounter}`).current;
+  // Where and when this row's previous tap landed. Per-row, so a tap on one row can never pair
+  // with a tap on another.
+  const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
   const { openId, setOpenId } = useContext(SwipeContext);
 
   // Close this row if another row opens
@@ -89,7 +104,7 @@ export function SwipeRow({
     }
   }
 
-  function end(target?: EventTarget | null) {
+  function end(target?: EventTarget | null, clientX?: number, clientY?: number) {
     if (startX.current === null) return;
     startX.current = null;
 
@@ -105,7 +120,29 @@ export function SwipeRow({
 
     // Tapping an open row closes the action strip — it does not also open the detail sheet.
     if (wasOpen) return;
-    if (onClick && !hitsInteractive(target ?? null)) onClick();
+    if (!onClick || hitsInteractive(target ?? null)) return;
+
+    if (!requireDoubleTap) {
+      onClick();
+      return;
+    }
+
+    const cx = clientX ?? 0;
+    const cy = clientY ?? 0;
+    const now = Date.now();
+    const prev = lastTap.current;
+    const paired =
+      prev !== null &&
+      now - prev.t <= DOUBLE_TAP_MS &&
+      Math.hypot(cx - prev.x, cy - prev.y) <= DOUBLE_TAP_SLOP;
+
+    if (paired) {
+      lastTap.current = null;
+      onClick();
+    } else {
+      // First tap, or too slow / too far to pair — becomes the new candidate rather than firing.
+      lastTap.current = { t: now, x: cx, y: cy };
+    }
   }
 
   // Pointer left / gesture aborted: resolve the swipe but never treat it as a tap.
@@ -158,16 +195,22 @@ export function SwipeRow({
         style={{
           transform: `translateX(${x}px)`,
           transitionDuration: startX.current === null ? "180ms" : "0ms",
+          // Suppresses the browser's own double-tap-to-zoom, which would otherwise fire on the
+          // very gesture requireDoubleTap depends on. index.html sets no maximum-scale, so pinch
+          // zoom is unaffected — only the double-tap shortcut goes away.
+          touchAction: "manipulation",
         }}
         onTouchStart={(e) => begin(e.touches[0].clientX)}
         onTouchMove={(e) => move(e.touches[0].clientX)}
-        onTouchEnd={(e) => end(e.target)}
+        onTouchEnd={(e) =>
+          end(e.target, e.changedTouches[0]?.clientX, e.changedTouches[0]?.clientY)
+        }
         onTouchCancel={cancel}
         onMouseDown={(e) => begin(e.clientX)}
         onMouseMove={(e) => {
           if (startX.current !== null) move(e.clientX);
         }}
-        onMouseUp={(e) => end(e.target)}
+        onMouseUp={(e) => end(e.target, e.clientX, e.clientY)}
         onMouseLeave={cancel}
         // Keyboard parity for the tap affordance; swipe-only rows stay non-focusable.
         role={onClick ? "button" : undefined}

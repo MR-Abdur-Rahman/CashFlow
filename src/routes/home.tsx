@@ -587,6 +587,7 @@ export default function Home() {
                     // Tap-to-view for plain transactions only. TxRowInner delegates split-backed
                     // rows to SplitRowContent, which keeps its own sheet and stays swipe-only.
                     onClick={item.is_split ? undefined : () => setViewTxn(item)}
+                    requireDoubleTap
                   >
                     <TxRowInner t={item} />
                   </SwipeRow>

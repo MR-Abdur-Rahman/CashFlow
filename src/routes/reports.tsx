@@ -895,6 +895,7 @@ function DrillPage({
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
                   onClick={item.is_split ? undefined : () => setViewItem(item)}
+                  requireDoubleTap
                 >
                   <ExpenseRow t={item} />
                 </SwipeRow>
@@ -918,6 +919,7 @@ function DrillPage({
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
                   onClick={item.is_split ? undefined : () => setViewItem(item)}
+                  requireDoubleTap
                 >
                   <IncomeRow t={item} />
                 </SwipeRow>

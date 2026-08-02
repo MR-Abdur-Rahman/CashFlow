@@ -325,6 +325,7 @@ export default function AccountDetail() {
                 onEdit={() => setEditTxn(item)}
                 onDelete={() => setDeleteTxn(item)}
                 onClick={item.is_split ? undefined : () => setViewTxn(item)}
+                requireDoubleTap
               >
                 <TxRow t={item} />
               </SwipeRow>
