@@ -24,6 +24,13 @@ const TAP_SLOP = 8;
 const DOUBLE_TAP_MS = 300;
 const DOUBLE_TAP_SLOP = 28;
 
+// A tap that isn't preventDefault'd is followed by compatibility mouse events —
+// touchend → mousedown → mouseup — at the same coordinates within a few tens of ms. Both
+// touchend and mouseup call end(), so one physical tap produced TWO taps, which is enough to
+// satisfy the double-tap gate on its own. Mouse input arriving this soon after a touch is
+// therefore synthetic and ignored. Real mice are unaffected: lastTouchEnd stays 0 for them.
+const MOUSE_AFTER_TOUCH_MS = 500;
+
 // A tap that lands on a real control inside the row (the avatar button on split rows) belongs to
 // that control, not to the row.
 //
@@ -70,6 +77,9 @@ export function SwipeRow({
   // Where and when this row's previous tap landed. Per-row, so a tap on one row can never pair
   // with a tap on another.
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
+  // When this row's touch gesture last ended, so the mouse events the browser synthesises from it
+  // can be told apart from a genuine mouse.
+  const lastTouchEnd = useRef(0);
   const { openId, setOpenId } = useContext(SwipeContext);
 
   // Close this row if another row opens
@@ -79,7 +89,10 @@ export function SwipeRow({
     }
   }, [openId]);
 
-  function begin(clientX: number) {
+  function begin(clientX: number, fromMouse = false) {
+    // Bail before arming: leaving startX.current null makes the matching mouseup a no-op, so the
+    // synthetic pair can't produce a second end() call for one physical tap.
+    if (fromMouse && Date.now() - lastTouchEnd.current < MOUSE_AFTER_TOUCH_MS) return;
     startX.current = clientX;
     startOffset.current = x;
     travel.current = 0;
@@ -202,11 +215,15 @@ export function SwipeRow({
         }}
         onTouchStart={(e) => begin(e.touches[0].clientX)}
         onTouchMove={(e) => move(e.touches[0].clientX)}
-        onTouchEnd={(e) =>
-          end(e.target, e.changedTouches[0]?.clientX, e.changedTouches[0]?.clientY)
-        }
-        onTouchCancel={cancel}
-        onMouseDown={(e) => begin(e.clientX)}
+        onTouchEnd={(e) => {
+          lastTouchEnd.current = Date.now();
+          end(e.target, e.changedTouches[0]?.clientX, e.changedTouches[0]?.clientY);
+        }}
+        onTouchCancel={() => {
+          lastTouchEnd.current = Date.now();
+          cancel();
+        }}
+        onMouseDown={(e) => begin(e.clientX, true)}
         onMouseMove={(e) => {
           if (startX.current !== null) move(e.clientX);
         }}
