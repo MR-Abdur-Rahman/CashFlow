@@ -558,6 +558,10 @@ function People() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["people"] });
+      // Deleting a person cascades its person_opening_balances row, so the balance query's
+      // `openings` map must be refetched too (prefix-matches ["splits","balances"]). Mirrors
+      // what the QR-connect and group-sync paths already do.
+      qc.invalidateQueries({ queryKey: ["splits"] });
       toast.success("Deleted");
     },
     onError: (e) => toast.error(e.message),

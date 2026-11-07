@@ -71,6 +71,12 @@ export function AddPersonDialog({
       setName(edit?.name ?? initial?.name ?? "");
       setPhoneSeed(edit?.phone_number ?? initial?.phone ?? null);
       setNickname(edit?.nickname ?? "");
+      // Opening balance is per-person, so clear it on EVERY open. Without this it survives a
+      // close-without-saving: the seeding effect below bails when there is no fetched row, and in
+      // create mode the query is disabled forever — so a previous person's amount would stay in
+      // the form and be saved onto a brand-new contact as a debt nobody entered.
+      setOpenAmount("");
+      setOpenDir(null);
     }
   }, [open, edit, initial]);
 
