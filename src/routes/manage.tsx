@@ -10,6 +10,7 @@ import {
 } from "@/lib/queries";
 import { bilateralBalance } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
+import { digitsOnly, phoneCompareKey } from "@/lib/phone";
 import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { UserAvatar } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
@@ -575,12 +576,19 @@ function People() {
   // Filter by name / nickname / phone number of the user's OWN saved contacts (a local-list filter —
   // not a cross-user lookup of other people's private numbers).
   const filtered = (people as any[]).filter((p) => {
-    if (!q.trim()) return true;
-    const hay = [contactDisplay(p).name, p.name, p.nickname, p.phone_number]
+    const query = q.trim();
+    if (!query) return true;
+    const hay = [contactDisplay(p).name, p.name, p.nickname]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
-    return hay.includes(q.trim().toLowerCase());
+    if (hay.includes(query.toLowerCase())) return true;
+    // Phone matched on normalised digits so "074…", "+9474…" and "9474…" all find the same
+    // contact regardless of which format the row was stored in.
+    const queryDigits = digitsOnly(query);
+    if (!queryDigits) return false;
+    const stored = phoneCompareKey(p.phone_number);
+    return !!stored && stored.includes(queryDigits);
   });
 
   return (

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { profileQuery } from "@/lib/queries";
+import { phoneCompareKey } from "@/lib/phone";
 
 // Build the default reminder text. Direction flips with `iOwe`: when the viewer is the debtor the
 // message is a "settling up" note instead of a "you owe me" nudge. Lists every related description.
@@ -78,7 +79,10 @@ export function SendReminderDialog({
 
   // CashFlow is independent; at most one external channel is paired with it (SMS not deliverable yet).
   const doCashflow = methods.includes("cashflow") && !!person.linked_user_id;
-  const doWhatsApp = methods.includes("whatsapp") && !!person.phone_number;
+  // wa.me needs E.164 digits with no `+`. Derive them through the shared util so a legacy
+  // "+94 743303794" row (or a doubled-prefix one) yields a working link instead of a mangled one.
+  const waDigits = phoneCompareKey(person.phone_number);
+  const doWhatsApp = methods.includes("whatsapp") && !!waDigits;
   const doTelegram = methods.includes("telegram");
   const canSend = doCashflow || doWhatsApp || doTelegram;
   const unavailableHint = methods.includes("whatsapp")
@@ -91,8 +95,7 @@ export function SendReminderDialog({
     if (!canSend) return toast.error(unavailableHint);
     // Open external apps first so they stay inside the click gesture (avoids popup blocking).
     if (doWhatsApp) {
-      const phone = person.phone_number!.replace(/[^\d]/g, "");
-      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+      window.open(`https://wa.me/${waDigits}?text=${encodeURIComponent(message)}`, "_blank");
     } else if (doTelegram) {
       window.open(`https://t.me/share/url?url=${encodeURIComponent(message)}`, "_blank");
     }

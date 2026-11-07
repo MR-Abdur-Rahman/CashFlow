@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { SettingsHeader } from "@/components/SettingsRows";
+import { PhoneInput, type PhoneInputValue } from "@/components/PhoneInput";
 import {
   usernameAvailable,
   usernameFormatError,
@@ -48,7 +49,10 @@ export default function AccountEditPage() {
   const { data: profile } = useQuery(profileQuery(userId));
   const { data: myPhone } = useQuery(myPhoneQuery());
   const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
+  // `phoneSeed` feeds PhoneInput (it parses legacy or E.164 itself); `phone` is the canonical
+  // E.164 it resolves back, which is what gets saved.
+  const [phoneSeed, setPhoneSeed] = useState<string | null>(null);
+  const [phone, setPhone] = useState<PhoneInputValue>({ e164: null, valid: true });
   const [username, setUsername] = useState("");
   const [uStatus, setUStatus] = useState<
     "idle" | "checking" | "available" | "taken" | "invalid"
@@ -60,7 +64,7 @@ export default function AccountEditPage() {
     }
   }, [profile]);
   useEffect(() => {
-    if (myPhone !== undefined) setPhone(myPhone ?? "");
+    if (myPhone !== undefined) setPhoneSeed(myPhone ?? null);
   }, [myPhone]);
   const google = profile?.google_email ?? email ?? "—";
 
@@ -104,9 +108,10 @@ export default function AccountEditPage() {
       if (!userId) throw new Error("Not signed in");
       // Username first (unique, validated server-side) — aborts before other edits if taken.
       if (!usernameUnchanged) await setUsernameRpc(normUser);
+      if (!phone.valid) throw new Error("Enter a valid phone number, or clear it");
       const { error } = await supabase
         .from("profiles")
-        .update({ full_name: fullName, phone_number: phone || null })
+        .update({ full_name: fullName, phone_number: phone.e164 })
         .eq("id", userId);
       if (error) throw error;
     },
@@ -116,7 +121,14 @@ export default function AccountEditPage() {
       qc.invalidateQueries({ queryKey: ["my-phone"] });
       navigate("/settings/account");
     },
-    onError: (e) => toast.error(e.message),
+    // profiles.phone_number is UNIQUE — surface that as plain language instead of the raw
+    // Postgres error, and stay on the form so the user's input isn't lost.
+    onError: (e: any) =>
+      toast.error(
+        e?.code === "23505" || /duplicate key|unique constraint/i.test(e?.message ?? "")
+          ? "That phone number is already registered."
+          : (e?.message ?? "Could not save"),
+      ),
   });
 
   function pickPhoto(f: File) {
@@ -303,13 +315,9 @@ export default function AccountEditPage() {
           <Phone className="h-6 w-6 text-muted-foreground shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-xs text-muted-foreground">Phone number</p>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+94..."
-              className="w-full bg-transparent text-base text-foreground outline-none mt-0.5 placeholder:text-muted-foreground"
-            />
+            <div className="mt-1">
+              <PhoneInput value={phoneSeed} onChange={setPhone} optional />
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-4 px-4 py-3">
@@ -324,7 +332,7 @@ export default function AccountEditPage() {
       <Button
         className="w-full"
         onClick={() => save.mutate()}
-        disabled={save.isPending || usernameBlocked}
+        disabled={save.isPending || usernameBlocked || !phone.valid}
       >
         Save
       </Button>

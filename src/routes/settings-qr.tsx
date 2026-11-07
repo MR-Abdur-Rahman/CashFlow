@@ -7,6 +7,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { cn } from "@/lib/utils";
 import { QrScannerInline } from "@/components/QrScannerInline";
 import { SettingsHeader, Section } from "@/components/SettingsRows";
+import { qrPhoneToE164, createMutualConnection } from "@/lib/connectQr";
 
 export default function QrPage() {
   const qc = useQueryClient();
@@ -36,7 +37,9 @@ export default function QrPage() {
   }, [myPhoneData]);
 
   const fullName = profile?.full_name ?? "";
-  const phone = myPhoneData ?? "";
+  // Emit E.164 in the QR payload so scanners receive the canonical form even if our own stored
+  // value is still in the legacy space-joined format.
+  const phone = qrPhoneToE164(myPhoneData) ?? "";
 
   async function handleScannedQr(text: string) {
     let payload: any;
@@ -49,8 +52,9 @@ export default function QrPage() {
 
     const scannedName =
       typeof payload.name === "string" ? payload.name.trim().slice(0, 80) : "Friend";
-    const phoneRaw = typeof payload.phone === "string" ? payload.phone.trim() : "";
-    const scannedPhone = phoneRaw && /^\+?[0-9 ()-]{6,20}$/.test(phoneRaw) ? phoneRaw : null;
+    // Only a number that normalises to E.164 may be stored; anything else is dropped and the
+    // connection proceeds without it.
+    const scannedPhone = qrPhoneToE164(payload.phone);
     const scannedUserId = typeof payload.id === "string" ? payload.id : null;
 
     if (!scannedUserId) return toast.error("QR is missing user ID");
@@ -61,9 +65,9 @@ export default function QrPage() {
 
     const currentProfile = profileRef.current;
     const myName = currentProfile?.full_name || "Friend";
-    const myPhone = myPhoneRef.current || null;
+    const myPhone = qrPhoneToE164(myPhoneRef.current);
 
-    const { error } = await supabase.rpc("create_mutual_connection", {
+    const { error } = await createMutualConnection({
       scanner_user_id: currentUserId,
       scanner_name: myName,
       scanner_phone: myPhone,

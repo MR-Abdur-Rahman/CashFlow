@@ -13,7 +13,6 @@ import {
   Trash2,
   Loader2,
   ArrowLeft,
-  ChevronDown,
   Check,
   X,
 } from "lucide-react";
@@ -28,9 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CountryPickerSheet } from "@/components/CountryPickerSheet";
-import { COUNTRY_DIAL_CODES } from "@/lib/countries";
-import { currencyFlag } from "@/lib/format";
+import { PhoneInput, type PhoneInputValue } from "@/components/PhoneInput";
 
 // Like SplashScreen / auth.tsx, guided setup renders before PrefsApplier applies the theme, so the
 // light-theme token values are hardcoded here instead of using var(--…). Keeps it reliably light.
@@ -172,21 +169,16 @@ function ProfileStep({
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
-  // Phone (optional) — same country-code picker used elsewhere.
-  const [country, setCountry] = useState("LK");
-  const [code, setCode] = useState("+94");
-  const [number, setNumber] = useState("");
-  const [pickerOpen, setPickerOpen] = useState(false);
+  // Phone (optional). PhoneInput owns the country selector and national-number box and reports
+  // canonical E.164 back — the seed is the stored value (legacy or E.164), which PhoneInput parses
+  // into country + national itself. Never put a full stored value into the national box: doing
+  // that is what produced the "+94 +94785533115" rows.
+  const [phoneSeed, setPhoneSeed] = useState<string | null>(null);
+  const [phone, setPhone] = useState<PhoneInputValue>({ e164: null, valid: true });
   const phoneInited = useRef(false);
-  const dialItems = COUNTRY_DIAL_CODES.map((c) => ({
-    key: c.country,
-    flag: currencyFlag(c.country),
-    name: c.name,
-    trailing: c.dial,
-  }));
   useEffect(() => {
     if (!phoneInited.current && myPhone) {
-      setNumber(myPhone);
+      setPhoneSeed(myPhone);
       phoneInited.current = true;
     }
   }, [myPhone]);
@@ -279,7 +271,7 @@ function ProfileStep({
     }
   }
 
-  const canContinue = !!(name ?? "").trim() && uStatus === "available";
+  const canContinue = !!(name ?? "").trim() && uStatus === "available" && phone.valid;
 
   async function handleContinue() {
     if (!userId) return onContinue();
@@ -291,7 +283,8 @@ function ProfileStep({
 
       const updates: { avatar_url?: string; full_name: string; phone_number: string | null } = {
         full_name: (name ?? "").trim(),
-        phone_number: number.trim() ? `${code.trim()} ${number.trim()}`.trim() : null,
+        // Canonical E.164 only (null when left empty) — never a concatenated string.
+        phone_number: phone.e164,
       };
       // Persist the Google-prefill photo if it isn't on the row yet.
       if (photo && photo === googlePicture && profile && profile.avatar_url !== photo) {
@@ -303,7 +296,12 @@ function ProfileStep({
       qc.invalidateQueries({ queryKey: ["my-phone"] });
       onContinue();
     } catch (e: any) {
-      toast.error(e.message ?? "Could not save profile");
+      // profiles.phone_number is UNIQUE — say so plainly and stay on the step so nothing is lost.
+      toast.error(
+        e?.code === "23505" || /duplicate key|unique constraint/i.test(e?.message ?? "")
+          ? "That phone number is already registered."
+          : (e?.message ?? "Could not save profile"),
+      );
     } finally {
       setSaving(false);
     }
@@ -419,47 +417,18 @@ function ProfileStep({
             {uStatus === "available" && <p className="mt-1 text-xs text-income">Available.</p>}
           </div>
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              aria-label="Select country code"
-              onClick={() => setPickerOpen(true)}
-              className="setup-field flex shrink-0 items-center gap-1.5 px-3 py-3.5 text-sm"
-            >
-              <span className="text-lg leading-none">{currencyFlag(country)}</span>
-              <span>{code}</span>
-              <ChevronDown className="h-4 w-4" style={{ color: LIGHT.muted }} />
-            </button>
-            <input
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="Phone number (optional)"
-              value={number}
-              onChange={(e) => setNumber(e.target.value)}
-              className="setup-field flex-1 min-w-0 px-4 py-3.5 text-sm"
-            />
-          </div>
+          <PhoneInput
+            value={phoneSeed}
+            onChange={setPhone}
+            optional
+            placeholder="Phone number (optional)"
+            triggerClassName="setup-field px-3 py-3.5"
+            inputClassName="setup-field px-4 py-3.5"
+          />
           <p className="text-xs" style={{ color: LIGHT.muted }}>
             Your number is never shown to other users unless you turn sharing on.
           </p>
         </div>
-
-        <CountryPickerSheet
-          open={pickerOpen}
-          onOpenChange={setPickerOpen}
-          title="Choose country"
-          searchPlaceholder="Search country or code"
-          items={dialItems}
-          selectedKey={country}
-          onSelect={(iso) => {
-            const c = COUNTRY_DIAL_CODES.find((x) => x.country === iso);
-            if (c) {
-              setCountry(c.country);
-              setCode(c.dial);
-            }
-          }}
-        />
       </div>
 
       <input

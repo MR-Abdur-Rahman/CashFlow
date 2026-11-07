@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { EntityAvatarUpload } from "./EntityAvatarUpload";
+import { PhoneInput, type PhoneInputValue } from "@/components/PhoneInput";
 
 export function AddPersonDialog({
   open,
@@ -21,14 +22,19 @@ export function AddPersonDialog({
 }) {
   const qc = useQueryClient();
   const [name, setName] = useState(edit?.name ?? initial?.name ?? "");
-  const [phone, setPhone] = useState(edit?.phone_number ?? initial?.phone ?? "");
+  // Seed value for PhoneInput (it parses legacy or E.164 itself); `phone` holds the canonical
+  // E.164 the component resolves, which is what gets saved. Phone stays optional here.
+  const [phoneSeed, setPhoneSeed] = useState<string | null>(
+    edit?.phone_number ?? initial?.phone ?? null,
+  );
+  const [phone, setPhone] = useState<PhoneInputValue>({ e164: null, valid: true });
   const [nickname, setNickname] = useState(edit?.nickname ?? "");
   const isLinked = !!edit?.linked_user_id;
 
   useEffect(() => {
     if (open) {
       setName(edit?.name ?? initial?.name ?? "");
-      setPhone(edit?.phone_number ?? initial?.phone ?? "");
+      setPhoneSeed(edit?.phone_number ?? initial?.phone ?? null);
       setNickname(edit?.nickname ?? "");
     }
   }, [open, edit, initial]);
@@ -37,9 +43,11 @@ export function AddPersonDialog({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
+      // Optional: empty is fine, but a non-empty number must have validated to E.164.
+      if (!phone.valid) throw new Error("Enter a valid phone number, or leave it empty");
       const payload = {
         name,
-        phone_number: phone || null,
+        phone_number: phone.e164,
         nickname: nickname.trim() || null,
         user_id: u.user.id,
       };
@@ -56,7 +64,7 @@ export function AddPersonDialog({
       qc.invalidateQueries({ queryKey: ["people"] });
       onOpenChange(false);
       setName("");
-      setPhone("");
+      setPhoneSeed(null);
       setNickname("");
     },
     onError: (e) => toast.error(e.message),
@@ -106,14 +114,19 @@ export function AddPersonDialog({
           {!isLinked && (
             <div className="space-y-1.5">
               <Label>Phone (optional)</Label>
-              <Input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+94..."
+              <PhoneInput
+                value={phoneSeed}
+                onChange={setPhone}
+                optional
+                placeholder="Phone number (optional)"
               />
             </div>
           )}
-          <Button type="submit" className="w-full" disabled={mutation.isPending}>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={mutation.isPending || !phone.valid}
+          >
             Save
           </Button>
         </form>
