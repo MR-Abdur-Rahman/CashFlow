@@ -2,6 +2,13 @@
 
 ## Open
 
+### [P3] Split create path is non-atomic
+- `AddTransactionSheet.tsx`'s split-creation mutation does two separate client calls — `supabase.from("splits").insert(...)` then a separate `supabase.from("split_shares").insert(shares)` — not wrapped in an RPC/transaction. A failure between the two (network drop, RLS hiccup) leaves a `splits` row with no `split_shares`, and the new server-side sum/negative validation on `update_split` (migration `split_shares_amount_guards`) only protects the *edit* path — the create path still has no server-side check against the total.
+- Fix needs an atomic RPC (mirroring `update_split`) that inserts the split + shares together and validates the sum there, same as the edit path now does.
+
+### [P4] SettleUpDialog "Confirm" button doesn't visually disable for invalid amount
+- The Confirm button's `disabled` only covers `mutation.isPending || netOwed <= 0` — not `amountNum <= 0`. Submitting zero/negative/non-numeric is still safely blocked (the `onClick` guard toasts and returns before `mutate()`, and `mutationFn` re-throws too), so this is cosmetic only: the button stays visually "enabled" while the typed amount is invalid, inconsistent with the disabled-while-invalid pattern now used on Custom Split / Edit Split.
+
 ### [P3] Scheduled transactions — true OS push (buzz while app fully closed)
 - The server cron already flags due schedules and drops an in-app `scheduled_due` bell notification (migration `scheduled_due_cron`), and the client shows a live toast + home badge + confirm prompt. What's missing is OS-level push so the phone alerts while the app is fully closed.
 - Needs (external, can't be done without user setup): a Firebase/FCM project + credentials (store in Supabase Vault), the `@capacitor/push-notifications` plugin (→ native APK rebuild via the Actions workflow), a device-token table + client token registration on login, and an edge function to send FCM. The cron is structured so this is one `pg_net` call per due row (pg_net already available).

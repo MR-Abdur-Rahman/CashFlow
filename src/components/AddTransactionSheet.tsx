@@ -34,6 +34,7 @@ import { AmountInput } from "@/components/AmountInput";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { TransactionAttachments } from "@/components/TransactionAttachments";
 import { uploadPending, type Coords, type PendingAttachment } from "@/lib/attachments";
+import { validateCustomSplit, resolveCustomAmounts, sanitizeAmountInput } from "@/lib/customSplit";
 
 type Tab = "income" | "expense" | "transfer" | "split";
 
@@ -783,16 +784,15 @@ function CustomSplitSheet({
     }
   }, [open, participants]);
 
-  const assigned = Object.values(amounts).reduce((s, v) => s + (Number(v) || 0), 0);
-  const myShare = total - assigned;
-  const remaining = myShare;
+  const validation = validateCustomSplit(amounts, participants, total, true);
 
   function confirm() {
-    const result: Record<string, number> = {};
-    participants.forEach((p) => {
-      result[p.id] = Number(amounts[p.id]) || 0;
-    });
-    onConfirm(result);
+    const check = validateCustomSplit(amounts, participants, total, true);
+    if (!check.valid) {
+      toast.error(check.message ?? "Fix the custom split amounts before confirming");
+      return;
+    }
+    onConfirm(resolveCustomAmounts(amounts, participants));
     onOpenChange(false);
   }
 
@@ -825,12 +825,15 @@ function CustomSplitSheet({
             <span
               className={cn(
                 "font-mono font-semibold",
-                remaining < 0 ? "text-expense" : "text-income",
+                validation.creatorShare < 0 ? "text-expense" : "text-income",
               )}
             >
-              {formatMoney(remaining)}
+              {formatMoney(validation.creatorShare)}
             </span>
           </div>
+          {!validation.valid && validation.message && (
+            <p className="text-[11px] text-expense mt-1.5">{validation.message}</p>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto divide-y divide-border">
@@ -842,11 +845,13 @@ function CustomSplitSheet({
               <div className="flex items-center gap-1">
                 <span className="text-xs text-muted-foreground font-mono">LKR</span>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
                   placeholder="0.00"
                   value={amounts[p.id] ?? ""}
-                  onChange={(e) => setAmounts((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                  onChange={(e) =>
+                    setAmounts((prev) => ({ ...prev, [p.id]: sanitizeAmountInput(e.target.value) }))
+                  }
                   className="w-28 bg-secondary rounded-md px-2 py-1.5 text-sm text-right font-mono outline-none border border-border focus:border-primary"
                 />
               </div>
@@ -855,7 +860,11 @@ function CustomSplitSheet({
         </div>
 
         <div className="p-4 border-t border-border">
-          <Button className="w-full bg-primary text-white" onClick={confirm}>
+          <Button
+            className="w-full bg-primary text-white"
+            onClick={confirm}
+            disabled={!validation.valid}
+          >
             Confirm Split
           </Button>
         </div>
@@ -1541,6 +1550,10 @@ function SplitForm({
       // as paid_by="other" with no person_id, silently skipping the account-pending flow.
       if (whoPaid !== "me" && (target === "multi" || target === "group") && !otherPayerId) {
         throw new Error("Select who paid");
+      }
+      if (splitType === "custom" && participants.length > 0) {
+        const check = validateCustomSplit(customAmounts, participants, total, true);
+        if (!check.valid) throw new Error(check.message ?? "Fix the custom split amounts before saving");
       }
 
       // Account-pending: if someone OTHER than me paid and that payer is a linked CashFlow user,

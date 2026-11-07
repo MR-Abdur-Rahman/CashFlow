@@ -52,6 +52,11 @@ import { toast } from "sonner";
 import { notifyToast } from "@/lib/notify";
 import { canModifySplit, deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
 import {
+  validateCustomSplit,
+  resolveCustomAmounts,
+  sanitizeAmountInput,
+} from "@/lib/customSplit";
+import {
   canDeleteSettlement,
   deleteSettlement as deleteSettlementRpc,
 } from "@/lib/deleteSettlement";
@@ -1037,10 +1042,10 @@ export function EditSplitSheet({
   const [splitType, setSplitType] = useState<"equal" | "custom">(
     split.split_type === "custom" ? "custom" : "equal",
   );
-  const [customAmounts, setCustomAmounts] = useState<Record<string, number>>(() => {
-    const amounts: Record<string, number> = {};
+  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>(() => {
+    const amounts: Record<string, string> = {};
     (split.split_shares ?? []).forEach((sh: any) => {
-      if (sh.person_id) amounts[sh.person_id as string] = Number(sh.share_amount);
+      if (sh.person_id) amounts[sh.person_id as string] = String(sh.share_amount ?? "");
     });
     return amounts;
   });
@@ -1094,6 +1099,9 @@ export function EditSplitSheet({
   const total = Number(amount);
   const equalShare = participants.length > 0 ? total / (participants.length + 1) : 0;
 
+  const customSplitValidation =
+    splitType === "custom" ? validateCustomSplit(customAmounts, participants, total, true) : null;
+
   const mutation = useMutation({
     mutationFn: async () => {
       if (!total || total <= 0) throw new Error("Enter a valid amount");
@@ -1101,11 +1109,16 @@ export function EditSplitSheet({
       if (target === "group" && !groupId) throw new Error("Select a group");
       if (target !== "group" && participants.length === 0)
         throw new Error("Select at least one person");
+      if (splitType === "custom") {
+        const check = validateCustomSplit(customAmounts, participants, total, true);
+        if (!check.valid) throw new Error(check.message ?? "Fix the custom split amounts before saving");
+      }
 
+      const resolvedCustom = splitType === "custom" ? resolveCustomAmounts(customAmounts, participants) : null;
       const shares = participants.map((p) => ({
         person_id: p.id || null,
         person_name: p.name,
-        share_amount: splitType === "custom" ? (customAmounts[p.id] ?? 0) : equalShare,
+        share_amount: resolvedCustom ? (resolvedCustom[p.id] ?? 0) : equalShare,
       }));
 
       // All writes go through the update_split RPC (SECURITY DEFINER): it enforces
@@ -1288,20 +1301,44 @@ export function EditSplitSheet({
               )}
               {splitType === "custom" && participants.length > 0 && (
                 <div className="space-y-2 mt-1">
+                  <div className="rounded-xl bg-secondary/30 px-3 py-2.5">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total</span>
+                      <span className="font-mono font-semibold">{formatMoney(total)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm mt-1">
+                      <span className="text-muted-foreground">Your share</span>
+                      <span
+                        className={cn(
+                          "font-mono font-semibold",
+                          (customSplitValidation?.creatorShare ?? 0) < 0
+                            ? "text-expense"
+                            : "text-income",
+                        )}
+                      >
+                        {formatMoney(customSplitValidation?.creatorShare ?? 0)}
+                      </span>
+                    </div>
+                    {customSplitValidation && !customSplitValidation.valid && customSplitValidation.message && (
+                      <p className="text-[11px] text-expense mt-1.5">
+                        {customSplitValidation.message}
+                      </p>
+                    )}
+                  </div>
                   {participants.map((p) => (
                     <div key={p.id} className="flex items-center gap-3">
                       <span className="text-sm flex-1 truncate">{p.name}</span>
                       <div className="flex items-center gap-1 shrink-0">
                         <span className="text-xs text-muted-foreground font-mono">LKR</span>
                         <input
-                          type="number"
+                          type="text"
                           inputMode="decimal"
                           placeholder="0.00"
                           value={customAmounts[p.id] ?? ""}
                           onChange={(e) =>
                             setCustomAmounts((prev) => ({
                               ...prev,
-                              [p.id]: Number(e.target.value) || 0,
+                              [p.id]: sanitizeAmountInput(e.target.value),
                             }))
                           }
                           className="w-28 bg-secondary rounded-md px-2 py-1.5 text-sm text-right font-mono outline-none border border-border focus:border-primary"
@@ -1398,7 +1435,7 @@ export function EditSplitSheet({
               className="w-full text-white font-medium"
               style={{ background: "#78350F" }}
               onClick={() => mutation.mutate()}
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || (customSplitValidation !== null && !customSplitValidation.valid)}
             >
               {mutation.isPending ? "Saving..." : "Save changes"}
             </Button>
