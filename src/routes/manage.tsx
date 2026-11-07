@@ -11,6 +11,7 @@ import {
 import { bilateralBalance } from "@/lib/balance";
 import { contactDisplay } from "@/lib/people";
 import { digitsOnly, phoneCompareKey } from "@/lib/phone";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { useContactVisibility } from "@/hooks/useContactVisibility";
 import { UserAvatar } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
@@ -459,6 +460,7 @@ function Accounts() {
   // Single source of truth: null = closed; else the mode + target travel together so they can't desync.
   const [action, setAction] = useState<{ mode: "create" } | { mode: "edit"; item: any } | null>(null);
   const [q, setQ] = useState("");
+  const { confirm, confirmDialog } = useConfirm();
 
   const del = useMutation({
     mutationFn: async (id: string) => {
@@ -500,8 +502,15 @@ function Accounts() {
           <SwipeRow
             key={a.id}
             onEdit={() => setAction({ mode: "edit", item: a })}
-            onDelete={() => {
-              if (confirm("Delete account?")) del.mutate(a.id);
+            onDelete={async () => {
+              const ok = await confirm({
+                title: `Delete ${[a.institution, a.label].filter(Boolean).join(" · ") || "this account"}?`,
+                description:
+                  "This removes the account. Accounts with transactions can't be deleted.",
+                confirmLabel: "Delete",
+                destructive: true,
+              });
+              if (ok) del.mutate(a.id);
             }}
           >
             <Link
@@ -532,6 +541,7 @@ function Accounts() {
         onOpenChange={(o) => !o && setAction(null)}
         edit={action?.mode === "edit" ? action.item : null}
       />
+      {confirmDialog}
     </div>
   );
 }
@@ -549,6 +559,7 @@ function People() {
   // Single source of truth: null = closed; else the mode + target travel together so they can't desync.
   const [action, setAction] = useState<{ mode: "create" } | { mode: "edit"; item: any } | null>(null);
   const [addCf, setAddCf] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
   const [q, setQ] = useState("");
 
   const del = useMutation({
@@ -617,15 +628,23 @@ function People() {
             <SwipeRow
               key={p.id}
               onEdit={() => setAction({ mode: "edit", item: p })}
-              onDelete={() => {
+              onDelete={async () => {
                 // Deleting a contact with an outstanding net would silently drop the debt: their
                 // split_shares go to NULL and any opening balance cascades away. Block it on the
                 // FULL bilateral net, so splits, settlements and the opening balance are one rule.
+                // Order is unchanged: the guard runs FIRST and returns, so a blocked delete shows
+                // only its toast and never opens the dialog.
                 if (Math.abs(bal) > 0.005) {
                   toast.error(`Settle up with ${name} first.`);
                   return;
                 }
-                if (confirm("Delete person?")) del.mutate(p.id);
+                const ok = await confirm({
+                  title: `Delete ${name}?`,
+                  description: "This removes the contact. This can't be undone.",
+                  confirmLabel: "Delete",
+                  destructive: true,
+                });
+                if (ok) del.mutate(p.id);
               }}
             >
               <Link
@@ -660,6 +679,7 @@ function People() {
         edit={action?.mode === "edit" ? action.item : null}
       />
       <AddCashFlowPersonDialog open={addCf} onOpenChange={setAddCf} />
+      {confirmDialog}
     </div>
   );
 }
@@ -671,6 +691,7 @@ function Groups() {
   const qc = useQueryClient();
   // Single source of truth: null = closed; else the mode + target travel together so they can't desync.
   const [action, setAction] = useState<{ mode: "create" } | { mode: "edit"; item: any } | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   const archive = useMutation({
     mutationFn: async (id: string) => {
@@ -751,8 +772,14 @@ function Groups() {
               <SwipeRow
                 key={g.id}
                 onEdit={() => archive.mutate(g.id)}
-                onDelete={() => {
-                  if (confirm("Delete group?")) del.mutate(g.id);
+                onDelete={async () => {
+                  const ok = await confirm({
+                    title: `Delete ${g.name}?`,
+                    description: "This removes the group and its member list. This can't be undone.",
+                    confirmLabel: "Delete",
+                    destructive: true,
+                  });
+                  if (ok) del.mutate(g.id);
                 }}
               >
                 <div className="flex items-center gap-3 p-3 bg-card">
@@ -771,6 +798,7 @@ function Groups() {
         onOpenChange={(o) => !o && setAction(null)}
         edit={action?.mode === "edit" ? action.item : null}
       />
+      {confirmDialog}
     </div>
   );
 }

@@ -18,6 +18,7 @@ import { AccountIcon, PRESET_ICONS, ICON_COLORS } from "./AccountIcon";
 import { ImageCropDialog } from "./ImageCropDialog";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type Account = {
   id?: string;
@@ -54,6 +55,7 @@ export function AddAccountSheet({
   const [iconCropFile, setIconCropFile] = useState<File | null>(null);
   const [iconCropOpen, setIconCropOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => {
     if (open) {
@@ -149,7 +151,7 @@ export function AddAccountSheet({
           {edit ? "Edit account" : "Add account"}
         </SheetTitle>
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             // Editing the opening balance shifts this account's current balance by the same amount —
             // confirm the impact before saving (only when it actually changed).
@@ -159,10 +161,11 @@ export function AddAccountSheet({
               if (newOpening !== oldOpening) {
                 const oldCur = Number(edit.current_balance) || 0;
                 const newCur = oldCur + (newOpening - oldOpening);
-                const ok = window.confirm(
-                  `Change the opening balance to ${formatMoney(newOpening)}?\n\n` +
-                    `This account's current balance will change from ${formatMoney(oldCur)} to ${formatMoney(newCur)}.`,
-                );
+                const ok = await confirm({
+                  title: `Change the opening balance to ${formatMoney(newOpening)}?`,
+                  description: `This account's current balance will change from ${formatMoney(oldCur)} to ${formatMoney(newCur)}.`,
+                  confirmLabel: "Change",
+                });
                 if (!ok) return;
               }
             }
@@ -325,6 +328,7 @@ export function AddAccountSheet({
         onOpenChange={setIconCropOpen}
         onCropped={uploadIcon}
       />
+      {confirmDialog}
     </Sheet>
   );
 }

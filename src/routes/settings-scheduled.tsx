@@ -18,6 +18,7 @@ import { formatMoney } from "@/lib/format";
 import { formatTime12 } from "@/components/TimePicker";
 import { isDue, type Scheduled } from "@/lib/scheduled";
 import { cn } from "@/lib/utils";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 function typeMeta(t: string) {
   if (t === "income") return { Icon: ArrowDownLeft, color: "text-income" };
@@ -36,6 +37,7 @@ export default function ScheduledPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [edit, setEdit] = useState<Scheduled | null>(null);
   const [q, setQ] = useState("");
+  const { confirm, confirmDialog } = useConfirm();
 
   const accLabel = (id: string | null) =>
     (accounts as any[]).find((a) => a.id === id)?.label ?? "—";
@@ -62,7 +64,14 @@ export default function ScheduledPage() {
   }
 
   async function remove(s: Scheduled) {
-    if (!confirm("Delete this scheduled transaction?")) return;
+    const ok = await confirm({
+      title: "Delete this scheduled transaction?",
+      description:
+        "It stops recurring. Transactions it already posted are kept. This can't be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase.from("scheduled_transactions").delete().eq("id", s.id);
     if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["scheduled_transactions"] });
@@ -181,6 +190,7 @@ export default function ScheduledPage() {
       )}
 
       <ScheduledTransactionSheet open={sheetOpen} onOpenChange={setSheetOpen} edit={edit} />
+      {confirmDialog}
     </div>
   );
 }
