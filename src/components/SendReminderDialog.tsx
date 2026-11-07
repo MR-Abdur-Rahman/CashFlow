@@ -13,13 +13,24 @@ import { phoneCompareKey } from "@/lib/phone";
 
 // Build the default reminder text. Direction flips with `iOwe`: when the viewer is the debtor the
 // message is a "settling up" note instead of a "you owe me" nudge. Lists every related description.
-function defaultMessage(name: string, amount: number, iOwe: boolean, descriptions: string[]) {
+function defaultMessage(
+  name: string,
+  amount: number,
+  iOwe: boolean,
+  descriptions: string[],
+  openingAmount?: number,
+) {
+  // An opening balance has no split behind it, so without this line an opening-only debt would
+  // read as a bare amount with no explanation at all.
+  const openingLine = openingAmount
+    ? `\n\nOpening balance (before CashFlow): ${formatMoney(openingAmount)}`
+    : "";
   // Debtor-side note lists no split descriptions — only the creditor's reminder itemizes them.
   if (iOwe) {
-    return `Hi ${name}, just a note that I owe you ${formatMoney(amount)}. I'll settle up soon!`;
+    return `Hi ${name}, just a note that I owe you ${formatMoney(amount)}. I'll settle up soon!${openingLine}`;
   }
   const list = descriptions.length ? ` for ${descriptions.join(", ")}` : "";
-  return `Hi ${name}, friendly reminder you owe ${formatMoney(amount)}${list}. Thanks!`;
+  return `Hi ${name}, friendly reminder you owe ${formatMoney(amount)}${list}. Thanks!${openingLine}`;
 }
 
 export function SendReminderDialog({
@@ -31,6 +42,7 @@ export function SendReminderDialog({
   amount,
   iOwe = false,
   descriptions = [],
+  openingAmount,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -45,6 +57,8 @@ export function SendReminderDialog({
   amount: number;
   iOwe?: boolean;
   descriptions?: string[];
+  /** Opening-balance amount included in `amount`, so the draft can itemise it. */
+  openingAmount?: number;
 }) {
   const qc = useQueryClient();
   const [uid, setUid] = useState<string | undefined>();
@@ -59,7 +73,7 @@ export function SendReminderDialog({
 
   // Reset the draft to the direction-aware default whenever the dialog (re)opens.
   useEffect(() => {
-    if (open) setMessage(defaultMessage(person.name, amount, iOwe, descriptions));
+    if (open) setMessage(defaultMessage(person.name, amount, iOwe, descriptions, openingAmount));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 

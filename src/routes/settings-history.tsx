@@ -537,6 +537,7 @@ function HistorySettlementRow({ s, all }: { s: any; all: any[] }) {
       s,
       balanceData?.currentUserId ?? null,
       balanceData?.myPersonIds ?? [],
+      balanceData?.openings ?? {},
     ) ?? undefined;
   return (
     <SettlementRow

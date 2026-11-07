@@ -56,6 +56,7 @@ export default function GroupDetail() {
   const allSettlements = balanceData?.settlements ?? [];
   const currentUserId = balanceData?.currentUserId ?? null;
   const myPersonIds = balanceData?.myPersonIds ?? [];
+  const openings = balanceData?.openings ?? {};
   const vis = useContactVisibility();
   const [edit, setEdit] = useState(false);
   const [addSplitOpen, setAddSplitOpen] = useState(false);
@@ -126,11 +127,13 @@ export default function GroupDetail() {
           { id: contact?.id, linked_user_id: uid },
           currentUserId,
           myPersonIds,
+          undefined,
+          openings,
         ),
       });
     }
     return out;
-  }, [group, myContacts, allSplits, allSettlements, currentUserId, myPersonIds, vis]);
+  }, [group, myContacts, allSplits, allSettlements, currentUserId, myPersonIds, vis, openings]);
 
   const { from: periodFrom, to: periodTo } = useMemo(
     () => getPeriodRange(period, anchor),

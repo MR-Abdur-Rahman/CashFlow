@@ -360,6 +360,41 @@ export type Database = {
           },
         ]
       }
+      person_opening_balances: {
+        Row: {
+          amount: number
+          created_at: string
+          direction: string
+          person_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          direction: string
+          person_id: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          direction?: string
+          person_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_opening_balances_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: true
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       phone_visibility_exceptions: {
         Row: {
           created_at: string

@@ -544,6 +544,7 @@ function People() {
   const allSettlements = balanceData?.settlements ?? [];
   const meId = balanceData?.currentUserId ?? null;
   const myPids = balanceData?.myPersonIds ?? [];
+  const openings = balanceData?.openings ?? {};
   const qc = useQueryClient();
   // Single source of truth: null = closed; else the mode + target travel together so they can't desync.
   const [action, setAction] = useState<{ mode: "create" } | { mode: "edit"; item: any } | null>(null);
@@ -598,13 +599,28 @@ function People() {
           </p>
         )}
         {filtered.map((p) => {
-          const bal = bilateralBalance(allSplits, allSettlements, p, meId, myPids);
+          const bal = bilateralBalance(
+            allSplits,
+            allSettlements,
+            p,
+            meId,
+            myPids,
+            undefined,
+            openings,
+          );
           const { name, avatarUrl } = contactDisplay(p, vis);
           return (
             <SwipeRow
               key={p.id}
               onEdit={() => setAction({ mode: "edit", item: p })}
               onDelete={() => {
+                // Deleting a contact with an outstanding net would silently drop the debt: their
+                // split_shares go to NULL and any opening balance cascades away. Block it on the
+                // FULL bilateral net, so splits, settlements and the opening balance are one rule.
+                if (Math.abs(bal) > 0.005) {
+                  toast.error(`Settle up with ${name} first.`);
+                  return;
+                }
                 if (confirm("Delete person?")) del.mutate(p.id);
               }}
             >

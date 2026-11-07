@@ -225,6 +225,7 @@ export default function Home() {
   const netSettlements = balanceData?.settlements ?? [];
   const netMeId = balanceData?.currentUserId ?? null;
   const netMyPids = balanceData?.myPersonIds ?? [];
+  const netOpenings = balanceData?.openings ?? {};
 
   const { data: homeSettlements = [] } = useQuery({
     queryKey: ["settlements", "home", dateFrom, dateTo],
@@ -301,7 +302,8 @@ export default function Home() {
         _remaining: remaining,
         _fullySettled: fullySettled,
         _netAfter:
-          settlementNetAfter(netSplits, netSettlements, s, netMeId, netMyPids) ?? undefined,
+          settlementNetAfter(netSplits, netSettlements, s, netMeId, netMyPids, netOpenings) ??
+          undefined,
       };
     });
 

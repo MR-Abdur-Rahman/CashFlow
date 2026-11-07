@@ -46,6 +46,7 @@ export default function SplitPage() {
   const allSettlements = balanceData?.settlements ?? [];
   const myPersonIds = balanceData?.myPersonIds ?? [];
   const currentUserId = balanceData?.currentUserId ?? null;
+  const openings = balanceData?.openings ?? {};
   const [addPerson, setAddPerson] = useState(false);
   const [addCf, setAddCf] = useState(false);
   const [addGroup, setAddGroup] = useState(false);
@@ -64,7 +65,15 @@ export default function SplitPage() {
     setSearchParams({ tab: v }, { replace: true });
 
   function personBalance(person: any): number {
-    return bilateralBalance(allSplits, allSettlements, person, currentUserId, myPersonIds);
+    return bilateralBalance(
+      allSplits,
+      allSettlements,
+      person,
+      currentUserId,
+      myPersonIds,
+      undefined,
+      openings,
+    );
   }
 
   // Search filters — people by name/nickname, groups by name (others hidden).

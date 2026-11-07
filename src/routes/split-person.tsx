@@ -89,6 +89,9 @@ export default function PersonDetail() {
   const allSettlements = balanceData?.settlements ?? [];
   const meId = balanceData?.currentUserId ?? null;
   const myPids = balanceData?.myPersonIds ?? [];
+  const openings = balanceData?.openings ?? {};
+  // This person's own opening balance (pre-CashFlow debt), if any. Local contacts only.
+  const opening = personId ? openings[personId] : undefined;
   const [period, setPeriod] = useState<Period>("monthly");
   const [anchor, setAnchor] = useState(new Date());
   const [reminderOpen, setReminderOpen] = useState(false);
@@ -109,8 +112,10 @@ export default function PersonDetail() {
         { id: personId!, linked_user_id: person?.linked_user_id ?? null },
         meId,
         myPids,
+        undefined,
+        openings,
       ),
-    [allSplits, allSettlements, personId, person, meId, myPids],
+    [allSplits, allSettlements, personId, person, meId, myPids, openings],
   );
 
   // Descriptions of only the splits that back the NET balance's direction (they-owe-me when net is
@@ -184,12 +189,12 @@ export default function PersonDetail() {
         ...st,
         _itemType: "settlement",
         _iPaid: iPaid,
-        _netAfter: settlementNetAfter(allSplits, allSettlements, st, meId, myPids) ?? 0,
+        _netAfter: settlementNetAfter(allSplits, allSettlements, st, meId, myPids, openings) ?? 0,
         _currentUserId: meId,
       });
     }
     return out;
-  }, [allSettlements, allSplits, meId, myPids, personId, person, fromStr, toStr]);
+  }, [allSettlements, allSplits, meId, myPids, personId, person, fromStr, toStr, openings]);
 
   const combinedItems = useMemo(() => {
     const items = [
@@ -312,6 +317,37 @@ export default function PersonDetail() {
           </div>
         </div>
 
+        {/* Opening balance — a pre-CashFlow debt. Sits above the activity list and is deliberately
+            NOT styled as a split row: it has no date, so it is never hidden by the period filter
+            and can't be swiped, edited or settled as if it were a split. */}
+        {opening && (
+          <div className="rounded-2xl border border-dashed border-border bg-secondary/30 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Opening balance</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {opening.direction === "they_owe_me"
+                    ? `${personName} owed you before CashFlow`
+                    : `You owed ${personName} before CashFlow`}
+                </p>
+              </div>
+              <span
+                className={cn(
+                  "font-mono font-semibold shrink-0",
+                  opening.direction === "they_owe_me" ? "text-income" : "text-expense",
+                )}
+              >
+                {formatMoney(Number(opening.amount))}
+              </span>
+            </div>
+            {person?.linked_user_id && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                This opening balance was recorded before linking and stays on your side only.
+              </p>
+            )}
+          </div>
+        )}
+
         {combinedItems.length === 0 ? (
           <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
             {(splits as any[]).length === 0 ? "No splits yet" : "Nothing this period"}
@@ -370,6 +406,13 @@ export default function PersonDetail() {
         amount={Math.abs(balance)}
         iOwe={balance < 0}
         descriptions={splitDescriptions}
+        // Only itemise the opening balance when it runs the SAME way as the net being chased —
+        // an opposite-direction opening balance isn't part of what's being asked for.
+        openingAmount={
+          opening && (opening.direction === "they_owe_me") === (balance > 0)
+            ? Number(opening.amount)
+            : undefined
+        }
       />
 
       <AddTransactionSheet

@@ -7,6 +7,32 @@
 type SplitRow = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 type TargetRef = { id?: string | null; linked_user_id?: string | null };
 
+// A pre-CashFlow debt recorded against a local contact (person_opening_balances).
+export type OpeningBalance = { amount: number; direction: "they_owe_me" | "i_owe_them" };
+/** person_id → opening balance. Supplied by splitBalancesQuery; missing id = no opening balance. */
+export type OpeningMap = Record<string, OpeningBalance>;
+
+/**
+ * An opening balance's signed contribution, in the same convention as everything else here:
+ * + = target owes me, − = I owe target.
+ *
+ * Resolved by `target.id` rather than read off the target object, because three of the five
+ * bilateralBalance call sites pass a SYNTHETIC target (`{id, linked_user_id}` only) — Person
+ * detail, group member balances, and settlementNetAfter. Reading it from the object would make
+ * those screens silently compute 0 and disagree with the Split and Manage lists.
+ *
+ * Opening balances only exist for LOCAL contacts, so resolution by person id alone is sufficient:
+ * a target reached purely by linked_user_id can never have one.
+ */
+export function openingContribution(target: TargetRef, openings?: OpeningMap): number {
+  const id = target?.id;
+  if (!id || !openings) return 0;
+  const o = openings[id];
+  if (!o) return 0;
+  const amt = Number(o.amount) || 0;
+  return o.direction === "i_owe_them" ? -amt : amt;
+}
+
 // A two-person split: one counterparty, no group. Its single split_shares row IS the bilateral
 // amount (the other side's line), not that person's slice of a bigger bill — which is why "I paid"
 // renders as "You lent <that row>". Multi-person and group splits instead record one row per
@@ -107,11 +133,12 @@ export function splitBilateralContribution(
 }
 
 // Bilateral net "bin" balance between the current user and a target contact:
-//   net = Σ (gross bilateral split debts) − Σ (settlements between us, signed by money direction).
+//   net = opening balance + Σ (gross bilateral split debts) − Σ (settlements, signed by direction).
 // Positive = target owes me; negative = I owe target. Third-party-paid splits are skipped.
 // `settlements` is the flat list of the viewer's settlements (splitBalancesQuery.settlements), each
 // with `person:person_id(id, linked_user_id, name)`. `cutoff` (a settlement created_at) makes it a
 // "net as of" — only settlements up to and including that instant count (for the running net).
+// `openings` comes from splitBalancesQuery too, so every screen reads the same source.
 export function bilateralBalance(
   splits: any[],
   settlements: any[],
@@ -119,9 +146,14 @@ export function bilateralBalance(
   currentUserId: string | null,
   myPersonIds: string[],
   cutoff?: string,
+  openings?: OpeningMap,
 ): number {
   const targetLui = target.linked_user_id ?? null;
   let net = 0; // + = target owes me
+
+  // 0) OPENING BALANCE — a debt that predates CashFlow. Always counted, never affected by `cutoff`:
+  // it is the starting point every later split and settlement moves away from.
+  net += openingContribution(target, openings);
 
   // 1) GROSS bilateral split debts (no settlement subtraction — settlements are handled below).
   for (const s of splits) {
@@ -155,6 +187,7 @@ export function settlementNetAfter(
   settlement: any,
   currentUserId: string | null,
   myPersonIds: string[],
+  openings?: OpeningMap,
 ): number | null {
   // The counterparty relative to the current user: my contact if I recorded it, else the recorder.
   let target: { id?: string; linked_user_id?: string | null } | null = null;
@@ -174,5 +207,6 @@ export function settlementNetAfter(
     currentUserId,
     myPersonIds,
     settlement.created_at,
+    openings,
   );
 }

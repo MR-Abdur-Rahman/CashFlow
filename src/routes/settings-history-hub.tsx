@@ -25,6 +25,7 @@ export default function HistoryHubPage() {
       "sub_categories",
       "transactions",
       "people",
+      "person_opening_balances",
       "groups",
       "group_members",
       "splits",
@@ -75,6 +76,8 @@ export default function HistoryHubPage() {
         "sub_categories",
         "accounts",
         "people",
+        // After `people`: person_opening_balances.person_id has an FK to people(id).
+        "person_opening_balances",
         "groups",
         "group_members",
         "transactions",

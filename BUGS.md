@@ -2,6 +2,15 @@
 
 ## Open
 
+### [P3] Opening balance is one-sided and does not survive linking
+- A person's opening balance (`person_opening_balances`) is a private, one-sided note recorded against a LOCAL contact — the other party never agreed to it, and it is deliberately kept out of `people` so co-participants can't read it via `can_see_person_via_split`.
+- When a local contact later links (QR scan or accepted username request), `create_mutual_connection()` matches on `linked_user_id`, which is NULL on a local row — so it **inserts a brand-new linked contact** instead of merging. The opening balance stays on the old local row, which remains a separate contact. That duplicate-contact behaviour predates this feature; the opening balance just makes it more visible.
+- Person detail shows "This opening balance was recorded before linking and stays on your side only." when the row has a `linked_user_id`. A real merge flow (combining two contacts and deciding what happens to a one-sided balance) is a separate feature and is **not** implemented.
+
+### [P4] Deleting a person now requires a zero net (new behaviour)
+- `manage.tsx` previously allowed deleting any contact after a bare `confirm("Delete person?")`. It now blocks deletion when `Math.abs(bilateralBalance(...)) > 0.005` with "Settle up with &lt;name&gt; first."
+- This is intentionally stricter than before: contacts with unsettled **splits** were previously deletable (their `split_shares.person_id` is `ON DELETE SET NULL`, so the debt was silently orphaned), and an opening balance would have cascade-deleted. One rule now covers splits, settlements and opening balances. Contacts with a zero net still delete normally.
+
 ### [P3] Phone numbers are format-validated, not ownership-verified
 - `PhoneInput` + `lib/phone.ts` + the `*_phone_number_e164` CHECK constraints guarantee a stored number is a well-formed E.164 mobile — they prove **nothing** about whether the user actually owns that number. There is no SMS/OTP verification anywhere (auth is email + password + Google; the Phone login tab is still a deferred placeholder).
 - Don't treat `profiles.phone_number` as a verified identity — e.g. as a login factor, an account-recovery channel, or a trust signal for linking contacts. Verifying ownership needs an SMS provider, which is on hold.

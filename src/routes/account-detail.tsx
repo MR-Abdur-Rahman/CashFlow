@@ -102,6 +102,7 @@ export default function AccountDetail() {
   const netSettlements = balanceData?.settlements ?? [];
   const netMeId = balanceData?.currentUserId ?? null;
   const netMyPids = balanceData?.myPersonIds ?? [];
+  const netOpenings = balanceData?.openings ?? {};
 
   const { data: splits = [] } = useQuery({
     queryKey: ["splits", "account", accountId, dateFrom, dateTo],
@@ -173,7 +174,8 @@ export default function AccountDetail() {
         _remaining: remaining,
         _fullySettled: fullySettled,
         _netAfter:
-          settlementNetAfter(netSplits, netSettlements, s, netMeId, netMyPids) ?? undefined,
+          settlementNetAfter(netSplits, netSettlements, s, netMeId, netMyPids, netOpenings) ??
+          undefined,
       };
     });
     // date DESC + time DESC (the values the user set), NOT created_at.

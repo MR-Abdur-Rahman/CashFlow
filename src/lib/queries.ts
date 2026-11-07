@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { OpeningMap } from "@/lib/balance";
 
 export const accountsQuery = () =>
   queryOptions({
@@ -379,6 +380,7 @@ export const splitBalancesQuery = () =>
           settlements: [] as any[],
           myPersonIds: [] as string[],
           currentUserId: null as string | null,
+          openings: {} as OpeningMap,
         };
       const currentUserId = u.user.id;
 
@@ -432,7 +434,22 @@ export const splitBalancesQuery = () =>
         .from("settlements")
         .select("*, person:person_id(id, linked_user_id, name)");
 
-      return { splits, settlements: settlements ?? [], myPersonIds, currentUserId };
+      // Opening balances (pre-CashFlow debts on local contacts). Returned as a person_id → value
+      // map so every bilateralBalance call site reads one shared source and no screen can disagree
+      // — three of those call sites pass a synthetic target and cannot carry it on the object.
+      // RLS limits this to the viewer's own rows.
+      const { data: openingRows } = await supabase
+        .from("person_opening_balances")
+        .select("person_id, amount, direction");
+      const openings: OpeningMap = {};
+      for (const row of (openingRows ?? []) as any[]) {
+        openings[row.person_id] = {
+          amount: Number(row.amount) || 0,
+          direction: row.direction,
+        };
+      }
+
+      return { splits, settlements: settlements ?? [], myPersonIds, currentUserId, openings };
     },
   });
 
