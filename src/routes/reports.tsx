@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SwipeRow } from "@/components/SwipeRow";
 import { deleteSettlement as deleteSettlementRpc } from "@/lib/deleteSettlement";
+import { deleteSplit as runSplitDelete } from "@/lib/deleteSplit";
 import { EditSplitSheet } from "@/routes/home";
 import { TransactionDetailSheet } from "@/components/TransactionDetailSheet";
 import { TransactionViewSheet, type TxnRow } from "@/components/TransactionViewSheet";
@@ -1029,13 +1030,17 @@ function DrillPage({
                     qc.invalidateQueries({ queryKey: ["drill"] });
                   }
                 } else if (item._type === "split") {
-                  ({ error } = await supabase.from("splits").delete().eq("id", item.id));
-                  if (!error) {
-                    qc.invalidateQueries({ queryKey: ["splits"] });
-                    qc.invalidateQueries({ queryKey: ["transactions"] });
-                    qc.invalidateQueries({ queryKey: ["accounts"] });
-                    qc.invalidateQueries({ queryKey: ["drill"] });
-                  }
+                  // Routed through the delete_split RPC, like every other page. A raw
+                  // splits.delete() here skipped all of the RPC's server-side work: the
+                  // creator-or-payer permission check (splits_delete RLS is created_by-only, so a
+                  // payer deleting an incoming split matched 0 rows and still reported success),
+                  // the "settlements exist" guard (settlements.split_id CASCADEs, so they were
+                  // silently destroyed), and the balance restore — transactions.split_id is SET
+                  // NULL, not CASCADE, so the linked expense survived and the account stayed
+                  // deducted. It also shows its own toast, so return before the generic one.
+                  await runSplitDelete(item.id, qc);
+                  qc.invalidateQueries({ queryKey: ["drill"] });
+                  return;
                 } else if (item._type === "set-inc") {
                   // Routed through the delete_settlement RPC (permission + balance triggers +
                   // notifications). It shows its own toast, so return before the generic one.
