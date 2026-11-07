@@ -104,6 +104,7 @@ function Categories({
   const [q, setQ] = useState("");
   // Which type's categories are shown. Defaults to expense (the common case).
   const [catType, setCatType] = useState<"expense" | "income">("expense");
+  const { confirm, confirmDialog } = useConfirm();
 
   const del = useMutation({
     mutationFn: async (id: string) => {
@@ -162,7 +163,19 @@ function Categories({
           <SwipeRow
             key={c.id}
             onEdit={() => setAction({ mode: "edit", cat: c })}
-            onDelete={() => del.mutate(c.id)}
+            // Nothing blocks this: every FK pointing at a category is ON DELETE SET NULL, and
+            // sub_categories CASCADE — so the delete always succeeds and the description says
+            // what it actually costs rather than warning about a failure that can't happen.
+            onDelete={async () => {
+              const ok = await confirm({
+                title: `Delete ${c.name}?`,
+                description:
+                  "Its sub-categories go too. Transactions keep their amounts but become uncategorised.",
+                confirmLabel: "Delete",
+                destructive: true,
+              });
+              if (ok) del.mutate(c.id);
+            }}
           >
             <button
               type="button"
@@ -188,6 +201,7 @@ function Categories({
         edit={action?.mode === "edit" ? action.cat : null}
         defaultType={catType}
       />
+      {confirmDialog}
     </div>
   );
 }
@@ -205,6 +219,7 @@ function SubCategoryPage({
   // Single source of truth for the sub-category dialog: null = closed, otherwise the mode AND its
   // target travel together in one value, so "which mode" and "which sub-category" can never disagree.
   const [action, setAction] = useState<{ mode: "create" } | { mode: "edit"; sub: any } | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   const del = useMutation({
     mutationFn: async (id: string) => {
@@ -250,7 +265,16 @@ function SubCategoryPage({
           <SwipeRow
             key={s.id}
             onEdit={() => setAction({ mode: "edit", sub: s })}
-            onDelete={() => del.mutate(s.id)}
+            // Also unblockable: transactions/splits referencing a sub-category are SET NULL.
+            onDelete={async () => {
+              const ok = await confirm({
+                title: `Delete ${s.name}?`,
+                description: "Transactions using it stay, but lose this sub-category.",
+                confirmLabel: "Delete",
+                destructive: true,
+              });
+              if (ok) del.mutate(s.id);
+            }}
           >
             <div className="flex items-center gap-3 p-3 bg-card">
               <span className="text-lg w-7 text-center">{s.icon ?? "📦"}</span>
@@ -270,6 +294,7 @@ function SubCategoryPage({
         categoryId={cat.id}
         edit={action?.mode === "edit" ? action.sub : null}
       />
+      {confirmDialog}
     </div>
   );
 }
