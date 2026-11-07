@@ -10,6 +10,7 @@ import {
   type PendingAttachment,
   type SavedAttachment,
 } from "@/lib/attachments";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type Props = {
   // Files chosen but not yet uploaded (uploaded after the transaction insert returns an id).
@@ -52,6 +53,7 @@ export function TransactionAttachments({
   children,
 }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   function removePending(a: PendingAttachment) {
     revokePreview(a);
@@ -59,6 +61,16 @@ export function TransactionAttachments({
   }
 
   async function removeSaved(a: SavedAttachment) {
+    // Confirm FIRST: this deletes the storage object as well as the row, so there is nothing to
+    // undo. Cancelling must leave the chip exactly as it was, hence the optimistic drop below
+    // only happens after the user agrees.
+    const ok = await confirm({
+      title: "Remove this attachment?",
+      description: "The file will be deleted and can't be recovered.",
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) return;
     // Optimistic: drop the chip immediately, the row+object deletion follows.
     onSavedChange?.(saved.filter((s) => s.id !== a.id));
     await removeAttachment(a.id, a.filePath);
@@ -142,6 +154,7 @@ export function TransactionAttachments({
         onAttach={(a) => onPendingChange([...pending, a])}
         onLocation={onLocationChange}
       />
+      {confirmDialog}
     </div>
   );
 }
