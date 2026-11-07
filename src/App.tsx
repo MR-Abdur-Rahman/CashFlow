@@ -56,9 +56,11 @@ import { supabase } from "./integrations/supabase/client";
 import { profileQuery } from "@/lib/queries";
 import { syncGoogleEmail } from "@/lib/googleAuth";
 
-// The add-transaction FAB lives on every main tab (Home / Accounts / Split / Reports / Manage /
-// Settings), not detail pages. Kept here so a single sheet instance is shared across tabs.
-const FAB_TABS = ["/home", "/accounts", "/split", "/reports", "/manage", "/settings"];
+// The add-transaction FAB lives on every main tab (Home / Accounts / Split / Reports / Settings),
+// not detail pages. Kept here so a single sheet instance is shared across tabs.
+// /manage is deliberately excluded: that page's own header "+" adds a category, and the
+// add-transaction FAB both overlapped the last list row and meant two different "+" on one screen.
+const FAB_TABS = ["/home", "/accounts", "/split", "/reports", "/settings"];
 
 function GlobalFab() {
   const { pathname } = useLocation();

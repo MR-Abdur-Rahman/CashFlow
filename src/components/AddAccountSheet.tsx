@@ -171,15 +171,38 @@ export function AddAccountSheet({
           className="flex flex-col flex-1 min-h-0"
         >
           <div className="flex-1 overflow-y-auto p-5 space-y-4">
-            <div className="flex justify-center">
-              <AccountIcon
-                iconType={a.icon_type}
-                iconName={a.icon_name}
-                iconColor={a.icon_color}
-                iconUrl={a.icon_url}
-                size={64}
-              />
+            {/* Preview icon + Opening balance share one row. min-w-0 on the right column (and on the
+                Input's wrapper) is what stops the 64px icon from pushing the row wider than the
+                sheet at 360px. */}
+            <div className="flex items-center gap-4">
+              <div className="shrink-0">
+                <AccountIcon
+                  iconType={a.icon_type}
+                  iconName={a.icon_name}
+                  iconColor={a.icon_color}
+                  iconUrl={a.icon_url}
+                  size={64}
+                />
+              </div>
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <Label htmlFor="opening-balance">Opening balance</Label>
+                <Input
+                  id="opening-balance"
+                  inputMode="decimal"
+                  className="w-full"
+                  value={String(a.opening_balance)}
+                  onChange={(e) =>
+                    setA((s) => ({ ...s, opening_balance: e.target.value.replace(/[^\d.-]/g, "") }))
+                  }
+                />
+              </div>
             </div>
+            {edit && (
+              <p className="text-xs text-muted-foreground">
+                The starting balance when this account was created. Editing it adjusts the current
+                balance by the same amount.
+              </p>
+            )}
 
             {/* Upload an image / select an icon — [+] uploads, rest are presets */}
             <div className="space-y-2">
@@ -261,7 +284,7 @@ export function AddAccountSheet({
                 required
                 value={a.label}
                 onChange={(e) => setA((s) => ({ ...s, label: e.target.value }))}
-                placeholder="e.g. HSBC"
+                placeholder="e.g. Savings"
               />
             </div>
 
@@ -270,7 +293,7 @@ export function AddAccountSheet({
               <Input
                 value={a.institution ?? ""}
                 onChange={(e) => setA((s) => ({ ...s, institution: e.target.value }))}
-                placeholder="e.g. Saving account / Current Account"
+                placeholder="e.g. HSBC"
               />
             </div>
 
@@ -288,22 +311,6 @@ export function AddAccountSheet({
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Opening balance</Label>
-              <Input
-                inputMode="decimal"
-                value={String(a.opening_balance)}
-                onChange={(e) =>
-                  setA((s) => ({ ...s, opening_balance: e.target.value.replace(/[^\d.-]/g, "") }))
-                }
-              />
-              {edit && (
-                <p className="text-xs text-muted-foreground">
-                  The starting balance when this account was created. Editing it adjusts the current
-                  balance by the same amount.
-                </p>
-              )}
-            </div>
           </div>
           <div className="p-4 border-t border-border">
             <Button type="submit" className="w-full" disabled={mutation.isPending}>

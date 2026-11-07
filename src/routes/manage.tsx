@@ -101,6 +101,8 @@ function Categories({
   // travel together in one value, so "which mode" and "which category" can never disagree.
   const [action, setAction] = useState<{ mode: "create" } | { mode: "edit"; cat: any } | null>(null);
   const [q, setQ] = useState("");
+  // Which type's categories are shown. Defaults to expense (the common case).
+  const [catType, setCatType] = useState<"expense" | "income">("expense");
 
   const del = useMutation({
     mutationFn: async (id: string) => {
@@ -124,11 +126,10 @@ function Categories({
   );
   const match = (c: any) =>
     !term || c.name.toLowerCase().includes(term) || catIdsWithSubMatch.has(c.id);
-  const expenseCats = (cats as any[]).filter(
-    (c) => (c.type === "expense" || c.type === "both") && match(c),
-  );
-  const incomeCats = (cats as any[]).filter(
-    (c) => (c.type === "income" || c.type === "both") && match(c),
+  // A "both"-typed category belongs to whichever toggle is active, so it shows in BOTH tabs —
+  // same rule the two stacked lists used before.
+  const visibleCats = (cats as any[]).filter(
+    (c) => (c.type === catType || c.type === "both") && match(c),
   );
 
   return (
@@ -140,67 +141,51 @@ function Categories({
         onAdd={() => setAction({ mode: "create" })}
       />
 
-      {/* Expense categories */}
-      <div>
-        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">Expense</p>
-        <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
-          {expenseCats.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-6">No expense categories</p>
-          )}
-          {expenseCats.map((c: any) => (
-            <SwipeRow
-              key={c.id}
-              onEdit={() => setAction({ mode: "edit", cat: c })}
-              onDelete={() => del.mutate(c.id)}
-            >
-              <button
-                type="button"
-                onClick={() => onSelectCat({ id: c.id, name: c.name, icon: c.icon ?? "📦" })}
-                className="w-full flex items-center gap-3 p-3 bg-card active:bg-secondary/40 text-left"
-              >
-                <span className="text-lg w-7 text-center">{c.icon ?? "📦"}</span>
-                <span className="flex-1 text-sm truncate">{c.name}</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-              </button>
-            </SwipeRow>
-          ))}
-        </div>
-      </div>
+      {/* Expense | Income toggle. Uses the same Tabs primitives as the Manage page's top tabs, so
+          the pill styling stays in one place — only TabsList/TabsTrigger are used here (the list
+          below is rendered directly rather than in a TabsContent panel). */}
+      <Tabs value={catType} onValueChange={(v) => setCatType(v as "expense" | "income")}>
+        <TabsList className="grid grid-cols-2 w-full">
+          <TabsTrigger value="expense">Expense</TabsTrigger>
+          <TabsTrigger value="income">Income</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      {/* Income categories */}
-      <div>
-        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2 px-1">Income</p>
-        <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
-          {incomeCats.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-6">No income categories</p>
-          )}
-          {incomeCats.map((c: any) => (
-            <SwipeRow
-              key={c.id}
-              onEdit={() => setAction({ mode: "edit", cat: c })}
-              onDelete={() => del.mutate(c.id)}
+      <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-sm">
+        {visibleCats.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-6">
+            No {catType} categories
+          </p>
+        )}
+        {visibleCats.map((c: any) => (
+          <SwipeRow
+            key={c.id}
+            onEdit={() => setAction({ mode: "edit", cat: c })}
+            onDelete={() => del.mutate(c.id)}
+          >
+            <button
+              type="button"
+              onClick={() => onSelectCat({ id: c.id, name: c.name, icon: c.icon ?? "📦" })}
+              className="w-full flex items-center gap-3 p-3 bg-card active:bg-secondary/40 text-left"
             >
-              <button
-                type="button"
-                onClick={() => onSelectCat({ id: c.id, name: c.name, icon: c.icon ?? "📦" })}
-                className="w-full flex items-center gap-3 p-3 bg-card active:bg-secondary/40 text-left"
-              >
-                <span className="text-lg w-7 text-center">{c.icon ?? "📦"}</span>
-                <span className="flex-1 text-sm truncate">{c.name}</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-              </button>
-            </SwipeRow>
-          ))}
-        </div>
+              <span className="text-lg w-7 text-center">{c.icon ?? "📦"}</span>
+              <span className="flex-1 text-sm truncate">{c.name}</span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            </button>
+          </SwipeRow>
+        ))}
       </div>
 
       {/* Keyed by the exact target so switching categories, flipping create↔edit, or reopening after
-          a close (via "idle") always remounts the dialog fresh — the key change replaces every reset. */}
+          a close (via "idle") always remounts the dialog fresh — the key change replaces every reset.
+          The active toggle is in the create key too, so reopening after switching type re-seeds the
+          form's default type. */}
       <CategoryDialog
-        key={action ? (action.mode === "edit" ? `edit-${action.cat.id}` : "create") : "idle"}
+        key={action ? (action.mode === "edit" ? `edit-${action.cat.id}` : `create-${catType}`) : "idle"}
         open={!!action}
         onClose={() => setAction(null)}
         edit={action?.mode === "edit" ? action.cat : null}
+        defaultType={catType}
       />
     </div>
   );
@@ -378,6 +363,7 @@ function CategoryDialog({
   open,
   onClose,
   edit,
+  defaultType = "expense",
 }: {
   open: boolean;
   onClose: () => void;
@@ -385,11 +371,14 @@ function CategoryDialog({
   // this target changes, so name/icon/type are seeded once from `edit` at mount and never need manual
   // resetting — no stale values, no flash, no mode/target desync.
   edit: { id: string; name: string; icon: string | null; type: string } | null;
+  // Seeds the type in create mode from the caller's active Expense/Income toggle. Still editable
+  // in the form; ignored when editing (the category's own type wins).
+  defaultType?: string;
 }) {
   const qc = useQueryClient();
   const [name, setName] = useState(edit?.name ?? "");
   const [icon, setIcon] = useState(edit?.icon ?? "📦");
-  const [type, setType] = useState<string>(edit?.type ?? "expense");
+  const [type, setType] = useState<string>(edit?.type ?? defaultType);
 
   const m = useMutation({
     mutationFn: async () => {
