@@ -2,6 +2,14 @@
 
 ## Open
 
+### [P3] Phone numbers are format-validated, not ownership-verified
+- `PhoneInput` + `lib/phone.ts` + the `*_phone_number_e164` CHECK constraints guarantee a stored number is a well-formed E.164 mobile — they prove **nothing** about whether the user actually owns that number. There is no SMS/OTP verification anywhere (auth is email + password + Google; the Phone login tab is still a deferred placeholder).
+- Don't treat `profiles.phone_number` as a verified identity — e.g. as a login factor, an account-recovery channel, or a trust signal for linking contacts. Verifying ownership needs an SMS provider, which is on hold.
+
+### [P4] PhoneInput pulls libphonenumber-js into the main bundle (~42KB gzip)
+- Adding `libphonenumber-js/mobile` took the main chunk from 531.92 KB to 574.17 KB gzipped (+42.25 KB, ~8%). The `mobile` metadata build is deliberate: the smaller `min` build wrongly accepts landline-shaped input like `123456789` as a valid LK number, so it can't enforce "9-digit mobile starting with 7".
+- Phone entry only happens on three screens (setup, account edit, add person), so `PhoneInput` is a good candidate for `React.lazy` + a dynamic `import()` of the util. Not urgent — noting it so the cost is traceable if bundle size is revisited.
+
 ### [P3] Split create path is non-atomic
 - `AddTransactionSheet.tsx`'s split-creation mutation does two separate client calls — `supabase.from("splits").insert(...)` then a separate `supabase.from("split_shares").insert(shares)` — not wrapped in an RPC/transaction. A failure between the two (network drop, RLS hiccup) leaves a `splits` row with no `split_shares`, and the new server-side sum/negative validation on `update_split` (migration `split_shares_amount_guards`) only protects the *edit* path — the create path still has no server-side check against the total.
 - Fix needs an atomic RPC (mirroring `update_split`) that inserts the split + shares together and validates the sum there, same as the edit path now does.
